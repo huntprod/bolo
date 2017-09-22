@@ -1,0 +1,7 @@
+Notes
+=====
+
+To test the SHA512 and HMAC-SHA512 implementation:
+
+    CPPFLAGS=-DTEST make sha && ./sha
+
