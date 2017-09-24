@@ -3,7 +3,12 @@
 
 #include "compiler.h"
 #include <sys/types.h>
+#include <string.h>
 #include <stdint.h>
+
+/*******************************************************  common utilities  ***/
+
+void bail(const char *msg);
 
 /**************************************************************  debugging  ***/
 
@@ -11,6 +16,9 @@ int  debugto(int fd);
 void debugf(const char *fmt, ...);
 
 /****************************************************************  SHA-512  ***/
+
+#define SHA512_DIGEST   64
+#define SHA512_BLOCK   128
 
 struct sha512 {
 	uint64_t state[8];
@@ -40,8 +48,12 @@ int hmac_sha512_raw(struct hmac_sha512 *c, void *hmac, size_t len) RETURNS;
 int hmac_sha512_hex(struct hmac_sha512 *c, void *hmac, size_t len) RETURNS;
 
 void hmac_sha512_seal (const char *key, size_t klen, const void *buf, size_t len);
-int  hmac_sha512_check(const char *key, size_t klen, const void *buf, size_t len)
-RETURNS;
+int  hmac_sha512_check(const char *key, size_t klen, const void *buf, size_t len) RETURNS;
+#define hmac_seal  hmac_sha512_seal
+#define hmac_check hmac_sha512_check
+
+#define FIXME_DEFAULT_KEY "bolo-fixed-secret-FIXME"
+#define FIXME_DEFAULT_KEY_LEN strlen(FIXME_DEFAULT_KEY)
 
 /********************************************************************  time ***/
 
@@ -61,26 +73,139 @@ bolo_msec_t
 bolo_s(const struct timeval *tv)
 RETURNS;
 
-/********************************************************************  TSDB ***/
+/***********************************************************  bit twiddling ***/
 
-struct bolo_tsdb;
+#define MAX_U8  0xff
+#define MAX_U16 0xffff
+#define MAX_U32 0xffffffff
+#define MAX_U64 0xffffffffffffffff
 
-struct bolo_tsdb *
-bolo_tsdb_create(const char *path)
-RETURNS;
+#define read8(b,o)   (*(uint8_t  *)((const uint8_t*)(b)+(o)))
+#define read16(b,o)  (*(uint16_t *)((const uint8_t*)(b)+(o)))
+#define read32(b,o)  (*(uint32_t *)((const uint8_t*)(b)+(o)))
+#define read64(b,o)  (*(uint64_t *)((const uint8_t*)(b)+(o)))
+#define read64f(b,o) (*(double   *)((const uint8_t*)(b)+(o)))
 
-int
-bolo_tsdb_close(struct bolo_tsdb *db)
-RETURNS;
+static inline void  write8 (void *b, size_t o, uint8_t  v) { memmove((uint8_t *)b+o, &v, 1); }
+static inline void write16 (void *b, size_t o, uint16_t v) { memmove((uint8_t *)b+o, &v, 2); }
+static inline void write32 (void *b, size_t o, uint32_t v) { memmove((uint8_t *)b+o, &v, 4); }
+static inline void write64 (void *b, size_t o, uint64_t v) { memmove((uint8_t *)b+o, &v, 8); }
+static inline void write64f(void *b, size_t o, double   v) { memmove((uint8_t *)b+o, &v, 8); }
 
-int
-bolo_tsdb_log(struct bolo_tsdb *db,
-              bolo_msec_t ts,
-              bolo_value_t value)
-RETURNS;
+static inline void writen(void *b, size_t o, const void *x, size_t l)
+{ memmove((uint8_t *)b+o, x, l); }
 
-int
-bolo_tsdb_commit(struct bolo_tsdb *db)
-RETURNS;
+/***********************************************************  mmap'd paging ***/
+
+struct page {
+	int     fd;
+	void   *data;
+	size_t  len;
+};
+
+
+int page_map  (struct page *p, int fd, off_t start, size_t len) RETURNS;
+int page_unmap(struct page *p) RETURNS;
+int page_sync (struct page *p) RETURNS;
+
+uint8_t  page_read8  (struct page *p, size_t o);
+uint16_t page_read16 (struct page *p, size_t o);
+uint32_t page_read32 (struct page *p, size_t o);
+uint64_t page_read64 (struct page *p, size_t o);
+double   page_read64f(struct page *p, size_t o);
+
+void page_write8  (struct page *p, size_t o, uint8_t  v);
+void page_write16 (struct page *p, size_t o, uint16_t v);
+void page_write32 (struct page *p, size_t o, uint32_t v);
+void page_write64 (struct page *p, size_t o, uint64_t v);
+void page_write64f(struct page *p, size_t o, double   v);
+
+void page_writen(struct page *p, size_t o, const void *buf, size_t len);
+
+/***************************************************************  database  ***/
+
+/* a SLAB file can be up to 8g in size
+   (plus a single page for the header) */
+#define TSLAB_MAX_SIZE    (1 << 30)
+#define TSLAB_HEADER_SIZE 88
+
+/* a SLAB endian-check magic number, to be
+   read/written as a 32-bit unsigned integer.
+
+   translates into BE as [hex 7e d1 32 4c]
+               and LE as [hex 4c 32 d1 7e] */
+#define TSLAB_ENDIAN_MAGIC 2127639116U
+
+/* a BLOCK in a SLAB is exactly 512k
+   with a 24b header and an HMAC-SHA512
+   footer, leaving 524,176b for data */
+#define TBLOCK_SIZE         (1 << 19)
+#define TBLOCK_HEADER_SIZE  24
+#define TBLOCK_DATA_SIZE    (TBLOCK_SIZE - TBLOCK_HEADER_SIZE - SHA512_DIGEST)
+
+/* each CELL has a 4b relative timestamp
+   (ms), and an 8b IEEE-754 float64 value */
+#define TCELL_SIZE       12
+
+#define TBLOCKS_PER_TSLAB (TSLAB_MAX_SIZE  / TBLOCK_SIZE)
+#define TCELLS_PER_TBLOCK (TBLOCK_DATA_SIZE / TCELL_SIZE)
+
+/********************************************************  database blocks  ***/
+
+struct tblock {
+	int valid;         /* is this block real? */
+	int cells;         /* how many cells are in use? */
+	bolo_msec_t base;  /* base timestamp (ms) for this block */
+
+	uint64_t number;   /* composite slab / block number,
+	                      where bits 0-53 are the slab number
+	                      and bits 54-63 are the block number */
+
+	struct page page;  /* backing data page */
+};
+
+#define tblock_read8(  b,o) page_read8  (&(b)->page, (o))
+#define tblock_read16( b,o) page_read16 (&(b)->page, (o))
+#define tblock_read32( b,o) page_read32 (&(b)->page, (o))
+#define tblock_read64( b,o) page_read64 (&(b)->page, (o))
+#define tblock_read64f(b,o) page_read64f(&(b)->page, (o))
+
+#define tblock_write8(  b,o,v) page_write8  (&(b)->page, (o), (v))
+#define tblock_write16( b,o,v) page_write16 (&(b)->page, (o), (v))
+#define tblock_write32( b,o,v) page_write32 (&(b)->page, (o), (v))
+#define tblock_write64( b,o,v) page_write64 (&(b)->page, (o), (v))
+#define tblock_write64f(b,o,v) page_write64f(&(b)->page, (o), (v))
+
+int tblock_map(struct tblock *b, int fd, off_t offset, size_t len) RETURNS;
+void tblock_init(struct tblock *b, uint64_t number, bolo_msec_t base);
+int tblock_isfull(struct tblock *b) RETURNS;
+int tblock_canhold(struct tblock *b, bolo_msec_t when) RETURNS;
+int tblock_log(struct tblock *b, bolo_msec_t when, double what) RETURNS;
+#define tblock_unmap(b) page_unmap(&(b)->page)
+#define tblock_sync(b)  page_sync(&(b)->page)
+
+#define tblock_seal( k,l,b) hmac_seal ((k),(l),(b)->page.data,(b)->page.len)
+#define tblock_check(k,l,b) hmac_check((k),(l),(b)->page.data,(b)->page.len)
+
+/*********************************************************  database slabs  ***/
+
+struct tslab {
+	int fd;                  /* file descriptor of the slab file */
+	uint32_t block_size;     /* how big is each data block page? */
+	uint64_t number;         /* slab number, with the least significant
+	                            11-bits cleared. */
+
+	struct tblock                 /* list of all blocks in this slab.    */
+	  blocks[TBLOCKS_PER_TSLAB];  /* present blocks will have .valid = 1 */
+};
+
+int tslab_map(struct tslab *s, int fd) RETURNS;
+int tslab_unmap(struct tslab *s) RETURNS;
+int tslab_sync(struct tslab *s) RETURNS;
+int tslab_init(struct tslab *s, int fd, uint64_t number, uint32_t block_size) RETURNS;
+int tslab_isfull(struct tslab *s) RETURNS;
+int tslab_extend(struct tslab *s, bolo_msec_t base);
+
+int FIXME_log(struct tslab *s, bolo_msec_t when, double what) RETURNS;
 
 #endif

@@ -1,8 +1,11 @@
 CFLAGS += -Wall -Wextra -Wpedantic -Wunused -Wunused-result -Wno-unused-parameter
 
-all: main
+all: main bolo
 
-main: main.o debug.o tsdb.o sha.o time.o
+bolo: bolo.o debug.o sha.o time.o util.o page.o tblock.o tslab.o
+	$(CC) -o $@ $+
+
+main: main.o debug.o sha.o time.o util.o page.o tblock.o tslab.o
 	$(CC) -o $@ $+
 
 clean:
@@ -12,9 +15,11 @@ clean:
 
 test: check
 check:
+	$(CC) -DTEST -o bits bits.c
 	$(CC) -DTEST -o sha  sha.c
 	$(CC) -DTEST -o time time.c
 	@echo "------------------------"
+	@./bits
 	@./sha
 	@./time
 	@echo "------------------------"

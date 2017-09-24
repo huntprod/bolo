@@ -1,5 +1,4 @@
 #include "bolo.h"
-
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,249 +8,218 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/mman.h>
-
-#define BOLO_TSDB_HDR_SIZE    4 * 1024
-#define BOLO_TSDB_BLK_SIZE  512 * 1024
+#include <errno.h>
 
 /* hex 7e d1 32 4c */
 #define ENDIAN_CHECK 2127639116U
 
+#define BOLO_TSDB_HDR_SIZE    4 * 1024
+#define BOLO_TSDB_BLK_SIZE  512 * 1024
+
 struct bolo_tsdb {
 	int fd;
-	void *ptr;
-	size_t mlen;
+	struct tsdb_slab *slab;
 };
 
-static void
-bail(const char *msg)
-{
-	fprintf(stderr, "%s\n", msg);
-	exit(2);
-}
+struct tsdb_slab {
+	int fd;                  /* file descriptor of the slab file */
+	uint32_t block_size;     /* how big is each data block page? */
+	uint64_t number;         /* slab number, with the least significant
+	                            11-bits cleared. */
 
+	struct tblock                 /* list of all blocks in this slab.    */
+	  blocks[TBLOCKS_PER_TSLAB];  /* present blocks will have .valid = 1 */
+};
+
+CATALOG
 static int
-s_extend(struct bolo_tsdb *db, size_t n)
+s_scan_slab(struct tsdb_slab *slab, int fd)
 {
-	int rc;
-	off_t pos, size;
+	assert(slab != NULL);
+	assert(fd >= 0);
 
-	assert(db != NULL);
-	assert(n != 0);
+	char header[TSLAB_HEADER_SIZE];
+	ssize_t nread;
+	uint32_t endian_check;
 
-	if (db->ptr) {
-		rc = munmap(db->ptr, db->mlen);
-		if (rc != 0) return rc;
-	}
-
-	pos = lseek(db->fd, 0, SEEK_END);
-	if (pos < 0)
-		return -1;
-	debugf("tsdb %p is currently at seek offset %ld\n", db, pos);
-
-	debugf("tsdb %p extending by %ld bytes to offset %ld\n", db, n, pos + n);
-	if (lseek(db->fd, n - 1, SEEK_CUR) < 0)
-		goto fail;
-
-	if (write(db->fd, "\0", 1) != 1)
-		goto fail;
-	size = lseek(db->fd, 0, SEEK_CUR);
-	if (size < 0)
+	nread = read(fd, header, TSLAB_HEADER_SIZE);
+	if (nread < 0) /* read error! */
 		return -1;
 
-	lseek(db->fd, pos, SEEK_SET);
-	debugf("tsdb %p is %ld bytes long\n", db, size);
-	assert(size > 0);
-
-	db->mlen = size;
-	db->ptr = mmap(
-		NULL,                   /* let kernel choose address */
-		db->mlen,             /* map the whole file        */
-		PROT_READ|PROT_WRITE,   /* allow reads and writes    */
-		MAP_SHARED,             /* contents visible on-disk  */
-		db->fd,               /* the file descriptor...    */
-		0                       /* from the start of file    */
-	);
-	if (db->ptr == MAP_FAILED) {
-		db->ptr = NULL;
+	if (nread != TSLAB_HEADER_SIZE) /* short read! */
 		return -1;
-	}
 
-	if (bolo_tsdb_commit(db) != 0)
+	errno = EINVAL;
+	if (memcmp(header, "SLABv1", 6) != 0) /* not a slab! */
 		return -1;
+
+	/* check the HMAC */
+	if (hmac_check(FIXME_DEFAULT_KEY, FIXME_DEFAULT_KEY_LEN, header, TSLAB_HEADER_SIZE) != 0)
+		return -1;
+
+	/* check host endianness vs file endianness */
+	endian_check = read32(header, 8);
+	if (endian_check != ENDIAN_CHECK)
+		return -1;
+
+	slab->fd         = fd;
+	slab->block_size = (1 << read8(header, 6));
+	slab->number     = read64(header, 16);
+
+	/* scan blocks! */
 
 	return 0;
+}
+
+CATALOG
+static int
+s_close_slab(struct tsdb_slab *slab)
+{
+	int i, ok;
+
+	assert(slab != NULL);
+
+	ok = 0;
+	for (i = 0; i < TBLOCKS_PER_TSLAB; i++) {
+		if (!slab->blocks[i].valid)
+			break;
+
+		slab->blocks[i].valid = 0;
+		if (tblock_unmap(&slab->blocks[i]) != 0)
+			ok = -1;
+	}
+
+	close(slab->fd);
+	return ok;
+}
+
+CATALOG
+static int
+s_sync_slab(struct tsdb_slab *slab)
+{
+	int i, ok;
+
+	assert(slab != NULL);
+
+	ok = 0;
+	for (i = 0; i < TBLOCKS_PER_TSLAB; i++) {
+		if (!slab->blocks[i].valid)
+			break;
+
+		if (tblock_sync(&slab->blocks[i]) != 0)
+			ok = -1;
+	}
+
+	return ok;
+}
+
+CATALOG
+static struct tsdb_slab *
+s_new_slab(const char *path, uint64_t number, int block_size_exp)
+{
+	struct tsdb_slab *slab;
+	int fd;
+	char header[TSLAB_HEADER_SIZE];
+	size_t nwrit;
+
+	assert(path != NULL);
+	assert(block_size_exp == 19);
+
+	fd = open(path, O_RDWR|O_CREAT, 0666);
+	if (fd < 0)
+		return NULL;
+
+	memset(header, 0, sizeof(header));
+	memcpy(header, "SLABv1", 6);
+	write8(header,   6, block_size_exp);
+	write32(header,  8, ENDIAN_CHECK);
+	write64(header, 16, number);
+	hmac_seal(FIXME_DEFAULT_KEY, FIXME_DEFAULT_KEY_LEN, header, sizeof(header));
+
+	slab = calloc(1, sizeof(*slab));
+	if (!slab)
+		bail("memory allocation failed");
+
+	nwrit = write(fd, header, sizeof(header));
+	if (nwrit != sizeof(header))
+		goto fail;
+
+	/* align to a page boundary */
+	lseek(fd, sysconf(_SC_PAGESIZE) - 1, SEEK_SET);
+	if (write(fd, "\0", 1) != 1)
+		goto fail;
+
+	slab->fd         = fd;
+	slab->block_size = (1 << block_size_exp);
+	slab->number     = number;
+	return slab;
 
 fail:
-	lseek(db->fd, pos, SEEK_SET);
+	free(slab);
+	close(fd);
+	return NULL;
+}
+
+CATALOG
+static int
+s_slab_isfull(struct tsdb_slab *slab)
+{
+	int i;
+
+	assert(slab != NULL);
+
+	for (i = 0; i < TBLOCKS_PER_TSLAB; i++)
+		if (!slab->blocks[i].valid)
+			return 0; /* this block is avail; slab is not full */
+
+	return 1; /* no blocks avail; slab is full */
+}
+
+CATALOG
+static int
+s_add_block(struct tsdb_slab *slab, bolo_msec_t base)
+{
+	int i;
+	off_t start;
+	size_t len;
+
+	assert(slab != NULL);
+
+	/* seek to the end of the fd, so we can extend it */
+	if (lseek(slab->fd, 0, SEEK_END) < 0)
+		return -1;
+
+	/* find the first available (!valid) block */
+	for (i = 0; i < TBLOCKS_PER_TSLAB; i++) {
+		if (slab->blocks[i].valid)
+			continue;
+
+		len   = slab->block_size;
+		start = sysconf(_SC_PAGESIZE) + i * len;
+		assert(len == (1 << 19));
+
+		/* extend the file descriptor one TBLOCK's worth */
+		if (lseek(slab->fd, start + len - 1, SEEK_SET) < 0)
+			return -1;
+		if (write(slab->fd, "\0", 1) != 1)
+			return -1;
+
+		/* map the new block into memory */
+		if (tblock_map(&slab->blocks[i], slab->fd, start, len) == 0) {
+			tblock_init(&slab->blocks[i], (slab->number & ~0x7ff) | i, base);
+			return 0;
+		}
+
+		/* map failed; truncate the fd back to previous size */
+		ftruncate(slab->fd, start);
+		lseek(slab->fd, 0, SEEK_END);
+
+		/* ... and signal failure */
+		return -1;
+	}
+
+	/* this slab is full; signal failure */
 	return -1;
-}
-
-CATALOG
-static uint8_t
-s_read8(struct bolo_tsdb *db, off_t offset)
-{
-	assert(db != NULL);
-	assert(db->ptr != NULL);
-	assert(offset >= 0);
-	assert((size_t)offset < db->mlen);
-
-	return (uint8_t)(*((uint8_t *)db->ptr + offset));
-}
-
-static void
-s_write8(struct bolo_tsdb *db, off_t offset, int v)
-{
-	uint8_t u;
-
-	assert(db != NULL);
-	assert(db->ptr != NULL);
-	assert(offset >= 0);
-	assert((size_t)offset < db->mlen);
-	assert(v >= 0 && v <= 0xff);
-
-	u = v & 0xff;
-	memcpy((uint8_t *)db->ptr + offset, &u, 1);
-}
-
-CATALOG
-static uint16_t
-s_read16(struct bolo_tsdb *db, off_t offset)
-{
-	assert(db != NULL);
-	assert(db->ptr != NULL);
-	assert(offset >= 0);
-	assert((size_t)offset + 2 < db->mlen);
-
-	return (uint16_t)(*((uint8_t *)db->ptr + offset));
-}
-
-CATALOG
-static void
-s_write16(struct bolo_tsdb *db, off_t offset, int v)
-{
-	uint16_t u;
-
-	assert(db != NULL);
-	assert(db->ptr != NULL);
-	assert(offset >= 0);
-	assert((size_t)offset + 2 < db->mlen);
-	assert(v >= 0 && v <= 0xffff);
-
-	u = v & 0xffff;
-	memcpy((uint8_t *)db->ptr + offset, &u, 2);
-}
-
-CATALOG
-static uint32_t
-s_read32(struct bolo_tsdb *db, off_t offset)
-{
-	assert(db != NULL);
-	assert(db->ptr != NULL);
-	assert(offset >= 0);
-	assert((size_t)offset + 4 < db->mlen);
-
-	return (uint32_t)(*((uint8_t *)db->ptr + offset));
-}
-
-CATALOG
-static void
-s_write32(struct bolo_tsdb *db, off_t offset, unsigned int v)
-{
-	uint32_t u;
-
-	assert(db != NULL);
-	assert(db->ptr != NULL);
-	assert(offset >= 0);
-	assert((size_t)offset + 4 < db->mlen);
-
-	u = v & 0xffffffff;
-	memcpy((uint8_t *)db->ptr + offset, &u, 4);
-}
-
-CATALOG
-static uint64_t
-s_read64(struct bolo_tsdb *db, off_t offset)
-{
-	assert(db != NULL);
-	assert(db->ptr != NULL);
-	assert(offset >= 0);
-	assert((size_t)offset + 8 < db->mlen);
-
-	return (uint64_t)(*((uint8_t *)db->ptr + offset));
-}
-
-CATALOG
-static void
-s_write64(struct bolo_tsdb *db, off_t offset, uint64_t v)
-{
-	uint64_t u;
-
-	assert(db != NULL);
-	assert(db->ptr != NULL);
-	assert(offset >= 0);
-	assert((size_t)offset + 8 < db->mlen);
-
-	u = v & 0xffffffffffffffff;
-	memcpy((uint8_t *)db->ptr + offset, &u, 8);
-}
-
-CATALOG
-static double
-s_read64f(struct bolo_tsdb *db, off_t offset)
-{
-	assert(db != NULL);
-	assert(db->ptr != NULL);
-	assert(offset >= 0);
-	assert((size_t)offset + 8 < db->mlen);
-
-	return (double)(*((uint8_t *)db->ptr + offset));
-}
-
-CATALOG
-static void
-s_write64f(struct bolo_tsdb *db, off_t offset, double v)
-{
-	assert(db != NULL);
-	assert(db->ptr != NULL);
-	assert(offset >= 0);
-	assert((size_t)offset + 8 < db->mlen);
-
-	memcpy((uint8_t *)db->ptr + offset, &v, 8);
-}
-
-static void
-s_write(struct bolo_tsdb *db, off_t offset, const char *b, size_t len)
-{
-	assert(db != NULL);
-	assert(db->ptr != NULL);
-	assert(offset >= 0);
-	assert(b != NULL);
-	assert(len > 0);
-	assert((size_t)offset + len < db->mlen);
-
-	memcpy((uint8_t *)db->ptr + offset, b, len);
-}
-
-static void
-s_zero(struct bolo_tsdb *db, off_t offset, size_t len)
-{
-	assert(db != NULL);
-	assert(db->ptr != NULL);
-	assert(offset >= 0);
-	assert(len > 0);
-	assert((size_t)offset + len < db->mlen);
-
-	memset((uint8_t *)db->ptr + offset, 0, len);
-}
-
-static void
-s_hmac(struct bolo_tsdb *db)
-{
-	assert(db != NULL);
-	assert(db->ptr != NULL);
-	assert(db->mlen == 4096);
-
-	hmac_sha512_seal("BOLO SECRET KEY", 15, db->ptr, db->mlen);
 }
 
 struct bolo_tsdb *
@@ -264,41 +232,13 @@ bolo_tsdb_create(const char *path)
 	db = malloc(sizeof(struct bolo_tsdb));
 	if (!db) bail("malloc failed");
 
-	db->fd = open(path, O_CREAT|O_TRUNC|O_RDWR, 0666);
-	if (db->fd < 0)
+	db->slab = s_new_slab(path, 123450000, 19); /* FIXME */
+	if (!db->slab)
 		goto fail;
-
-	db->ptr = NULL;
-	if (s_extend(db, BOLO_TSDB_HDR_SIZE) != 0)
-		goto fail;
-
-	/*
-
-	     +--------+--------+--------+--------+--------+--------+--------+--------+
-	   0 | "BFD1"                            | ENDIANNESS                        |
-	     +--------+--------+--------+--------+--------+--------+--------+--------+
-	   8 | NUM BLOCKS                        | BSE    | (reserved)               |
-	     +--------+--------+--------+--------+--------+--------+--------+--------+
-	  16 | FILE NUMBER                                                           |
-	     +--------+--------+--------+--------+--------+--------+--------+--------+
-	   * | (pad out to 4k)                                                       |
-	     +--------+--------+--------+--------+--------+--------+--------+--------+
-
-	 */
-
-	s_write  (db,  0, "BFD1", 4);    /* MAGIC "BFD1"      */
-	s_write32(db,  4, ENDIAN_CHECK); /* ENDIANNESS        */
-	s_write32(db,  8, 0);            /* NUM BLOCKS (none) */
-	s_write8 (db, 12, 19);           /* BSE, 2^19 = 512k  */
-	s_zero   (db, 13, 3);            /* (reserved)        */
-	s_zero   (db, 16, 8);            /* FILE NUMBER FIXME */
-
-	s_hmac(db);
 
 	return db;
 
 fail:
-	if (db->fd >= 0) close(db->fd);
 	free(db);
 	return NULL;
 }
@@ -309,9 +249,9 @@ bolo_tsdb_close(struct bolo_tsdb *db)
 	int rc;
 
 	assert(db != NULL);
-	assert(db->ptr != NULL);
+	assert(db->slab != NULL);
 
-	rc = munmap(db->ptr, db->mlen);
+	rc = s_close_slab(db->slab);
 	close(db->fd);
 	return rc;
 }
@@ -319,7 +259,30 @@ bolo_tsdb_close(struct bolo_tsdb *db)
 int
 bolo_tsdb_log(struct bolo_tsdb *db, bolo_msec_t ts, bolo_value_t value)
 {
-	uint16_t n;
+	int i;
+
+	assert(db != NULL);
+	assert(db->slab != NULL);
+
+	if (s_slab_isfull(db->slab))
+		bail("slab full!");
+
+	for (i = 0; i < TBLOCKS_PER_TSLAB; i++) {
+		if (!db->slab->blocks[i].valid) {
+			if (s_add_block(db->slab, ts) != 0)
+				bail("failed to add another block");
+			break;
+		}
+
+		if (!tblock_isfull(&db->slab->blocks[i])
+		  && tblock_canhold(&db->slab->blocks[i], ts))
+			break; /* found it! */
+	}
+	assert(i < TBLOCKS_PER_TSLAB);
+
+	fprintf(stderr, "using block #%d\n", i);
+	if (tblock_log(&db->slab->blocks[i], ts, value) != 0)
+		fprintf(stderr, "warning: failed to log {%lu,%lf} in block #%d: %s\n", ts, value, i, strerror(errno));
 
 	/* START HERE:
 	   - need to mmap the file in create/open         DONE
@@ -337,11 +300,6 @@ bolo_tsdb_log(struct bolo_tsdb *db, bolo_msec_t ts, bolo_value_t value)
 	   for a certain amount of reordering before commiting to a full
 	   ordered block
 	 */
-	n = s_read16(db, 24) + 1;
-	s_write16(db, 24, n);
-	s_write64(db, 26 + n * 16,    ts);
-	s_write64f(db, 26 + n * 16 + 8, value);
-	s_hmac(db);
 	return 0;
 }
 
@@ -349,7 +307,7 @@ int
 bolo_tsdb_commit(struct bolo_tsdb *db)
 {
 	assert(db != NULL);
-	assert(db->ptr != NULL);
+	assert(db->slab != NULL);
 
-	return msync(db->ptr, db->mlen, MS_SYNC);
+	return s_sync_slab(db->slab);
 }

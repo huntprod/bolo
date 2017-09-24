@@ -73,10 +73,6 @@ static uint64_t H0[8] = {
 /* hex conversion */
 static char HEX[16] = "0123456789abcdef";
 
-/* sha-512 lengths */
-#define SHA512_DIGEST   64
-#define SHA512_BLOCK   128
-
 /* bit twiddling */
 #if BYTE_ORDER == LITTLE_ENDIAN
 #  define swap64(dst,src) do { \

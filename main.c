@@ -2,22 +2,33 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 #include "bolo.h"
 
 int main(int argc, char **argv)
 {
 	char buf[32], *end;
+	const char *path;
 	double v;
-	struct bolo_tsdb *db;
+	struct tslab slab;
+	int fd, rc;
 	bolo_msec_t now;
 
 	if (debugto(3) != 0)
 		fprintf(stderr, "note: debugging not available; re-run with `3>&2' to activate it.\n");
 
-	db = bolo_tsdb_create("bolo.db");
-	if (!db) {
-		fprintf(stderr, "failed to create bolo database: %s\n", strerror(errno));
+	path = "bolo.db";
+	fd = open(path, O_RDWR|O_CREAT|O_TRUNC, 0666);
+	if (fd < 0) {
+		fprintf(stderr, "failed to open %s: %s\n", path, strerror(errno));
+		exit(1);
+	}
+
+	rc = tslab_init(&slab, fd, 123450000, (1 << 19)); /* FIXME */
+	if (rc != 0) {
+		fprintf(stderr, "failed to map %s: %s\n", path, strerror(errno));
 		exit(1);
 	}
 
@@ -37,15 +48,16 @@ int main(int argc, char **argv)
 		now = bolo_ms(NULL);
 		if (now != INVALID_MS) {
 			fprintf(stderr, "{%lu, %lf}\n", now, v);
-			if (bolo_tsdb_log(db, now, v) != 0)
+			if (FIXME_log(&slab, now, v) != 0)
 				fprintf(stderr, "oops. log tuple failed: %s\n", strerror(errno));
-			if (bolo_tsdb_commit(db) != 0)
+			if (tslab_sync(&slab) != 0)
 				fprintf(stderr, "oops. commit failed: %s\n", strerror(errno));
 		}
 	}
 
 	fprintf(stderr, "shutting down...\n");
-	if (bolo_tsdb_close(db) != 0)
+	if (tslab_unmap(&slab) != 0)
 		fprintf(stderr, "oops. close failed: %s\n", strerror(errno));
+
 	return 0;
 }

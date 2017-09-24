@@ -1,0 +1,10 @@
+6 "SLABv1"
+1 log2(K)
+1 (resv)
+
+4 ENDIAN CANARY
+4 (reserved)
+
+8 FILE NUMBER
+
+- HMAC-SHA512 (64 octets)
