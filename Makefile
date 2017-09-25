@@ -31,4 +31,8 @@ coverage:
 	genhtml -o coverage/ lcov.info
 	rm -f lcov.info
 
+copycov: clean test coverage
+	rm -rf /vagrant/coverage/
+	cp -a coverage/ /vagrant/coverage/
+
 .PHONY: coverage
