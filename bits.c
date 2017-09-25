@@ -30,6 +30,7 @@ int main(int argc, char **argv)
 	test(16, 0x4242);
 	test(32, 0x43434343);
 	test(64, 0x4545454545454545ul);
+	test(64f, 0x4646464646464646ul);
 
 	printf("bits: ok\n");
 	return 0;
