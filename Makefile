@@ -1,5 +1,5 @@
 CFLAGS += -Wall -Wextra -Wpedantic -Wunused -Wunused-result -Wno-unused-parameter
-TEST_CFLAGS := -g -DTEST
+TEST_CFLAGS := -g -DTEST -fprofile-arcs -ftest-coverage
 
 all: main bolo
 
@@ -13,6 +13,7 @@ clean:
 	rm -f *.o
 	rm -f main
 	rm -f sha time
+	rm -f *.gcno *.gcda
 
 test: check
 check:
