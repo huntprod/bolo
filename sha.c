@@ -459,109 +459,156 @@ hmac_sha512_check(const char *key, size_t key_len, const void *buf, size_t len)
 }
 
 #ifdef TEST
+#include <ctap.h>
 #include <stdio.h>
 
-static int
-test_sha512()
-{
-	int rc;
-	char hex[2 * SHA512_DIGEST + 1];
-	const char *ans;
-	struct sha512 c;
+TESTS {
+	subtest {
+		struct sha512 c;
+		char hex[2 * SHA512_DIGEST + 1];
 
-	sha512_init(&c);
-	sha512_feed(&c, "abc", 3);
-	sha512_done(&c);
+		sha512_init(&c);
+		sha512_feed(&c, "abc", 3);
+		sha512_done(&c);
 
-	rc = sha512_hex(&c, hex, 2 * SHA512_DIGEST);
-	if (rc != 0) return rc;
+		if (sha512_hex(&c, hex, 2 * SHA512_DIGEST) != 0)
+			BAIL_OUT("sha512_hex() failed");
 
-	hex[2 * SHA512_DIGEST] = '\0';
-	ans = "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a"
-          "2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f";
-	if (strcmp(hex, ans) != 0) {
-		fprintf(stderr, "sha('abc') was %s\n"
-		                "           not %s\n", hex, ans);
-		return 1;
+		hex[2 * SHA512_DIGEST] = '\0';
+		is_string(hex, "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a"
+		               "2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f",
+		  "sha512('abc', 3)");
 	}
 
-	sha512_init(&c);
-	sha512_feed(&c, "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmn"
-	                "hijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu", 112);
-	sha512_done(&c);
+	subtest {
+		struct sha512 c;
+		char hex[2 * SHA512_DIGEST + 1];
 
-	rc = sha512_hex(&c, hex, 2 * SHA512_DIGEST);
-	if (rc != 0) return rc;
+		sha512_init(&c);
+		sha512_feed(&c, "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmn"
+		                "hijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu", 112);
+		sha512_done(&c);
 
-	hex[2 * SHA512_DIGEST] = '\0';
-	ans = "8e959b75dae313da8cf4f72814fc143f8f7779c6eb9f7fa17299aeadb6889018"
-	      "501d289e4900f7e4331b99dec4b5433ac7d329eeb6dd26545e96e55b874be909";
-	if (strcmp(hex, ans) != 0) {
-		fprintf(stderr, "sha(<112 bytes>) was %s\n"
-		                "                 not %s\n", hex, ans);
-		return 1;
+		if (sha512_hex(&c, hex, 2 * SHA512_DIGEST) != 0)
+			BAIL_OUT("sha512_hex() failed");
+
+		hex[2 * SHA512_DIGEST] = '\0';
+		is_string(hex, "8e959b75dae313da8cf4f72814fc143f8f7779c6eb9f7fa17299aeadb6889018"
+		               "501d289e4900f7e4331b99dec4b5433ac7d329eeb6dd26545e96e55b874be909",
+		  "sha512('abcd...qrstu', 112)");
 	}
 
-	printf("sha512: ok\n");
-	return 0;
-}
+	subtest {
+		struct hmac_sha512 c;
+		char key[20];
+		char hex[2 * SHA512_DIGEST + 1];
 
-static int
-test_hmac_sha512()
-{
-	int rc;
-	char hex[2 * SHA512_DIGEST + 1];
-	const char *ans;
-	struct hmac_sha512 c;
-	char key[256];
+		memset(key, 0x0b, 20);
+		hmac_sha512_init(&c, key, 20);
+		hmac_sha512_feed(&c, "Hi There", 8);
+		hmac_sha512_done(&c);
 
-	memset(key, 0x0b, 20);
-	hmac_sha512_init(&c, key, 20);
-	hmac_sha512_feed(&c, "Hi There", 8);
-	hmac_sha512_done(&c);
+		if (hmac_sha512_hex(&c, hex, 2 * SHA512_DIGEST))
+			BAIL_OUT("sha512_hex() failed");
 
-	rc = hmac_sha512_hex(&c, hex, 2 * SHA512_DIGEST);
-	if (rc != 0) return rc;
-
-	hex[2 * SHA512_DIGEST] = '\0';
-	ans = "87aa7cdea5ef619d4ff0b4241a1d6cb02379f4e2ce4ec2787ad0b30545e17cde"
-	      "daa833b7d6b8a702038b274eaea3f4e4be9d914eeb61f1702e696c203a126854";
-	if (strcmp(hex, ans) != 0) {
-		fprintf(stderr, "hmac_sha512 Test Case 1 (RFC-4231)\n"
-		                "   was %s\n"
-		                "   not %s\n", hex, ans);
-		//return 1;
+		hex[2 * SHA512_DIGEST] = '\0';
+		is_string(hex, "87aa7cdea5ef619d4ff0b4241a1d6cb02379f4e2ce4ec2787ad0b30545e17cde"
+		               "daa833b7d6b8a702038b274eaea3f4e4be9d914eeb61f1702e696c203a126854",
+		  "RFC-4231 HMAC-SHA512 Test Case 1");
 	}
 
-	hmac_sha512_init(&c, "test", 4);
-	hmac_sha512_feed(&c, "test", 4);
-	hmac_sha512_done(&c);
+	subtest {
+		struct hmac_sha512 c;
+		char hex[2 * SHA512_DIGEST + 1];
 
-	rc = hmac_sha512_hex(&c, hex, 2 * SHA512_DIGEST);
-	if (rc != 0) return rc;
+		hmac_sha512_init(&c, "Jefe", 4);
+		hmac_sha512_feed(&c, "what do ya want for nothing?", 28);
+		hmac_sha512_done(&c);
 
-	hex[2 * SHA512_DIGEST] = '\0';
-	ans = "9ba1f63365a6caf66e46348f43cdef956015bea997adeb06e69007ee3ff517df"
-	      "10fc5eb860da3d43b82c2a040c931119d2dfc6d08e253742293a868cc2d82015";
-	if (strcmp(hex, ans) != 0) {
-		fprintf(stderr, "hmac_sha512(test,test)\n"
-		                "   was %s\n"
-		                "   not %s\n", hex, ans);
-		return 1;
+		if (hmac_sha512_hex(&c, hex, 2 * SHA512_DIGEST))
+			BAIL_OUT("sha512_hex() failed");
+
+		hex[2 * SHA512_DIGEST] = '\0';
+		is_string(hex, "164b7a7bfcf819e2e395fbe73b56e0a387bd64222e831fd610270cd7ea250554"
+		               "9758bf75c05a994a6d034f65f8f0e6fdcaeab1a34d4a6b4b636e070a38bce737",
+		  "RFC-4231 HMAC-SHA512 Test Case 2");
 	}
 
-	printf("hmac-sha512: ok\n");
-	return 0;
-}
+	subtest {
+		struct hmac_sha512 c;
+		char key[20];
+		char dat[50];
+		char hex[2 * SHA512_DIGEST + 1];
 
-int main(int argc, char **argv)
-{
-	int rc;
+		memset(key, 0xaa, 20);
+		memset(dat, 0xdd, sizeof(dat));
+		hmac_sha512_init(&c, key, sizeof(key));
+		hmac_sha512_feed(&c, dat, sizeof(dat));
+		hmac_sha512_done(&c);
 
-	rc = test_sha512();
-	if (rc != 0) return rc;
+		if (hmac_sha512_hex(&c, hex, 2 * SHA512_DIGEST))
+			BAIL_OUT("sha512_hex() failed");
 
-	rc = test_hmac_sha512();
-	if (rc != 0) return rc;
+		hex[2 * SHA512_DIGEST] = '\0';
+		is_string(hex, "fa73b0089d56a284efb0f0756c890be9b1b5dbdd8ee81a3655f83e33b2279d39"
+		               "bf3e848279a722c806b485a47e67c807b946a337bee8942674278859e13292fb",
+		  "RFC-4231 HMAC-SHA512 Test Case 3");
+	}
+
+	subtest {
+		struct hmac_sha512 c;
+		char key[25];
+		char dat[50];
+		char hex[2 * SHA512_DIGEST + 1];
+		unsigned int i;
+
+		for (i = 0; i < sizeof(key); i++) key[i] = i+1;
+		memset(dat, 0xcd, sizeof(dat));
+		hmac_sha512_init(&c, key, sizeof(key));
+		hmac_sha512_feed(&c, dat, sizeof(dat));
+		hmac_sha512_done(&c);
+
+		if (hmac_sha512_hex(&c, hex, 2 * SHA512_DIGEST))
+			BAIL_OUT("sha512_hex() failed");
+
+		hex[2 * SHA512_DIGEST] = '\0';
+		is_string(hex, "b0ba465637458c6990e5a8c5f61d4af7e576d97ff94b872de76f8050361ee3db"
+		               "a91ca5c11aa25eb4d679275cc5788063a5f19741120c4f2de2adebeb10a298dd",
+		  "RFC-4231 HMAC-SHA512 Test Case 4");
+	}
+
+	subtest {
+		char box[4 + SHA512_DIGEST];
+
+		memset(box, 0, sizeof(box));
+		memcpy(box, "test", 4);
+
+		ok(hmac_sha512_check("key1", 4, box, sizeof(box)) != 0,
+			"hmac_sha512_check should fail on unsealed crypto box");
+
+		hmac_sha512_seal("key1", 4, box, sizeof(box));
+		ok(hmac_sha512_check("key1", 4, box, sizeof(box)) == 0,
+			"hmac_sha512_check should succeed on sealed crypto box");
+
+		ok(hmac_sha512_check("BAD KEY", 7, box, sizeof(box)) != 0,
+			"hmac_sha512_check should fail on sealed crypto box with incorrect key");
+
+		box[60] = box[59];
+		ok(hmac_sha512_check("key1", 4, box, sizeof(box)) != 0,
+			"hmac_sha512_check should fail on sealed crypto box that has been tampered with");
+	}
+
+	subtest {
+		char box[4 + SHA512_DIGEST];
+		char key[1024];
+
+		memset(key, 0x41, sizeof(key));
+		memset(box, 0,    sizeof(box));
+		memcpy(box, "test", 4);
+
+		hmac_sha512_seal(key, sizeof(key), box, sizeof(box));
+		ok(hmac_sha512_check(key, sizeof(key), box, sizeof(box)) == 0,
+			"hmac_sha512_seal with large keys (> SHA-512 block size) should succeed");
+	}
 }
 #endif

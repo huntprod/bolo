@@ -32,59 +32,23 @@ bolo_s(const struct timeval *tv)
 }
 
 #ifdef TEST
+#include <ctap.h>
 #include <stdio.h>
 
-int main(int argc, char **argv)
-{
-	bolo_msec_t ms, want_ms;
-	bolo_sec_t  s,  want_s;
+TESTS {
 	struct timeval tv;
 
-	tv.tv_sec = 400; tv.tv_usec = 0;
-	ms = bolo_ms(&tv); want_ms = 400000;
-	if (ms != want_ms) {
-		fprintf(stderr, "time: bolo_ms({400,0})\n"
-		                "  was %lu\n"
-		                "  not %lu\n", ms, want_ms);
-		return 1;
-	}
-	s = bolo_s(&tv); want_s = 400;
-	if (s != want_s) {
-		fprintf(stderr, "time: bolo_s({400,0})\n"
-		                "  was %u\n"
-		                "  not %u\n", s, want_s);
-		return 1;
-	}
+#define is_time(s,ms,real_ms,msg) do { \
+	tv.tv_sec = (s); tv.tv_usec = (ms) * 1000; \
+	is_unsigned(bolo_ms(&tv),(real_ms),msg ": bolo_ms()"); \
+	is_unsigned(bolo_s (&tv),(s),      msg ": bolo_s()"); \
+} while (0)
 
-	tv.tv_sec = 400, tv.tv_usec = 700 * 1000;
-	ms = bolo_ms(&tv); want_ms = 400700;
-	if (ms != want_ms) {
-		fprintf(stderr, "time: bolo_ms({400,700_000})\n"
-		                "  was %lu\n"
-		                "  not %lu\n", ms, want_ms);
-		return 1;
-	}
-	s = bolo_s(&tv); want_s = 400;
-	if (s != want_s) {
-		fprintf(stderr, "time: bolo_s({400,700_000})\n"
-		                "  was %u\n"
-		                "  not %u\n", s, want_s);
-		return 1;
-	}
+	is_time(400, 0,   400000, "400s 0ms");
+	is_time(400, 700, 400700, "400s 700ms");
 
-	ms = bolo_ms(NULL);
-	if (ms == INVALID_MS) {
-		fprintf(stderr, "time: bolo_ms(NULL) failed\n");
-		return 1;
-	}
-	s = bolo_s(NULL);
-	if (s == INVALID_S) {
-		fprintf(stderr, "time: bolo_s(NULL) failed\n");
-		return 1;
-	}
-
-	fprintf(stderr, "time: ok\n");
-	return 0;
+	ok(bolo_ms(NULL) != INVALID_MS, "bolo_ms(NULL) returns now");
+	ok(bolo_s(NULL)  != INVALID_S,  "bolo_s(NULL) returns now");
 }
 
 #endif

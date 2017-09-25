@@ -2,8 +2,10 @@
 /main
 
 /bits
+/page
 /btree
 /sha
 /time
 
 *.db
+/coverage

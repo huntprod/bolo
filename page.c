@@ -173,3 +173,51 @@ void page_writen(struct page *p, size_t offset, const void *buf, size_t len)
 
 	writen(p->data, offset, buf, len);
 }
+
+#ifdef TEST
+#include <ctap.h>
+#include <stdio.h>
+
+#define _GNU_SOURCE  /* for syscall(2) */
+#include <sys/syscall.h>
+
+TESTS {
+	int fd;
+	struct page p;
+
+	memset(&p, 0, sizeof(p));
+
+	fd = syscall(SYS_memfd_create, "test-page", 0);
+	if (fd < 0)
+		BAIL_OUT("memffd_create() failed");
+
+	lseek(fd, sysconf(_SC_PAGESIZE) - 1, SEEK_SET);
+	if (write(fd, "\0", 1) != 1)
+		BAIL_OUT("failed to extend memfd backing file");
+
+	ok(page_map(&p, fd, 0, sysconf(_SC_PAGESIZE)) == 0,
+		"page_map() should succeed");
+
+	page_write8  (&p,  0, 0x41);
+	page_write16 (&p,  1, 0x4242);
+	page_write32 (&p,  3, 0x43434343);
+	page_write64 (&p,  7, 0x4545454545454545);
+	page_write64f(&p, 15, 12345.6789);
+
+	ok(page_sync(&p)  == 0, "page_sync() should succeed");
+
+	is_unsigned(page_read8(&p, 0), 0x41,
+		"page_read8() should read what we page_wrote8()");
+	is_unsigned(page_read16(&p, 1), 0x4242,
+		"page_read16() should read what we page_wrote8()");
+	is_unsigned(page_read32(&p, 3), 0x43434343,
+		"page_read32() should read what we page_wrote32()");
+	is_unsigned(page_read64(&p, 7), 0x4545454545454545,
+		"page_read64() should read what we page_wrote64()");
+	ok(page_read64f(&p, 15) == 12345.6789,
+		"page_read64f() should read what we page_wrote64()");
+
+	ok(page_sync(&p)  == 0, "page_sync() should succeed");
+	ok(page_unmap(&p) == 0, "page_unmap() should succeed");
+}
+#endif

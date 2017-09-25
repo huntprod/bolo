@@ -1,38 +1,31 @@
 #include "bolo.h"
 
 /* to avoid compiler warnings... */
-void bits_unused() {}
+void bits_unused() {} /* LCOV_EXCL_LINE */
 /* ... this translation unit is only really
        useful if -DTEST is passed, to test
        the read* / write* macros... */
 
 #ifdef TEST
+#include <ctap.h>
 #include <stdio.h>
-int main(int argc, char **argv)
-{
+
+TESTS {
 	char buf[32];
 
-#define test(n,v) do {\
-	write##n(buf, 0, (v)); \
-	if (read##n(buf, 0) != (v)) { \
-		fprintf(stderr, "write" #n "(buf,0," #v ") != read" #n "(buf,0)\n" \
-		                "  was %ld (%02lx)\n" \
-		                "  not %ld (%02lx)\n", \
-		                (unsigned long)read##n(buf, 0), \
-		                (unsigned long)read##n(buf, 0), \
-		                (unsigned long)(v), \
-		                (unsigned long)(v)); \
-		return 0; \
-	} \
-} while (0)
+	write8(buf, 0, 0x41);
+	is_unsigned(read8(buf, 0), 0x41, "write8() / read8()");
 
-	test(8, 0x41);
-	test(16, 0x4242);
-	test(32, 0x43434343);
-	test(64, 0x4545454545454545ul);
-	test(64f, 0x4646464646464646ul);
+	write16(buf, 0, 0x4242);
+	is_unsigned(read16(buf, 0), 0x4242, "write16() / read16()");
 
-	printf("bits: ok\n");
-	return 0;
+	write32(buf, 0, 0x43434343);
+	is_unsigned(read32(buf, 0), 0x43434343, "write32() / read32()");
+
+	write64(buf, 0, 0x4545454545454545ul);
+	is_unsigned(read64(buf, 0), 0x4545454545454545ul, "write64() / read64()");
+
+	write64f(buf, 0, 12345.6789);
+	ok(read64f(buf, 0) == 12345.6789, "write64f() / read64f()");
 }
 #endif
