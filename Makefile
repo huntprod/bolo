@@ -1,4 +1,5 @@
 CFLAGS += -Wall -Wextra -Wpedantic -Wunused -Wunused-result -Wno-unused-parameter
+TEST_CFLAGS := -g -DTEST
 
 all: main bolo
 
@@ -15,11 +16,13 @@ clean:
 
 test: check
 check:
-	$(CC) -DTEST -o bits bits.c
-	$(CC) -DTEST -o sha  sha.c
-	$(CC) -DTEST -o time time.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o bits  bits.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o btree btree.c page.c util.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o sha   sha.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o time  time.c
 	@echo "------------------------"
 	@./bits
+	@./btree
 	@./sha
 	@./time
 	@echo "------------------------"

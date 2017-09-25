@@ -122,6 +122,68 @@ void page_write64f(struct page *p, size_t o, double   v);
 
 void page_writen(struct page *p, size_t o, const void *buf, size_t len);
 
+/******************************************************************  btree  ***/
+
+/* Almost all systems have 4k or 8k memory pages, a fact
+   which can be verified with sysconfig(_SC_PAGESIZE), so
+   we will make our btree pages 8k, a multiple of each.
+ */
+#define BTREE_PAGE_SIZE 8192
+
+/* The degree of a btree governs how many keys each page
+   can store.  Since the nodes flank the keys, a btree
+   of degree K has K+1 nodes.
+
+   We reserve 1b for flagging this page as a leaf node,
+   and 2b (a 16-bit value) to track how many keys are
+   actually in use.
+
+   Specifically, this btree implementation stores 64-bit
+   keys and 64-bit values, so the degree can be calculated
+   as the page size, less 3 octets for header data, less
+   another 8 octets (64 bits for the +1 node), divided by the
+   composite key+value size (16 octets, or 2x 64-bit values).
+ */
+#define BTREE_DEGREE ((BTREE_PAGE_SIZE - 1 - 2 - 8) / 16)
+
+/* The btree split factor governs how a btree node is split
+   into two pieces to ensure balance.  It ranges (0,1) and
+   acts as a percentage.  I.e. a value of 0.5 (50%) nets a
+   "classical" btree tuned for random-order insertion.
+
+   Since our btree uses timestamps as its keys, and most
+   values will be inserted in-order, we choose a split factor
+   higher than 0.5 to bias the balance towards inserting
+   "newer" keys.
+ */
+#define BTREE_SPLIT_FACTOR 0.9
+
+struct btree {
+	uint16_t used;  /* how many keys are populated?
+	                  (must be strictly <= BTREE_DEGREE */
+
+	int leaf;      /* is this node a leaf node?
+	                  (leaf nodes contain immediate data,
+	                   non-leaf nodes point to other nodes) */
+
+	uint64_t id;   /* identity of this block, on-disk */
+
+	struct btree *kids[BTREE_DEGREE+1];
+
+	struct page page;
+};
+
+struct btree * btree_create(int fd);
+struct btree * btree_read(int fd);
+int btree_write(struct btree *t);
+int btree_close(struct btree *t);
+
+void btree_print(struct btree *t);
+
+int btree_insert(struct btree *t, bolo_msec_t key, uint64_t block_number);
+
+uint64_t btree_find(struct btree *t, bolo_msec_t key);
+
 /***************************************************************  database  ***/
 
 /* a SLAB file can be up to 8g in size
@@ -180,7 +242,7 @@ int tblock_map(struct tblock *b, int fd, off_t offset, size_t len) RETURNS;
 void tblock_init(struct tblock *b, uint64_t number, bolo_msec_t base);
 int tblock_isfull(struct tblock *b) RETURNS;
 int tblock_canhold(struct tblock *b, bolo_msec_t when) RETURNS;
-int tblock_log(struct tblock *b, bolo_msec_t when, double what) RETURNS;
+int tblock_log(struct tblock *b, bolo_msec_t when, bolo_value_t what) RETURNS;
 #define tblock_unmap(b) page_unmap(&(b)->page)
 #define tblock_sync(b)  page_sync(&(b)->page)
 
@@ -206,6 +268,6 @@ int tslab_init(struct tslab *s, int fd, uint64_t number, uint32_t block_size) RE
 int tslab_isfull(struct tslab *s) RETURNS;
 int tslab_extend(struct tslab *s, bolo_msec_t base);
 
-int FIXME_log(struct tslab *s, bolo_msec_t when, double what) RETURNS;
+int FIXME_log(struct tslab *s, bolo_msec_t when, bolo_value_t what) RETURNS;
 
 #endif

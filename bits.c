@@ -16,9 +16,11 @@ int main(int argc, char **argv)
 	write##n(buf, 0, (v)); \
 	if (read##n(buf, 0) != (v)) { \
 		fprintf(stderr, "write" #n "(buf,0," #v ") != read" #n "(buf,0)\n" \
-		                "  was %1$ld (%1$02lx)\n" \
-		                "  not %2$ld (%2$02lx)\n", \
+		                "  was %ld (%02lx)\n" \
+		                "  not %ld (%02lx)\n", \
 		                (unsigned long)read##n(buf, 0), \
+		                (unsigned long)read##n(buf, 0), \
+		                (unsigned long)(v), \
 		                (unsigned long)(v)); \
 		return 0; \
 	} \

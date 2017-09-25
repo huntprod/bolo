@@ -110,7 +110,7 @@ int tslab_init(struct tslab *s, int fd, uint64_t number, uint32_t block_size)
 	memcpy(header, "SLABv1", 6);
 	write8(header,   6, 19); /* from block_size, ostensibly */
 	write32(header,  8, TSLAB_ENDIAN_MAGIC);
-	write64(header, 16, number & ~0x7ff);
+	write64(header, 16, number & ~0xff);
 	hmac_seal(FIXME_DEFAULT_KEY, FIXME_DEFAULT_KEY_LEN, header, sizeof(header));
 
 	lseek(fd, 0, SEEK_SET);
@@ -173,7 +173,7 @@ int tslab_extend(struct tslab *s, bolo_msec_t base)
 
 		/* map the new block into memory */
 		if (tblock_map(&s->blocks[i], s->fd, start, len) == 0) {
-			tblock_init(&s->blocks[i], (s->number & ~0x7ff) | i, base);
+			tblock_init(&s->blocks[i], (s->number & ~0xff) | i, base);
 			return 0;
 		}
 
