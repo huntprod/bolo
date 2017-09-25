@@ -121,6 +121,7 @@ void page_write64 (struct page *p, size_t o, uint64_t v);
 void page_write64f(struct page *p, size_t o, double   v);
 
 void page_writen(struct page *p, size_t o, const void *buf, size_t len);
+ssize_t page_readn(struct page *p, size_t o, void *buf, size_t len);
 
 /******************************************************************  btree  ***/
 

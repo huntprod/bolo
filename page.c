@@ -174,6 +174,17 @@ void page_writen(struct page *p, size_t offset, const void *buf, size_t len)
 	writen(p->data, offset, buf, len);
 }
 
+ssize_t page_readn(struct page *p, size_t offset, void *buf, size_t len)
+{
+	assert(p != NULL);
+	assert(p->data != NULL);
+	assert(buf != NULL);
+	assert(offset + len < p->len);
+
+	memcpy(buf, (uint8_t *)p->data + offset, len);
+	return len;
+}
+
 #ifdef TEST
 #include <ctap.h>
 #include <stdio.h>
@@ -184,6 +195,7 @@ void page_writen(struct page *p, size_t offset, const void *buf, size_t len)
 TESTS {
 	int fd;
 	struct page p;
+	char buf[64];
 
 	memset(&p, 0, sizeof(p));
 
@@ -204,6 +216,8 @@ TESTS {
 	page_write64 (&p,  7, 0x4545454545454545);
 	page_write64f(&p, 15, 12345.6789);
 
+	page_writen(&p, 0x100, "Hello, World", 12);
+
 	ok(page_sync(&p)  == 0, "page_sync() should succeed");
 
 	is_unsigned(page_read8(&p, 0), 0x41,
@@ -216,6 +230,13 @@ TESTS {
 		"page_read64() should read what we page_wrote64()");
 	ok(page_read64f(&p, 15) == 12345.6789,
 		"page_read64f() should read what we page_wrote64()");
+
+	memset(buf, 0, sizeof(buf));
+	is_unsigned(page_readn(&p, 0x100, buf, 12), 12,
+		"page_readn() of 12 bytes should return 12");
+	is_string(buf, "Hello, World",
+		"page_readn() should read what we page_wroten()");
+
 
 	ok(page_sync(&p)  == 0, "page_sync() should succeed");
 	ok(page_unmap(&p) == 0, "page_unmap() should succeed");

@@ -27,5 +27,8 @@ TESTS {
 
 	write64f(buf, 0, 12345.6789);
 	ok(read64f(buf, 0) == 12345.6789, "write64f() / read64f()");
+
+	writen(buf, 0, "Hello!", 6);
+	ok(memcmp(buf, "Hello!", 6) == 0, "writen() / direct memory access");
 }
 #endif
