@@ -8,6 +8,7 @@
 #endif
 
 #include "compiler.h"
+#include <assert.h>
 #include <sys/types.h>
 #include <string.h>
 #include <stdint.h>
@@ -15,6 +16,7 @@
 
 /*******************************************************  common utilities  ***/
 
+#define streq(a,b) (strcmp((a),(b)) == 0)
 void bail(const char *msg);
 
 /**************************************************************  debugging  ***/
@@ -61,6 +63,21 @@ int  hmac_sha512_check(const char *key, size_t klen, const void *buf, size_t len
 
 #define FIXME_DEFAULT_KEY "bolo-fixed-secret-FIXME"
 #define FIXME_DEFAULT_KEY_LEN strlen(FIXME_DEFAULT_KEY)
+
+/*****************************************************************  hashing ***/
+
+#define HASH_MANAGED 0x01
+
+struct hash;
+
+struct hash * hash_new(int flags);
+void hash_free(struct hash *h);
+
+struct hash * hash_read(int fd);
+int hash_write(struct hash *h, int fd);
+
+int hash_set(struct hash *h, const char *key, void *value);
+int hash_get(struct hash *h, void **dst, const char *key);
 
 /********************************************************************  time ***/
 
