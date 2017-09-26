@@ -1,8 +1,5 @@
 #include "bolo.h"
-#include <stdlib.h>
 #include <sys/mman.h>
-#include <unistd.h>
-#include <fcntl.h>
 
 int
 page_map(struct page *p, int fd, off_t start, size_t len)
@@ -185,9 +182,6 @@ ssize_t page_readn(struct page *p, size_t offset, void *buf, size_t len)
 }
 
 #ifdef TEST
-#include <unistd.h>
-#include <sys/syscall.h>
-
 TESTS {
 	int fd;
 	struct page p;

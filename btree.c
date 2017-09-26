@@ -1,8 +1,4 @@
 #include "bolo.h"
-#include <stdlib.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <stdio.h>
 
 /* reserve the first 8 octets for header data */
 #define BTREE_HEADER_SIZE 8

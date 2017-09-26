@@ -1,11 +1,7 @@
 #include "bolo.h"
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
 #include <errno.h>
 
 #ifdef DEBUG
-#include <stdio.h>
 static void hexit(const char *msg, const void *buf, size_t start, size_t len)
 {
 	char *pre = strdup(msg);

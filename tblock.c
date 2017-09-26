@@ -1,5 +1,4 @@
 #include "bolo.h"
-#include <stdlib.h>
 #include <errno.h>
 
 int

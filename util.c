@@ -1,5 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
+#include "bolo.h"
 
 void
 bail(const char *msg)

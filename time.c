@@ -1,5 +1,4 @@
 #include "bolo.h"
-#include <stdlib.h>
 #include <sys/time.h>
 
 bolo_msec_t
