@@ -412,9 +412,6 @@ btree_find(struct btree *t, bolo_msec_t key)
 
 
 #ifdef TEST
-#include <unistd.h>
-#include <sys/syscall.h>
-
 /* Tests will be inserting arbitrary values,
    so we will iterate over a range of keys.
    To generate the values from the keys, we
@@ -445,10 +442,7 @@ TESTS {
 	bolo_msec_t key;
 	uint64_t value;
 
-	fd = syscall(SYS_memfd_create, "test-btree", 0);
-	if (fd < 0)
-		BAIL_OUT("btree: memfd_create() failed");
-
+	fd = memfd("btree");
 	t = btree_create(fd);
 	if (!t)
 		BAIL_OUT("btree: btree_create(fd) returned NULL");

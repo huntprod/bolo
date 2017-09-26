@@ -5,6 +5,7 @@
 #ifdef TEST
 #  define _GNU_SOURCE /* to expose syscall() */
 #  include <ctap.h>
+#  include "t/memfd.h"
 #endif
 
 #include "compiler.h"

@@ -195,10 +195,7 @@ TESTS {
 
 	memset(&p, 0, sizeof(p));
 
-	fd = syscall(SYS_memfd_create, "test-page", 0);
-	if (fd < 0)
-		BAIL_OUT("memffd_create() failed");
-
+	fd = memfd("page");
 	lseek(fd, sysconf(_SC_PAGESIZE) - 1, SEEK_SET);
 	if (write(fd, "\0", 1) != 1)
 		BAIL_OUT("failed to extend memfd backing file");
