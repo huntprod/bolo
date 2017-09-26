@@ -78,11 +78,14 @@ struct hash;
 struct hash * hash_new(int flags);
 void hash_free(struct hash *h);
 
-struct hash * hash_read(int fd);
+struct hash * hash_read(int fd, int flags);
 int hash_write(struct hash *h, int fd);
 
-int hash_set(struct hash *h, const char *key, void *value);
-int hash_get(struct hash *h, void **dst, const char *key);
+int hash_setp(struct hash *h, const char *key, void *value);
+int hash_getp(struct hash *h, void **dst, const char *key);
+
+int hash_setv(struct hash *h, const char *key, uint64_t v);
+int hash_getv(struct hash *h, uint64_t *dst, const char *key);
 
 /********************************************************************  time ***/
 
