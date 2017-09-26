@@ -1,0 +1,11 @@
+#!/bin/sh
+
+rm -rf t/tmp
+mkdir t/tmp
+
+for t in "$@"; do
+  if ! valgrind --leak-check=full --error-exitcode=1 $t 2> t/tmp/valgrind.out; then
+    cat t/tmp/valgrind.out >&2
+    exit 1
+  fi
+done

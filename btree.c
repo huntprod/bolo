@@ -213,6 +213,7 @@ btree_close(struct btree *t)
 
 	if (page_unmap(&t->page) != 0)
 		rc = -1;
+	free(t);
 
 	return rc;
 }
@@ -440,7 +441,7 @@ iszero(const void *buf, off_t offset, size_t size)
 
 TESTS {
 	int fd;
-	struct btree *t;
+	struct btree *t, *tmp;
 	bolo_msec_t key;
 	uint64_t value;
 
@@ -480,6 +481,7 @@ TESTS {
 	if (btree_write(t) != 0)
 		BAIL_OUT("btree_write failed");
 
+	tmp = t;
 	t = btree_read(fd);
 	if (!t)
 		BAIL_OUT("btree_read(fd) failed!");
@@ -494,6 +496,8 @@ TESTS {
 
 	if (btree_close(t) != 0)
 		BAIL_OUT("btree_close failed");
+
+	btree_close(tmp);
 	close(fd);
 }
 

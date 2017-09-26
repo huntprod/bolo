@@ -26,6 +26,10 @@ check: page.o util.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o time  time.c
 	prove -v ./bits ./hash ./page ./btree ./sha ./time
 
+memtest: check
+	t/vg ./bits ./hash ./page ./btree ./sha ./time
+	@echo "No memory leaks detected"
+
 coverage:
 	rm -rf coverage/
 	lcov --capture --directory . --output-file lcov.info
@@ -35,5 +39,8 @@ coverage:
 copycov: clean test coverage
 	rm -rf /vagrant/coverage/
 	cp -a coverage/ /vagrant/coverage/
+
+# full test suite
+sure: memtest
 
 .PHONY: coverage
