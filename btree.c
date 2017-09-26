@@ -412,8 +412,6 @@ btree_find(struct btree *t, bolo_msec_t key)
 
 
 #ifdef TEST
-#include <ctap.h>
-#define _GNU_SOURCE  /* for syscall(2) */
 #include <unistd.h>
 #include <sys/syscall.h>
 

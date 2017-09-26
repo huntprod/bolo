@@ -1,10 +1,17 @@
 #ifndef BOLO_H
 #define BOLO_H
 
+#define _POSIX_C_SOURCE 200809L
+#ifdef TEST
+#  define _GNU_SOURCE /* to expose syscall() */
+#  include <ctap.h>
+#endif
+
 #include "compiler.h"
 #include <sys/types.h>
 #include <string.h>
 #include <stdint.h>
+#include <sys/time.h>
 
 /*******************************************************  common utilities  ***/
 

@@ -7,9 +7,6 @@ void bits_unused() {} /* LCOV_EXCL_LINE */
        the read* / write* macros... */
 
 #ifdef TEST
-#include <ctap.h>
-#include <stdio.h>
-
 TESTS {
 	char buf[32];
 

@@ -459,9 +459,6 @@ hmac_sha512_check(const char *key, size_t key_len, const void *buf, size_t len)
 }
 
 #ifdef TEST
-#include <ctap.h>
-#include <stdio.h>
-
 TESTS {
 	subtest {
 		struct sha512 c;

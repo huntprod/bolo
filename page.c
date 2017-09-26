@@ -186,10 +186,7 @@ ssize_t page_readn(struct page *p, size_t offset, void *buf, size_t len)
 }
 
 #ifdef TEST
-#include <ctap.h>
-#include <stdio.h>
-
-#define _GNU_SOURCE  /* for syscall(2) */
+#include <unistd.h>
 #include <sys/syscall.h>
 
 TESTS {

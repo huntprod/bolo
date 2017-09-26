@@ -32,9 +32,6 @@ bolo_s(const struct timeval *tv)
 }
 
 #ifdef TEST
-#include <ctap.h>
-#include <stdio.h>
-
 TESTS {
 	struct timeval tv;
 
