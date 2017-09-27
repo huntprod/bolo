@@ -1,5 +1,4 @@
 #include "bolo.h"
-#include <errno.h>
 
 int
 tblock_map(struct tblock *b, int fd, off_t offset, size_t len)
@@ -45,7 +44,7 @@ int tblock_isfull(struct tblock *b)
 {
 	assert(b != NULL);
 
-	errno = ENOBUFS;
+	errno = BOLO_EBLKFULL;
 	return b->cells == TCELLS_PER_TBLOCK;
 }
 
@@ -54,7 +53,7 @@ tblock_canhold(struct tblock *b, bolo_msec_t when)
 {
 	assert(b != NULL);
 
-	errno = ERANGE;
+	errno = BOLO_EBLKRANGE;
 	return when - b->base <  MAX_U32;
 }
 

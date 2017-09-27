@@ -123,6 +123,7 @@ hash_getp(struct hash *h, void **dst, const char *key)
 	}
 
 	/* key not set in the hash */
+	errno = BOLO_ENOTSET;
 	return -1;
 }
 
@@ -180,6 +181,7 @@ hash_getv(struct hash *h, uint64_t *dst, const char *key)
 	}
 
 	/* key not set in the hash */
+	errno = BOLO_ENOTSET;
 	return -1;
 }
 
@@ -212,6 +214,7 @@ hash_read(int from, int flags)
 		a = strchr(buf, '\t');
 		b = strchr(buf, '\n');
 
+		errno = BOLO_EBADHASH;
 		if (!a && !b)
 			goto fail;
 

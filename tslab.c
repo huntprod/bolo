@@ -1,7 +1,4 @@
 #include "bolo.h"
-#include <sys/types.h>
-#include <unistd.h>
-#include <errno.h>
 
 int tslab_map(struct tslab *s, int fd)
 {
@@ -14,6 +11,7 @@ int tslab_map(struct tslab *s, int fd)
 	off_t n;
 	uint32_t endian_check;
 
+	errno = BOLO_EBADSLAB;
 	nread = read(fd, header, TSLAB_HEADER_SIZE);
 	if (nread < 0) /* read error! */
 		return -1;
@@ -21,7 +19,6 @@ int tslab_map(struct tslab *s, int fd)
 	if (nread != TSLAB_HEADER_SIZE) /* short read! */
 		return -1;
 
-	errno = EINVAL;
 	if (memcmp(header, "SLABv1", 6) != 0) /* not a slab! */
 		return -1;
 

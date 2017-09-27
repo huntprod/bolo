@@ -1,6 +1,5 @@
 #include "bolo.h"
 #include <sys/stat.h>
-#include <errno.h>
 
 /* USAGE:
 
@@ -30,13 +29,13 @@ do_slabinfo(int argc, char **argv)
 		path = argv[i];
 		fd = open(path, O_RDONLY);
 		if (fd < 0) {
-			fprintf(stderr, "failed to open %s: %s\n", path, strerror(errno));
+			fprintf(stderr, "failed to open %s: %s\n", path, error(errno));
 			continue;
 		}
 
 		rc = tslab_map(&slab, fd);
 		if (rc != 0) {
-			fprintf(stderr, "failed to map %s: %s\n", path, strerror(errno));
+			fprintf(stderr, "failed to map %s: %s\n", path, error(errno));
 			continue;
 		}
 

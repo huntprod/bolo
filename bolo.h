@@ -9,7 +9,11 @@
 #endif
 
 #include "compiler.h"
+#include "errno.h"
+
 #include <assert.h>
+#include <errno.h>
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -23,6 +27,7 @@
 
 #define streq(a,b) (strcmp((a),(b)) == 0)
 void bail(const char *msg);
+const char * error(int num);
 
 /**************************************************************  debugging  ***/
 

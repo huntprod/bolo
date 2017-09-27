@@ -147,6 +147,7 @@ btree_read(int fd)
 	off_t offset;
 	struct btree *t;
 
+	errno = BOLO_EBADTREE;
 	offset = lseek(fd, 0, SEEK_END);
 	if (offset % BTREE_PAGE_SIZE)
 		return NULL; /* corrupt or invalid btree */
@@ -194,11 +195,10 @@ btree_close(struct btree *t)
 {
 	int i, rc;
 
-	rc = 0;
-
 	if (!t)
-		return rc;
+		return 0;
 
+	rc = 0;
 	if (!t->leaf)
 		for (i = 0; i <= t->used; i++)
 			if (btree_close(t->kids[i]) != 0)

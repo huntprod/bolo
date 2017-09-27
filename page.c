@@ -20,7 +20,9 @@ page_map(struct page *p, int fd, off_t start, size_t len)
 	case O_RDONLY: prot = PROT_READ;              break;
 	case O_WRONLY: prot =             PROT_WRITE; break;
 	case O_RDWR:   prot = PROT_READ | PROT_WRITE; break;
-	default: bail("page_map: failed to determine r/w status of fd");
+	default:
+		errno = EBADF;
+		return -1;
 	}
 
 	p->fd   = fd;

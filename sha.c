@@ -1,5 +1,4 @@
 #include "bolo.h"
-#include <errno.h>
 
 #ifdef DEBUG
 static void hexit(const char *msg, const void *buf, size_t start, size_t len)
@@ -266,9 +265,9 @@ sha512_raw(struct sha512 *c, void *d, size_t len)
 {
 	assert(c != NULL);
 
-	errno = -EINVAL;
+	errno = EINVAL;
 	if (!d || len < SHA512_DIGEST)
-		return errno;
+		return -1;
 
 #define u64(i) u64be((uint8_t*)d,(i),c->state[(i)])
 	u64(0); u64(1); u64(2); u64(3);
@@ -283,9 +282,9 @@ sha512_hex(struct sha512 *c, void *d, size_t len)
 {
 	assert(c != NULL);
 
-	errno = -EINVAL;
+	errno = EINVAL;
 	if (!d || len < 2 * SHA512_DIGEST)
-		return errno;
+		return -1;
 
 #define x64(i) do {\
 	(((uint8_t*)d)[16 * (i) +  0] = HEX[(uint8_t)(c->state[(i)] >> 60) & 0x0f]); \
