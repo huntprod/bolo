@@ -20,11 +20,11 @@ static const char *errors[] = {
 
 const char * error(int num)
 {
+	if (num < 0 || num > BOLO_ERROR_TOP)
+		return errors[BOLO_EUNKNOWN];
+
 	if (num <= BOLO_ERROR_BASE)
 		return strerror(num);
-
-	if (num > BOLO_ERROR_TOP)
-		num = BOLO_EUNKNOWN;
 
 	return errors[num];
 }
