@@ -46,8 +46,8 @@ struct list {
 	     &v->m != (l); v = item(v->m.next, typeof(*v), m))
 
 #define for_eachx(v,t,l,m) \
-	for ( v = item((l)->next, typeof(*v), m), t = item(v->m.next, typeof(*p), m); \
-	     &v->m != (l); v = t; t = item(t->m.next; typeof(*t), m))
+	for ( v = item((l)->next, typeof(*v), m), t = item(v->m.next, typeof(*v), m); \
+	     &v->m != (l); v = t, t = item(t->m.next, typeof(*t), m))
 
 #define empty(l) ((l)->next = (l)->prev = (l))
 #define isempty(l) ((l)->next == (l))
