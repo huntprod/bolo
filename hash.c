@@ -393,6 +393,27 @@ TESTS {
 		hash_free(h);
 		close(fd);
 	}
+
+	subtest {
+		struct hash *h;
+		char *key;
+		int i;
+
+		h = hash_new(0);
+		if (!h)
+			BAIL_OUT("hash_new(0) returned a NULL pointer");
+
+		for (i = 0; i < HASH_STRIDE + 1; i++) {
+			if (asprintf(&key, "key%d", i) <= 0)
+				BAIL_OUT("failed to generate a key for pigeon-hole test");
+
+			if (hash_setv(h, key, 12345) != 0)
+				fail("failed to set key %s => 12345 in pigeon-hole test");
+			free(key);
+		}
+
+		hash_free(h);
+	}
 }
 /* LCOV_EXCL_END */
 #endif
