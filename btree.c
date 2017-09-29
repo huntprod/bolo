@@ -23,6 +23,7 @@
   (t)->kids[(i)] = (c); \
 } while (0)
 
+#if 0
 static void
 _print(struct btree *t, int indent)
 {
@@ -62,6 +63,7 @@ btree_print(struct btree *bt)
 {
 	_print(bt, 0);
 }
+#endif
 
 static struct btree *
 s_mapat1(int fd, off_t offset)
