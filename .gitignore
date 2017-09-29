@@ -3,10 +3,12 @@
 
 /bits
 /btree
+/db
 /hash
 /page
 /sha
 /time
+/util
 
 *.db
 /coverage

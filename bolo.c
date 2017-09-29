@@ -7,6 +7,7 @@
 
     bolo slabinfo FILE
     bolo version
+    bolo stdin
 
     (other commands and options added as necessary)
 
@@ -68,6 +69,68 @@ do_slabinfo(int argc, char **argv)
 }
 
 static int
+do_stdin(int argc, char **argv)
+{
+	char buf[8192];
+	char *metric, *tags, *time, *value, *end;
+	struct db *db;
+	bolo_msec_t when;
+	bolo_value_t what;
+
+	if (argc != 3) {
+		fprintf(stderr, "USAGE: bolo stdin path/to/db\n");
+		return 1;
+	}
+
+	db = db_mount(argv[2]);
+	if (!db && errno == EBADF) /* FIXME: might be a little fast and loose */
+		db = db_init(argv[2]);
+	if (!db) {
+		fprintf(stderr, "%s: %s\n", argv[2], error(errno));
+		return 2;
+	}
+
+	while (fgets(buf, 8192, stdin) != NULL) {
+		metric = strtok(buf,  " \n");
+		tags   = strtok(NULL, " \n");
+		time   = strtok(NULL, " \n");
+		value  = strtok(NULL, " \n");
+
+		if (!metric || !tags || !time || !value)
+			continue;
+
+		when = strtoull(time, &end, 10);
+		if (end && *end) {
+			fprintf(stderr, "failed to parse [%s %s] timestamp '%s'\n",
+			                 metric, tags, time);
+			continue;
+		}
+
+		what = strtod(time, &end);
+		if (end && *end) {
+			fprintf(stderr, "failed to parse [%s %s] measurement value '%s'\n",
+			                metric, tags, value);
+			continue;
+		}
+
+		/* FIXME: compose metric|tags */
+		if (db_insert(db, metric, when, what) != 0)
+			fprintf(stderr, "failed to insert [%s %s %s %s]: %s\n",
+			                metric, tags, time, value, error(errno));
+
+		if (db_sync(db) != 0)
+			fprintf(stderr, "failed to sync database to disk: %s\n",
+			                error(errno));
+	}
+
+	if (db_unmount(db) != 0)
+		fprintf(stderr, "failed to unmount database: %s\n",
+		                error(errno));
+
+	return 0;
+}
+
+static int
 do_usage(int argc, char **argv)
 {
 	fprintf(stderr, "USAGE: ...\n");
@@ -96,6 +159,9 @@ int main(int argc, char **argv)
 
 	if (strcmp(command, "version") == 0)
 		return do_version(argc, argv);
+
+	if (strcmp(command, "stdin") == 0)
+		return do_stdin(argc, argv);
 
 	if (strcmp(command, "slabinfo") == 0)
 		return do_slabinfo(argc, argv);

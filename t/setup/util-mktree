@@ -1,0 +1,3 @@
+#!/bin/sh
+rm -rf t/tmp
+mkdir -p t/tmp

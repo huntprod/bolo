@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+
+rm -rf t/tmp
+mkdir  t/tmp
+
+mkdir t/tmp/old
+touch t/tmp/old/main.db
+
+mkdir t/tmp/new
+
+exit 0

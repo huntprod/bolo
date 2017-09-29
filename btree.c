@@ -398,7 +398,8 @@ btree_find(struct btree *t, bolo_msec_t key)
 	i = s_find(t, key);
 
 	if (t->leaf)
-		return valueat(t,i);
+		return (keyat(t,i) == key) ? valueat(t,i)
+		                           : MAX_U64;
 
 	if (!t->kids[i])
 		return MAX_U64;
@@ -454,6 +455,13 @@ TESTS {
 
 	is_unsigned(lseek(fd, 0, SEEK_END), BTREE_PAGE_SIZE,
 		"new btree file should be exactly ONE page long");
+
+	for (key = KEYSTART; key <= KEYEND; key++) {
+		value = btree_find(t, key);
+		if (value != MAX_U64)
+			fail("btree lookup(%lx) before insertion should fail, but got %#lx\n", key, value);
+	}
+	pass("btree lookups should fail before insertion");
 
 	for (key = KEYSTART; key <= KEYEND; key++) {
 		if (btree_insert(t, key, key + PERTURB) != 0)

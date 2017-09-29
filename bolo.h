@@ -2,6 +2,8 @@
 #define BOLO_H
 
 #define _POSIX_C_SOURCE 200809L
+#define _GNU_SOURCE /* for asprintf */
+
 #ifdef TEST
 #  define _GNU_SOURCE /* to expose syscall() */
 #  include <ctap.h>
@@ -17,9 +19,11 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stddef.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
 
@@ -27,7 +31,30 @@
 
 #define streq(a,b) (strcmp((a),(b)) == 0)
 void bail(const char *msg);
-const char * error(int num);
+const char * error(int num) RETURNS;
+
+int mktree(int dirfd, const char *path, mode_t mode) RETURNS;
+
+struct list {
+	struct list *next;
+	struct list *prev;
+};
+
+#define item(l,t,m) ((t*)((uint8_t*)(l) - offsetof(t,m)))
+#define for_each(v,l,m) \
+	for ( v = item((l)->next, typeof(*v), m); \
+	     &v->m != (l); v = item(v->m.next, typeof(*v), m))
+
+#define for_eachx(v,t,l,m) \
+	for ( v = item((l)->next, typeof(*v), m), t = item(v->m.next, typeof(*p), m); \
+	     &v->m != (l); v = t; t = item(t->m.next; typeof(*t), m))
+
+#define empty(l) ((l)->next = (l)->prev = (l))
+#define isempty(l) ((l)->next == (l))
+
+size_t len(const struct list *l) RETURNS;
+void push(struct list *list, struct list *add);
+
 
 /**************************************************************  debugging  ***/
 
@@ -74,7 +101,8 @@ int  hmac_sha512_check(const char *key, size_t klen, const void *buf, size_t len
 #define FIXME_DEFAULT_KEY "bolo-fixed-secret-FIXME"
 #define FIXME_DEFAULT_KEY_LEN strlen(FIXME_DEFAULT_KEY)
 
-/*****************************************************************  hashing ***/
+
+/****************************************************************  hashing  ***/
 
 #define HASH_MANAGED 0x01
 
@@ -87,7 +115,7 @@ struct hash * hash_read(int fd, int flags);
 int hash_write(struct hash *h, int fd);
 
 int hash_setp(struct hash *h, const char *key, void *value);
-int hash_getp(struct hash *h, void **dst, const char *key);
+int hash_getp(struct hash *h, void *dst, const char *key);
 
 int hash_setv(struct hash *h, const char *key, uint64_t v);
 int hash_getv(struct hash *h, uint64_t *dst, const char *key);
@@ -290,6 +318,8 @@ int tblock_log(struct tblock *b, bolo_msec_t when, bolo_value_t what) RETURNS;
 /*********************************************************  database slabs  ***/
 
 struct tslab {
+	struct list l;           /* list hook for database slab refs */
+
 	int fd;                  /* file descriptor of the slab file */
 	uint32_t block_size;     /* how big is each data block page? */
 	uint64_t number;         /* slab number, with the least significant
@@ -307,5 +337,14 @@ int tslab_isfull(struct tslab *s) RETURNS;
 int tslab_extend(struct tslab *s, bolo_msec_t base);
 
 int FIXME_log(struct tslab *s, bolo_msec_t when, bolo_value_t what) RETURNS;
+
+/***************************************************************  database  ***/
+
+struct db;
+struct db * db_mount(const char *path) RETURNS;
+struct db * db_init(const char *path) RETURNS;
+int db_sync(struct db *db) RETURNS;
+int db_unmount(struct db *db) RETURNS;
+int db_insert(struct db *, const char *name, bolo_msec_t when, bolo_value_t what) RETURNS;
 
 #endif

@@ -102,7 +102,7 @@ hash_setp(struct hash *h, const char *key, void *val)
 }
 
 int
-hash_getp(struct hash *h, void **dst, const char *key)
+hash_getp(struct hash *h, void *dst, const char *key)
 {
 	unsigned int k;
 	struct bucket *b;
@@ -118,7 +118,7 @@ hash_getp(struct hash *h, void **dst, const char *key)
 		if (!streq(b->key, key))
 			continue;
 
-		*dst = b->ptr;
+		*(void **)dst = b->ptr;
 		return 0;
 	}
 
