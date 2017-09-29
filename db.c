@@ -27,34 +27,46 @@ typedef int(*fs_handler)(struct db *, uint64_t, int);
 static int
 s_handle_idx(struct db *db, uint64_t id, int fd)
 {
-	struct btree *t;
+	struct idx *idx;
 
-	t = btree_read(fd);
-	close(fd);
+	idx = malloc(sizeof(*idx));
+	if (!idx)
+		goto fail;
 
-	if (!t)
-		return -1;
+	idx->number = id;
+	idx->btree = btree_read(fd);
+	if (!idx->btree)
+		goto fail;
 
-	/* FIXME: do something with the ts btree */
-
+	push(&db->idx, &idx->l);
 	return 0;
+
+fail:
+	free(idx);
+	close(fd);
+	return -1;
 }
 
 static int
 s_handle_slab(struct db *db, uint64_t id, int fd)
 {
-	struct tslab *s;
+	struct tslab *slab;
 
-	s = malloc(sizeof(*s));
-	if (!s)
-		return -1;
+	slab = malloc(sizeof(*slab));
+	if (!slab)
+		goto fail;
 
-	if (tslab_map(s, fd) != 0)
-		return -1;
+	slab->number = id;
+	if (tslab_map(slab, fd) != 0)
+		goto fail;
 
-	/* FIXME: do something with the slab */
-
+	push(&db->slab, &slab->l);
 	return 0;
+
+fail:
+	free(slab);
+	close(fd);
+	return -1;
 }
 
 static int
@@ -274,8 +286,12 @@ db_mount(const char *path)
 	close(fd);
 
 	/* FIXME: scan the tags/ subdirectory */
+
+	empty(&db->idx);
 	if (s_scandir(db, "idx", ".idx", s_handle_idx) != 0)
 		goto fail;
+
+	empty(&db->slab);
 	if (s_scandir(db, "slabs", ".slab", s_handle_slab) != 0)
 		goto fail;
 
@@ -386,7 +402,7 @@ s_tmpcopyat(int dirfd, const char *origpath, int flags, char **copypath)
 	if (!*copypath)
 		goto fail;
 
-	fd = openat(dirfd, *copypath, flags);
+	fd = openat(dirfd, *copypath, flags|O_CREAT, 0666);
 	if (fd < 0)
 		goto fail;
 
@@ -400,8 +416,21 @@ fail:
 int
 db_sync(struct db *db)
 {
+	struct tslab *slab;
+	struct idx   *idx;
 	char *copy;
 	int fd;
+
+	fd = -1;
+	copy = NULL;
+
+	for_each(slab, &db->slab, l)
+		if (tslab_sync(slab) != 0)
+			goto fail;
+
+	for_each(idx, &db->idx, l)
+		if (btree_write(idx->btree) != 0)
+			goto fail;
 
 	fd = s_tmpcopyat(db->rootfd, PATH_TO_MAINDB, O_WRONLY, &copy);
 	if (fd < 0)
@@ -410,22 +439,45 @@ db_sync(struct db *db)
 	if (hash_write(db->main, fd) != 0)
 		goto fail;
 
+	if (renameat(db->rootfd, copy, db->rootfd, PATH_TO_MAINDB) != 0)
+		goto fail;
+
 	close(fd);
+	free(copy);
 	return 0;
 
 fail:
 	if (fd >= 0) close(fd);
+	free(copy);
 	return -1;
 }
 
 int
 db_unmount(struct db *db)
 {
+	struct tslab *slab, *tmp_slab;
+	struct idx   *idx,  *tmp_idx;
+	int ok;
+
 	assert(db != NULL);
+
+	ok = 0;
+	for_eachx(slab, tmp_slab, &db->slab, l) {
+		if (tslab_unmap(slab) != 0)
+			ok = -1;
+		free(slab);
+	}
+
+	for_eachx(idx, tmp_idx, &db->idx, l) {
+		if (btree_close(idx->btree) != 0)
+			ok = -1;
+		free(idx);
+	}
 
 	hash_free(db->main);
 	close(db->rootfd);
-	return 0;
+	free(db);
+	return ok;
 }
 
 #define BOLO_TS_BLOCK 512 /* FIXME completely arbitrary */
@@ -562,7 +614,6 @@ db_insert(struct db *db, const char *name, bolo_msec_t when, bolo_value_t what)
 
 	slab_ts = s_normts(when);
 	slab_id = btree_find(idx->btree, slab_ts);
-	fprintf(stderr, "found slab for %lu (%lu adj.) as %016lx\n", when, slab_ts, slab_id);
 	if (slab_id == MAX_U64) {
 		if (s_newslab(db, slab_ts, &slab_id) != 0)
 			return -1;
@@ -625,11 +676,17 @@ TESTS {
 		ok(db_insert(db, "metric|tags", 1234567890, 4567.89) == 0,
 			"db_insert() should succeed on fresh database");
 
+		ok(db_sync(db) == 0,
+			"db_sync() should succeed");
 		ok(db_unmount(db) == 0,
 			"db_unmount() should succeed");
 
+
 		db = db_mount("t/tmp/new");
 		isnt_null(db, "db_mount() should succeed with newly-init'd data directories");
+
+		ok(db_unmount(db) == 0,
+			"db_unmount() should succeed");
 	}
 }
 /* LCOV_EXCL_END */
