@@ -453,6 +453,7 @@ hmac_sha512_check(const char *key, size_t key_len, const void *buf, size_t len)
 }
 
 #ifdef TEST
+/* LCOV_EXCL_START */
 TESTS {
 	subtest {
 		struct sha512 c;
@@ -602,4 +603,5 @@ TESTS {
 			"hmac_sha512_seal with large keys (> SHA-512 block size) should succeed");
 	}
 }
+/* LCOV_EXCL_END */
 #endif

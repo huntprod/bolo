@@ -269,6 +269,7 @@ hash_write(struct hash *h, int to)
 
 
 #ifdef TEST
+/* LCOV_EXCL_START */
 TESTS {
 	subtest {
 		isnt_unsigned(
@@ -388,4 +389,5 @@ TESTS {
 		close(fd);
 	}
 }
+/* LCOV_EXCL_END */
 #endif

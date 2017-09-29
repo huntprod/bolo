@@ -584,6 +584,7 @@ db_insert(struct db *db, const char *name, bolo_msec_t when, bolo_value_t what)
 }
 
 #ifdef TEST
+/* LCOV_EXCL_START */
 TESTS {
 	subtest {
 		char *copy;
@@ -631,4 +632,5 @@ TESTS {
 		isnt_null(db, "db_mount() should succeed with newly-init'd data directories");
 	}
 }
+/* LCOV_EXCL_END */
 #endif

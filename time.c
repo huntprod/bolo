@@ -31,6 +31,7 @@ bolo_s(const struct timeval *tv)
 }
 
 #ifdef TEST
+/* LCOV_EXCL_START */
 TESTS {
 	struct timeval tv;
 
@@ -46,5 +47,5 @@ TESTS {
 	ok(bolo_ms(NULL) != INVALID_MS, "bolo_ms(NULL) returns now");
 	ok(bolo_s(NULL)  != INVALID_S,  "bolo_s(NULL) returns now");
 }
-
+/* LCOV_EXCL_END */
 #endif

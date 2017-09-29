@@ -7,6 +7,7 @@ void bits_unused() {} /* LCOV_EXCL_LINE */
        the read* / write* macros... */
 
 #ifdef TEST
+/* LCOV_EXCL_START */
 TESTS {
 	char buf[32];
 
@@ -28,4 +29,5 @@ TESTS {
 	writen(buf, 0, "Hello!", 6);
 	ok(memcmp(buf, "Hello!", 6) == 0, "writen() / direct memory access");
 }
+/* LCOV_EXCL_END */
 #endif

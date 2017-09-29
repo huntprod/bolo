@@ -184,6 +184,7 @@ ssize_t page_readn(struct page *p, size_t offset, void *buf, size_t len)
 }
 
 #ifdef TEST
+/* LCOV_EXCL_START */
 TESTS {
 	int fd;
 	struct page p;
@@ -230,4 +231,5 @@ TESTS {
 	ok(page_sync(&p)  == 0, "page_sync() should succeed");
 	ok(page_unmap(&p) == 0, "page_unmap() should succeed");
 }
+/* LCOV_EXCL_END */
 #endif

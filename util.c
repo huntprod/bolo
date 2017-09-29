@@ -86,6 +86,7 @@ push(struct list *lst, struct list *add)
 }
 
 #ifdef TEST
+/* LCOV_EXCL_START */
 TESTS {
 	subtest {
 		struct stat st;
@@ -111,4 +112,5 @@ TESTS {
 			"stat(t/tmp/a/b/c/d/FILE) should fail, even after we call mktree()");
 	}
 }
+/* LCOV_EXCL_END */
 #endif

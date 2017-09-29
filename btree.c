@@ -409,6 +409,7 @@ btree_find(struct btree *t, bolo_msec_t key)
 
 
 #ifdef TEST
+/* LCOV_EXCL_START */
 /* Tests will be inserting arbitrary values,
    so we will iterate over a range of keys.
    To generate the values from the keys, we
@@ -498,5 +499,5 @@ TESTS {
 	btree_close(tmp);
 	close(fd);
 }
-
+/* LCOV_EXCL_END */
 #endif
