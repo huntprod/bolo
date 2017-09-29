@@ -288,7 +288,8 @@ TESTS {
 		void *v;
 
 		h = hash_new(0);
-		isnt_null(h, "hash_new(0) should return a valid pointer");
+		if (!h)
+			BAIL_OUT("hash_new(0) returned a NULL pointer");
 
 		v = NULL;
 		ok(hash_getp(h, &v, "one") != 0,
@@ -312,7 +313,8 @@ TESTS {
 		const char *keys[4] = { "first", "second", "third", "last" };
 
 		h = hash_new(HASH_MANAGED);
-		isnt_null(h, "hash_new(0) should return a valid pointer");
+		if (!h)
+			BAIL_OUT("hash_new(HASH_MANAGED) returned a NULL pointer");
 
 		for (i = 0; i < 4; i++) {
 			values[i] = malloc(sizeof(unsigned int));
@@ -341,7 +343,8 @@ TESTS {
 		unsigned int *value, *v;
 
 		h = hash_new(HASH_MANAGED);
-		isnt_null(h, "hash_new(0) should return a valid pointer");
+		if (!h)
+			BAIL_OUT("hash_new(0) returned a NULL pointer");
 
 		value = malloc(sizeof(*value));
 		if (!value)
@@ -366,6 +369,8 @@ TESTS {
 
 		fd = memfd("hash");
 		h = hash_new(0);
+		if (!h)
+			BAIL_OUT("hash_new(0) returned a NULL pointer");
 
 		if (hash_setv(h, "key", 0xdecafbaddecafbadUL) != 0)
 			BAIL_OUT("failed to set up the test for hash_read/write");
