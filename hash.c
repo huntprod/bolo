@@ -23,14 +23,11 @@ struct bucket {
 
 #define HASH_STRIDE  255
 struct hash {
-	int flags;
 	struct bucket *buckets[HASH_STRIDE];
 };
 
-#define s_ismanaged(h) (((h)->flags & HASH_MANAGED) == HASH_MANAGED)
-
 struct hash *
-hash_new(int flags)
+hash_new()
 {
 	struct hash *h;
 
@@ -38,7 +35,6 @@ hash_new(int flags)
 	if (!h)
 		return NULL;
 
-	h->flags = flags;
 	return h;
 }
 
@@ -55,9 +51,6 @@ hash_free(struct hash *h)
 		for (b = h->buckets[i]; b; ) {
 			free(b->key);
 
-			if (s_ismanaged(h))
-				free(b->ptr);
-
 			tmp = b->next;
 			free(b);
 			b = tmp;
@@ -68,7 +61,7 @@ hash_free(struct hash *h)
 }
 
 int
-hash_setp(struct hash *h, const char *key, void *val)
+hash_set(struct hash *h, const char *key, void *val)
 {
 	unsigned int k;
 	struct bucket *b;
@@ -83,8 +76,6 @@ hash_setp(struct hash *h, const char *key, void *val)
 		if (!streq(b->key, key))
 			continue;
 
-		if (s_ismanaged(h))
-			free(b->ptr);
 		b->ptr = val;
 		return 0;
 	}
@@ -102,33 +93,7 @@ hash_setp(struct hash *h, const char *key, void *val)
 }
 
 int
-hash_getp(struct hash *h, void *dst, const char *key)
-{
-	unsigned int k;
-	struct bucket *b;
-
-	assert(h != NULL);
-	assert(key != NULL);
-	assert(dst != NULL);
-
-	k = s_hash(key) % HASH_STRIDE;
-
-	/* check existing data */
-	for (b = h->buckets[k]; b; b = b->next) {
-		if (!streq(b->key, key))
-			continue;
-
-		*(void **)dst = b->ptr;
-		return 0;
-	}
-
-	/* key not set in the hash */
-	errno = BOLO_ENOTSET;
-	return -1;
-}
-
-int
-hash_setv(struct hash *h, const char *key, uint64_t val)
+hash_get(struct hash *h, void *dst, const char *key)
 {
 	unsigned int k;
 	struct bucket *b;
@@ -143,40 +108,8 @@ hash_setv(struct hash *h, const char *key, uint64_t val)
 		if (!streq(b->key, key))
 			continue;
 
-		b->val = val;
-		return 0;
-	}
-
-	/* not in existing data, prepend a new bucket */
-	b = calloc(1, sizeof(struct bucket));
-	if (!b)
-		return -1;
-
-	b->key = strdup(key);
-	b->val = val;
-	b->next = h->buckets[k];
-	h->buckets[k] = b;
-	return 0;
-}
-
-int
-hash_getv(struct hash *h, uint64_t *dst, const char *key)
-{
-	unsigned int k;
-	struct bucket *b;
-
-	assert(h != NULL);
-	assert(key != NULL);
-	assert(dst != NULL);
-
-	k = s_hash(key) % HASH_STRIDE;
-
-	/* check existing data */
-	for (b = h->buckets[k]; b; b = b->next) {
-		if (!streq(b->key, key))
-			continue;
-
-		*dst = b->val;
+		if (dst)
+			*(void **)dst = b->ptr;
 		return 0;
 	}
 
@@ -186,13 +119,14 @@ hash_getv(struct hash *h, uint64_t *dst, const char *key)
 }
 
 struct hash *
-hash_read(int from, int flags)
+hash_read(int from, hash_reader_fn reader, void *udata)
 {
 	struct hash *h;
 	int fd;
 	FILE *in;
 	char buf[8192], *a, *b;
 	uint64_t value;
+	void *ptr;
 
 	assert(from >= 0);
 
@@ -206,7 +140,7 @@ hash_read(int from, int flags)
 	if (!in)
 		goto fail;
 
-	h = hash_new(flags);
+	h = hash_new();
 	if (!h)
 		goto fail;
 
@@ -223,7 +157,11 @@ hash_read(int from, int flags)
 		if (b && *b)
 			goto fail;
 
-		if (hash_setv(h, buf, value) != 0)
+		ptr = reader(value, udata);
+		if (!ptr)
+			goto fail;
+
+		if (hash_set(h, buf, ptr) != 0)
 			goto fail;
 	}
 
@@ -237,7 +175,7 @@ fail:
 }
 
 int
-hash_write(struct hash *h, int to)
+hash_write(struct hash *h, int to, hash_writer_fn writer, void *udata)
 {
 	FILE *out;
 	int i, fd;
@@ -261,7 +199,7 @@ hash_write(struct hash *h, int to)
 
 	for (i = 0; i < HASH_STRIDE; i++)
 		for (b = h->buckets[i]; b; b = b->next)
-			fprintf(out, "%s\t%lu\n", b->key, b->val);
+			fprintf(out, "%s\t%lu\n", b->key, writer(b->ptr, udata));
 
 	fclose(out);
 	return 0;
@@ -270,6 +208,39 @@ hash_write(struct hash *h, int to)
 
 #ifdef TEST
 /* LCOV_EXCL_START */
+#define new_hash(h) do {\
+	h = hash_new(); \
+	if (!h) \
+		BAIL_OUT("hash_new() returned a NULL pointer"); \
+} while (0)
+
+struct data {
+	uint64_t id;
+	/* don't need any other fields... */
+};
+
+static uint64_t test_writer1(void *_ptr, void *_)
+{
+	assert(_ptr != NULL);
+	return ((struct data *)_ptr)->id;
+}
+/* _u (userdata) will be a contiguous array of
+   struct data pointers, NULL-terminated. */
+static void * test_reader1(uint64_t v, void *_u)
+{
+	struct data **u, *i;
+
+	assert(_u != NULL);
+
+	u = (struct data **)_u;
+	for (i = *u; i; i++)
+		if (i->id == v)
+			return i;
+
+	/* not found! */
+	return NULL;
+}
+
 TESTS {
 	subtest {
 		isnt_unsigned(
@@ -285,79 +256,26 @@ TESTS {
 
 	subtest {
 		struct hash *h;
-		void *v;
+		const char *v;
 
-		h = hash_new(0);
-		if (!h)
-			BAIL_OUT("hash_new(0) returned a NULL pointer");
+		new_hash(h);
 
-		v = NULL;
-		ok(hash_getp(h, &v, "one") != 0,
-			"hash_getp(k) should fail, since k is not set in the hash");
-
-		ok(hash_setp(h, "one", (void *)1) == 0,
-			"hash_setp(k,v) should succeed");
+		ok(!hash_isset(h, "one"), "h[one] should not be set");
 
 		v = NULL;
-		ok(hash_getp(h, &v, "one") == 0,
-			"hash_getp(k) should succeed");
-		is_ptr(v, (void *)1,
-			"hash_getp(k) should retrieve what we hash_setp(k)");
+		ok(hash_get(h, &v, "one") != 0,
+			"hash_get(k) should fail, since k is not set in the hash");
 
-		hash_free(h);
-	}
+		ok(hash_set(h, "one", "the first value") == 0,
+			"hash_set(k,v) should succeed");
 
-	subtest {
-		struct hash *h;
-		unsigned int i, *values[4], *v;
-		const char *keys[4] = { "first", "second", "third", "last" };
-
-		h = hash_new(HASH_MANAGED);
-		if (!h)
-			BAIL_OUT("hash_new(HASH_MANAGED) returned a NULL pointer");
-
-		for (i = 0; i < 4; i++) {
-			values[i] = malloc(sizeof(unsigned int));
-			if (!values[i])
-				BAIL_OUT("failed to allocate integers for managed hash tests");
-
-			*values[i] = i + 0x0200; /* arbitrary constant, no meaning */
-			ok(hash_setp(h, keys[i], values[i]) == 0,
-				"hash_setp() should set %s -> %p (%i)", keys[i], values[i], values[i]);
-		}
-
-		for (i = 0; i < 4; i++) {
-			v = NULL;
-			ok(hash_getp(h, (void **)&v, keys[i]) == 0,
-				"hash_getp() should retrieve %s", keys[i]);
-
-			is_ptr(v, values[i],
-				"hash_getp() should retrieve the correct pointer for %s", keys[i]);
-		}
-
-		hash_free(h);
-	}
-
-	subtest {
-		struct hash *h;
-		unsigned int *value, *v;
-
-		h = hash_new(HASH_MANAGED);
-		if (!h)
-			BAIL_OUT("hash_new(0) returned a NULL pointer");
-
-		value = malloc(sizeof(*value));
-		if (!value)
-			BAIL_OUT("failed to allocate an integer for the hash memory leak test");
-		ok(hash_setp(h, "reused-key", value) == 0, "1st hash_setp(k,v) should succeed");
-
-		value = malloc(sizeof(*value));
-		if (!value)
-			BAIL_OUT("failed to allocate an integer for the hash memory leak test");
-		ok(hash_setp(h, "reused-key", value) == 0, "2nd hash_setp(k,v) should succeed");
+		ok(hash_isset(h, "one"), "h[one] should be set");
 
 		v = NULL;
-		ok(hash_getp(h, (void **)&v, "reused-key") == 0, "hash_getp() should succeed");
+		ok(hash_get(h, &v, "one") == 0,
+			"hash_get(k) should succeed");
+		is_string(v, "the first value",
+			"hash_get(k) should retrieve what we hash_set(k)");
 
 		hash_free(h);
 	}
@@ -365,52 +283,71 @@ TESTS {
 	subtest {
 		struct hash *h;
 		int fd;
-		uint64_t v;
+		struct data *data, *lst[2], *result;
 
+		new_hash(h);
 		fd = memfd("hash");
-		h = hash_new(0);
-		if (!h)
-			BAIL_OUT("hash_new(0) returned a NULL pointer");
 
-		if (hash_setv(h, "key", 0xdecafbaddecafbadUL) != 0)
+		data = malloc(sizeof(struct data));
+		if (!data)
+			BAIL_OUT("memory allocation failed");
+
+		data->id = 0xdecafbad;
+		lst[0] = data;
+		lst[1] = NULL;
+
+		if (hash_set(h, "key", data) != 0)
 			BAIL_OUT("failed to set up the test for hash_read/write");
 
-		ok(hash_write(h, fd) == 0,
+		ok(hash_write(h, fd, test_writer1, lst) == 0,
 			"hash_write() should succeed");
 
 		hash_free(h);
 
-		h = hash_read(fd, 0);
+		h = hash_read(fd, test_reader1, lst);
 		if (!h)
 			BAIL_OUT("failed to read hash back in from the fd");
 
-		v = 0xabad1deaUL;
-		ok(hash_getv(h, &v, "key") == 0,
-			"hash_getv() should succeed after re-read");
-		is_unsigned(v, 0xdecafbaddecafbadUL,
-			"hash_getv() should return a value");
+		ok(hash_get(h, &result, "key") == 0,
+			"hash_get() should succeed after re-read");
+		is_ptr(result, data, "hash_get() should return pointer set by reader fn");
 
 		hash_free(h);
 		close(fd);
+		free(data);
 	}
 
 	subtest {
 		struct hash *h;
 		char *key;
 		int i;
+		struct data d;
 
-		h = hash_new(0);
-		if (!h)
-			BAIL_OUT("hash_new(0) returned a NULL pointer");
-
+		new_hash(h);
 		for (i = 0; i < HASH_STRIDE + 1; i++) {
 			if (asprintf(&key, "key%d", i) <= 0)
 				BAIL_OUT("failed to generate a key for pigeon-hole test");
 
-			if (hash_setv(h, key, 12345) != 0)
-				fail("failed to set key %s => 12345 in pigeon-hole test");
+			if (hash_set(h, key, &d) != 0)
+				fail("failed to set key %s => (data) in pigeon-hole test");
 			free(key);
 		}
+
+		hash_free(h);
+	}
+
+	subtest {
+		struct hash *h;
+		struct data d1, d2, *v;
+
+		new_hash(h);
+		ok(hash_set(h, "x", &d1) == 0, "should set x => d1");
+		ok(hash_get(h, &v, "x") == 0, "should be able to retrieve 'x'");
+		is_ptr(v, &d1, "'x' should be mapped to d1");
+
+		ok(hash_set(h, "x", &d2) == 0, "should set x => d2");
+		ok(hash_get(h, &v, "x") == 0, "should be able to retrieve 'x'");
+		is_ptr(v, &d2, "'x' should now be mapped to d2");
 
 		hash_free(h);
 	}

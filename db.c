@@ -315,6 +315,29 @@ fail:
 	return 0;
 }
 
+static uint64_t
+s_maindb_writer(void *_idx, void *_)
+{
+	assert(_idx != NULL);
+	return ((struct idx *)_idx)->number;
+}
+
+static void *
+s_maindb_reader(uint64_t id, void *udata)
+{
+	struct db *db;
+	struct idx *i;
+
+	assert(udata != NULL);
+
+	db = (struct db *)udata;
+	for_each(i, &db->idx, l)
+		if (i->number == id)
+			return i;
+
+	return NULL;
+}
+
 struct db *
 db_mount(const char *path)
 {
@@ -349,18 +372,22 @@ db_mount(const char *path)
 		goto fail;
 	}
 
-	db->main = hash_read(fd, 0);
+	/* first, we have to scan the time series indices */
+	infof("scanning time series time index files at %s/idx", path);
+	empty(&db->idx);
+	s_ensure_dirat(db->rootfd, "idx", 0777);
+	if (s_scandir(db, "idx", ".idx", s_handle_idx) != 0)
+		goto fail;
+
+	infof("mounting main.db index file at %s/%s", path, PATH_TO_MAINDB);
+	db->main = hash_read(fd, s_maindb_reader, db);
 	if (!db->main)
 		goto fail;
 	close(fd);
 
 	/* FIXME: scan the tags/ subdirectory */
 
-	empty(&db->idx);
-	s_ensure_dirat(db->rootfd, "idx", 0777);
-	if (s_scandir(db, "idx", ".idx", s_handle_idx) != 0)
-		goto fail;
-
+	infof("scanning time series slab storage files at %s/slabs", path);
 	empty(&db->slab);
 	s_ensure_dirat(db->rootfd, "slabs", 0777);
 	if (s_scandir(db, "slabs", ".slab", s_handle_slab) != 0)
@@ -426,7 +453,7 @@ db_init(const char *path)
 			errno = BOLO_ENOMAINDB;
 		goto fail;
 	}
-	if (hash_write(db->main, fd) != 0)
+	if (hash_write(db->main, fd, s_maindb_writer, db) != 0)
 		goto fail;
 	close(fd);
 	fd = -1;
@@ -519,7 +546,7 @@ db_sync(struct db *db)
 	if (fd < 0)
 		goto fail;
 
-	if (hash_write(db->main, fd) != 0)
+	if (hash_write(db->main, fd, s_maindb_writer, db) != 0)
 		goto fail;
 
 	if (renameat(db->rootfd, copy, db->rootfd, PATH_TO_MAINDB) != 0)
@@ -690,12 +717,12 @@ db_insert(struct db *db, const char *name, bolo_msec_t when, bolo_value_t what)
 	assert(db->main != NULL);
 	assert(name != NULL);
 
-	if (hash_getp(db->main, &idx, name) != 0) {
+	if (hash_get(db->main, &idx, name) != 0) {
 		if (s_newidx(db, &idx, &idx_id) != 0)
 			return -1;
+		assert(idx != NULL);
 
-		if (hash_setp(db->main, name, idx)    != 0
-		 || hash_setv(db->main, name, idx_id) != 0)
+		if (hash_set(db->main, name, idx) != 0)
 			return -1;
 	}
 	assert(idx != NULL);

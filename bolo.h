@@ -132,21 +132,19 @@ int  hmac_sha512_check(const char *key, size_t klen, const void *buf, size_t len
 
 /****************************************************************  hashing  ***/
 
-#define HASH_MANAGED 0x01
-
 struct hash;
+typedef void *   (*hash_reader_fn)(uint64_t v, void *udata);
+typedef uint64_t (*hash_writer_fn)(void    *v, void *udata);
 
-struct hash * hash_new(int flags);
+struct hash * hash_new();
 void hash_free(struct hash *h);
 
-struct hash * hash_read(int fd, int flags);
-int hash_write(struct hash *h, int fd);
+struct hash * hash_read(int fd, hash_reader_fn fn, void *udata);
+int hash_write(struct hash *h, int fd, hash_writer_fn fn, void *udata);
 
-int hash_setp(struct hash *h, const char *key, void *value);
-int hash_getp(struct hash *h, void *dst, const char *key);
-
-int hash_setv(struct hash *h, const char *key, uint64_t v);
-int hash_getv(struct hash *h, uint64_t *dst, const char *key);
+int hash_set(struct hash *h, const char *key, void *value);
+int hash_get(struct hash *h, void *dst, const char *key);
+#define hash_isset(h,k) (hash_get((h), NULL, (k)) == 0)
 
 /********************************************************************  time ***/
 
