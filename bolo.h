@@ -56,6 +56,19 @@ size_t len(const struct list *l) RETURNS;
 void push(struct list *list, struct list *add);
 
 
+/****************************************************************  logging  ***/
+
+#define LOG_ERRORS   0
+#define LOG_WARNINGS 1
+#define LOG_INFO     2
+
+void startlog(const char *bin, pid_t pid, int level);
+void logto(int fd);
+void errorf(const char *fmt, ...);
+void warningf(const char *fmt, ...);
+void infof(const char *fmt, ...);
+
+
 /**************************************************************  debugging  ***/
 
 int  debugto(int fd);

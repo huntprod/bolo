@@ -5,6 +5,7 @@
 /btree
 /db
 /hash
+/log
 /page
 /sha
 /time
