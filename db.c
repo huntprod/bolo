@@ -4,6 +4,8 @@
 
 #define PATH_TO_MAINDB "main.db"
 
+#define DEFAULT_BLOCK_SPAN 1000 * 60 * 60 * 18 /* 18h */
+
 struct db {
 	/* tunables */
 	unsigned int  block_span;
@@ -363,6 +365,7 @@ db_mount(const char *path)
 	if (!db)
 		goto fail;
 
+	db->block_span = DEFAULT_BLOCK_SPAN;
 	db->rootfd = fd;
 
 	fd = openat(db->rootfd, PATH_TO_MAINDB, O_RDONLY);
@@ -439,7 +442,7 @@ db_init(const char *path)
 	if (!db)
 		goto fail;
 
-	db->block_span = 1000 * 60 * 60 * 18; /* 18h */
+	db->block_span = DEFAULT_BLOCK_SPAN;
 	db->rootfd = fd;
 	fd = -1;
 	db->main = hash_new(0);
