@@ -26,7 +26,7 @@ const char *
 error(int num)
 {
 	if (num < 0 || num > BOLO_ERROR_TOP)
-		return errors[BOLO_EUNKNOWN];
+		num = BOLO_EUNKNOWN;
 
 	if (num < BOLO_ERROR_BASE)
 		return strerror(num);
@@ -90,6 +90,20 @@ push(struct list *lst, struct list *add)
 
 #ifdef TEST
 /* LCOV_EXCL_START */
+struct data {
+	struct list l;
+	char        value;
+};
+
+static int s_listis(struct list *lst, const char *expect)
+{
+	struct data *d;
+	for_each(d, lst, l)
+		if (d->value != *expect++)
+			return 0;
+	return 1; /* mismatch */
+}
+
 TESTS {
 	subtest {
 		struct stat st;
@@ -113,6 +127,47 @@ TESTS {
 
 		ok(stat("t/tmp/a/b/c/d/FILE", &st) != 0,
 			"stat(t/tmp/a/b/c/d/FILE) should fail, even after we call mktree()");
+	}
+
+	subtest {
+		struct list lst;
+		struct data A, B, C, D;
+
+		A.value = 'a';
+		B.value = 'b';
+		C.value = 'c';
+		D.value = 'd';
+
+		empty(&lst);
+		is_unsigned(len(&lst), 0, "empty lists should be empty");
+		ok(s_listis(&lst, ""), "empty lists should equal []");
+
+		push(&lst, &A.l);
+		is_unsigned(len(&lst), 1, "list should be 1 element long after 1 push() op");
+		ok(s_listis(&lst, "a"), "after push(a), list should be [a]");
+
+		push(&lst, &B.l);
+		is_unsigned(len(&lst), 2, "list should be 2 element long after 2 push() ops");
+		ok(s_listis(&lst, "ab"), "after push(b), list should be [a, b]");
+
+		push(&lst, &C.l);
+		is_unsigned(len(&lst), 3, "list should be 3 element long after 3 push() ops");
+		ok(s_listis(&lst, "abc"), "after push(c), list should be [a, b, c]");
+
+		push(&lst, &D.l);
+		is_unsigned(len(&lst), 4, "list should be 4 element long after 4 push() ops");
+		ok(s_listis(&lst, "abcd"), "after push(d), list should be [a, b, c, d]");
+	}
+
+	subtest {
+		is_string(error(ENOENT), strerror(ENOENT),
+			"error() should hand off to system error stringification");
+		is_string(error(BOLO_EBADHASH), errors[BOLO_EBADHASH - BOLO_ERROR_BASE],
+			"error() should divert to its own error stringification");
+		is_string(error(BOLO_ERROR_TOP + 0x100), errors[BOLO_EUNKNOWN - BOLO_ERROR_BASE],
+			"error() should revert to the unknown error for out-of-range errnos");
+		is_string(error(-3), errors[BOLO_EUNKNOWN - BOLO_ERROR_BASE],
+			"error() should revert to the unknown error for out-of-range errnos");
 	}
 }
 /* LCOV_EXCL_STOP */
