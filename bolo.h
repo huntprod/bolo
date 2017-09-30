@@ -74,6 +74,16 @@ void infof(const char *fmt, ...);
 int  debugto(int fd);
 void debugf(const char *fmt, ...);
 
+
+/*****************************************************************  config  ***/
+
+struct config {
+	int log_level;
+};
+
+int configure(struct config *, int fd) RETURNS;
+
+
 /****************************************************************  SHA-512  ***/
 
 #define SHA512_DIGEST   64

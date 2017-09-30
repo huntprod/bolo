@@ -16,29 +16,22 @@ clean:
 	rm -f *.gcno *.gcda
 	rm -f lcov.info
 
-PAGE_DEPS  := util.o
-LOG_DEPS   := util.o
-BTREE_DEPS := page.o $(PAGE_DEPS)
-DB_DEPS    := btree.o $(BTREE_DEPS)
-DB_DEPS    += hash.o
-DB_DEPS    += sha.o
-DB_DEPS    += tblock.o tslab.o
-
 test: check
-check: $(LOG_DEPS) $(PAGE_DEPS) $(BTREE_DEPS) $(DB_DEPS)
+check: util.o log.o page.o btree.o hash.o sha.o tblock.o tslab.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o bits  bits.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o util  util.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o log   log.c    $(LOG_DEPS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o log   log.c    util.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o cfg   cfg.c    log.o util.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o hash  hash.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o page  page.c   $(PAGE_DEPS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o btree btree.c  $(BTREE_DEPS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o page  page.c   util.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o btree btree.c  page.o util.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o sha   sha.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o time  time.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o db    db.c     $(DB_DEPS)
-	prove -v ./bits ./util ./log ./hash ./page ./btree ./sha ./time ./db
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o db    db.c     btree.o page.o util.o hash.o sha.o tblock.o tslab.o log.o
+	prove -v ./bits ./util ./log ./cfg ./hash ./page ./btree ./sha ./time ./db
 
 memtest: check
-	t/vg ./bits ./util ./log ./hash ./page ./btree ./sha ./time ./db
+	t/vg ./bits ./util ./log ./cfg ./hash ./page ./btree ./sha ./time ./db
 	@echo "No memory leaks detected"
 
 coverage:

@@ -3,6 +3,7 @@
 
 /bits
 /btree
+/cfg
 /db
 /hash
 /log
