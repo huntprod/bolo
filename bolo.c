@@ -101,26 +101,28 @@ do_stdin(int argc, char **argv)
 
 		when = strtoull(time, &end, 10);
 		if (end && *end) {
-			fprintf(stderr, "failed to parse [%s %s] timestamp '%s'\n",
-			                 metric, tags, time);
+			errorf("failed to parse [%s %s] timestamp '%s'\n",
+			       metric, tags, time);
 			continue;
 		}
 
 		what = strtod(time, &end);
 		if (end && *end) {
-			fprintf(stderr, "failed to parse [%s %s] measurement value '%s'\n",
-			                metric, tags, value);
+			errorf("failed to parse [%s %s] measurement value '%s'\n",
+			       metric, tags, value);
 			continue;
 		}
 
 		/* FIXME: compose metric|tags */
+		infof("inserting [%s %s %s %s]",
+			       metric, tags, time, value);
 		if (db_insert(db, metric, when, what) != 0)
-			fprintf(stderr, "failed to insert [%s %s %s %s]: %s\n",
-			                metric, tags, time, value, error(errno));
+			errorf("failed to insert [%s %s %s %s]: %s (error %d)\n",
+			       metric, tags, time, value, error(errno), errno);
 
 		if (db_sync(db) != 0)
-			fprintf(stderr, "failed to sync database to disk: %s\n",
-			                error(errno));
+			errorf("failed to sync database to disk: %s (error %d)\n",
+			       error(errno), errno);
 	}
 
 	if (db_unmount(db) != 0)
