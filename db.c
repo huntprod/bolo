@@ -225,6 +225,9 @@ s_scandir(struct db *db, const char *path, const char *suffix, fs_handler fn)
 		}
 
 		while ((e2 = readdir(dh2)) != NULL) {
+			if (e2->d_name[0] == '.')
+				continue;
+
 			if (!s_isdatfile(e2->d_name, suffix)) {
 				warningf("file %s/%s/%s does not appear to be a data file (name mismatch)",
 						path, e1->d_name, e2->d_name);
