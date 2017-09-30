@@ -1,12 +1,14 @@
 #include "bolo.h"
 #include <limits.h>
 
+/* LCOV_EXCL_START */
 void
 bail(const char *msg)
 {
 	fprintf(stderr, "%s\n", msg);
 	exit(2);
 }
+/* LCOV_EXCL_STOP */
 
 static const char *errors[] = {
 	/* BOLO_EUNKNOWN */  "An unknown error has occurred",
