@@ -186,7 +186,7 @@ int tslab_extend(struct tslab *s, bolo_msec_t base)
 	return -1;
 }
 
-int FIXME_log(struct tslab *s, bolo_msec_t when, double what)
+int tslab_insert(struct tslab *s, bolo_msec_t when, double what)
 {
 	int i;
 

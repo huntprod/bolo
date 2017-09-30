@@ -656,7 +656,7 @@ db_insert(struct db *db, const char *name, bolo_msec_t when, bolo_value_t what)
 	if (!slab)
 		return -1;
 
-	if (FIXME_log(slab, when, what) != 0)
+	if (tslab_insert(slab, when, what) != 0)
 		return -1;
 
 	/* FIXME: may need to sync */

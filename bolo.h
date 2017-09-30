@@ -366,7 +366,7 @@ int tslab_init(struct tslab *s, int fd, uint64_t number, uint32_t block_size) RE
 int tslab_isfull(struct tslab *s) RETURNS;
 int tslab_extend(struct tslab *s, bolo_msec_t base);
 
-int FIXME_log(struct tslab *s, bolo_msec_t when, bolo_value_t what) RETURNS;
+int tslab_insert(struct tslab *s, bolo_msec_t when, bolo_value_t what) RETURNS;
 
 /***************************************************************  database  ***/
 

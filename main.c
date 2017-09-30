@@ -41,7 +41,7 @@ int main(int argc, char **argv)
 		now = bolo_ms(NULL);
 		if (now != INVALID_MS) {
 			fprintf(stderr, "{%lu, %lf}\n", now, v);
-			if (FIXME_log(&slab, now, v) != 0)
+			if (tslab_insert(&slab, now, v) != 0)
 				fprintf(stderr, "oops. log tuple failed: %s\n", error(errno));
 			if (tslab_sync(&slab) != 0)
 				fprintf(stderr, "oops. commit failed: %s\n", error(errno));
