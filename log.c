@@ -122,7 +122,7 @@ TESTS {
 		startlog("test-driver", 12345, LOG_WARNINGS);
 		infof("an informational message (number %d)", 42);
 		warningf("oh noes, a %s (%x)!", "warning", 0xdecafbad);
-		errorf("error %d (%s)", ENOENT, strerror(ENOENT));
+		errorf("error %d (%s)", ENOENT, error(ENOENT));
 
 		lseek(fd, 0, SEEK_SET);
 		ok(read(fd, buf, 8192) > 0,

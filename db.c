@@ -203,14 +203,14 @@ s_scandir(struct db *db, const char *path, const char *suffix, fs_handler fn)
 		fd = openat(dirfd(dh1), e1->d_name, O_RDONLY | O_DIRECTORY);
 		if (fd < 0) {
 			errorf("failed to open %s/%s/ for reading: %s (error %d)",
-					path, e1->d_name, strerror(errno), errno);
+					path, e1->d_name, error(errno), errno);
 			continue;
 		}
 
 		dh2 = fdopendir(fd);
 		if (!dh2) {
 			errorf("failed to fdopen %s/%s/ for reading: %s (error %d)",
-					path, e1->d_name, strerror(errno), errno);
+					path, e1->d_name, error(errno), errno);
 			close(fd);
 			continue;
 		}
@@ -226,7 +226,7 @@ s_scandir(struct db *db, const char *path, const char *suffix, fs_handler fn)
 			fd = openat(dirfd(dh2), e2->d_name, O_RDWR);
 			if (fd < 0) {
 				errorf("failed to open datfile %s/%s/%s: %s (error %d)",
-						path, e1->d_name, e2->d_name, strerror(errno), errno);
+						path, e1->d_name, e2->d_name, error(errno), errno);
 				continue;
 			}
 

@@ -30,7 +30,7 @@ configure(struct config *cfg, int fd)
 			}
 			if (n <  0) {
 				errorf("failed to read configuration: %s (error %d)",
-						strerror(errno), errno);
+						error(errno), errno);
 				return -1;
 			}
 
