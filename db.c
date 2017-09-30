@@ -435,7 +435,7 @@ db_init(const char *path)
 		goto fail;
 
 	/* make sure we have a root directory */
-	s_ensure_dirat(db->rootfd, path, 0777);
+	s_ensure_dirat(cwd, path, 0777);
 	fd = openat(cwd, path, O_RDONLY | O_DIRECTORY);
 	if (fd < 0)
 		goto fail;
