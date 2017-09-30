@@ -195,7 +195,7 @@ s_scandir(struct db *db, const char *path, const char *suffix, fs_handler fn)
 
 		while ((e2 = readdir(dh2)) != NULL) {
 			if (!s_isdatfile(e2->d_name, suffix)) {
-				warnf("file %s/%s/%s does not appear to be a data file (name mismatch)",
+				warningf("file %s/%s/%s does not appear to be a data file (name mismatch)",
 						path, e1->d_name, e2->d_name);
 				continue;
 			}
@@ -648,6 +648,8 @@ db_insert(struct db *db, const char *name, bolo_msec_t when, bolo_value_t what)
 #ifdef TEST
 /* LCOV_EXCL_START */
 TESTS {
+	startlog("test:db", 0, LOG_ERRORS);
+
 	subtest {
 		char *copy;
 
