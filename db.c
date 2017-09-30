@@ -179,23 +179,34 @@ s_scandir(struct db *db, const char *path, const char *suffix, fs_handler fn)
 			continue;
 
 		fd = openat(dirfd(dh1), e1->d_name, O_RDONLY | O_DIRECTORY);
-		if (fd < 0) /* FIXME should we log something here? */
+		if (fd < 0) {
+			errorf("failed to open %s/%s/ for reading: %s (error %d)",
+					path, e1->d_name, strerror(errno), errno);
 			continue;
+		}
 
 		dh2 = fdopendir(fd);
-		if (!dh2) { /* FIXME should we log something here? */
+		if (!dh2) {
+			errorf("failed to fdopen %s/%s/ for reading: %s (error %d)",
+					path, e1->d_name, strerror(errno), errno);
 			close(fd);
 			continue;
 		}
 
 		while ((e2 = readdir(dh2)) != NULL) {
-			if (!s_isdatfile(e2->d_name, suffix)) /* FIXME should we log something here? */
+			if (!s_isdatfile(e2->d_name, suffix)) {
+				warnf("file %s/%s/%s does not appear to be a data file (name mismatch)",
+						path, e1->d_name, e2->d_name);
 				continue;
+			}
 
 			id = s_datfileno(e2->d_name);
 			fd = openat(dirfd(dh2), e2->d_name, O_RDWR);
-			if (fd < 0) /* FIXME should we log something here? */
+			if (fd < 0) {
+				errorf("failed to open datfile %s/%s/%s: %s (error %d)",
+						path, e1->d_name, e2->d_name, strerror(errno), errno);
 				continue;
+			}
 
 			if (fn(db, id, fd) != 0)
 				goto fail;
