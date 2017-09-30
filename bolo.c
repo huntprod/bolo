@@ -83,7 +83,7 @@ do_stdin(int argc, char **argv)
 	}
 
 	db = db_mount(argv[2]);
-	if (!db && errno == EBADF) /* FIXME: might be a little fast and loose */
+	if (!db && (errno == BOLO_ENODBROOT || errno == BOLO_ENOMAINDB))
 		db = db_init(argv[2]);
 	if (!db) {
 		fprintf(stderr, "%s: %s\n", argv[2], error(errno));
@@ -147,11 +147,23 @@ do_version(int argc, char **argv)
 int main(int argc, char **argv)
 {
 	const char *command;
+	int log_level;
+	char *s;
 
 	if (argc < 2)
 		command = "version";
 	else
 		command = argv[1];
+
+	log_level = LOG_ERRORS;
+	if ((s = getenv("BOLO_LOGLEVEL")) != NULL) {
+		     if (streq(s, "error")   || streq(s, "ERROR"))  log_level = LOG_ERRORS;
+		else if (streq(s, "warning") || streq(s, "WARNING")
+		      || streq(s, "warn")    || streq(s, "WARN"))   log_level = LOG_WARNINGS;
+		else if (streq(s, "info")    || streq(s, "INFO"))   log_level = LOG_INFO;
+		/* silently ignore incorrect values */
+	}
+	startlog(argv[0], getpid(), log_level);
 
 	if (strcmp(command, "-v") == 0
 	 || strcmp(command, "--version") == 0)

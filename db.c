@@ -49,6 +49,7 @@ encryptdb(const char *key, size_t len)
 static int
 s_handle_idx(struct db *db, uint64_t id, int fd)
 {
+	int esave;
 	struct idx *idx;
 
 	idx = malloc(sizeof(*idx));
@@ -64,14 +65,17 @@ s_handle_idx(struct db *db, uint64_t id, int fd)
 	return 0;
 
 fail:
+	esave = errno;
 	free(idx);
 	close(fd);
+	errno = esave;
 	return -1;
 }
 
 static int
 s_handle_slab(struct db *db, uint64_t id, int fd)
 {
+	int esave;
 	struct tslab *slab;
 
 	slab = malloc(sizeof(*slab));
@@ -86,8 +90,10 @@ s_handle_slab(struct db *db, uint64_t id, int fd)
 	return 0;
 
 fail:
+	esave = errno;
 	free(slab);
 	close(fd);
+	errno = esave;
 	return -1;
 }
 
@@ -175,6 +181,7 @@ s_scandir(struct db *db, const char *path, const char *suffix, fs_handler fn)
 	   tracking and linking.
 	 */
 
+	int esave;
 	DIR *dh1, *dh2;
 	int fd;
 	uint64_t id;
@@ -241,17 +248,38 @@ s_scandir(struct db *db, const char *path, const char *suffix, fs_handler fn)
 	return 0;
 
 fail:
+	esave = errno;
 	if (dh1) closedir(dh1);
 	if (dh2) closedir(dh2);
 	if (fd >= 0) close(fd);
+	errno = esave;
 	return -1;
 }
 
 #define s_cwd() open(".", O_RDONLY | O_DIRECTORY)
 
+static void
+s_ensure_dirat(int dirfd, const char *path, mode_t mode)
+{
+	int fd;
+
+	fd = openat(dirfd, path, O_RDONLY | O_DIRECTORY);
+	if (fd < 0) {
+		if (mktree(dirfd, path, mode) != 0
+		 || (mkdirat(dirfd, path, mode) != 0 && errno != EEXIST))
+			return;
+
+		fd = openat(dirfd, path, O_RDONLY | O_DIRECTORY);
+		if (fd < 0)
+			return;
+	}
+	close(fd);
+}
+
 static int
 s_dirempty(int dirfd)
 {
+	int esave;
 	int fd;
 	DIR *d;
 	struct dirent *e;
@@ -280,8 +308,10 @@ s_dirempty(int dirfd)
 	return 1;
 
 fail:
+	esave = errno;
 	if (d) closedir(d);
 	close(fd);
+	errno = esave;
 	return 0;
 }
 
@@ -290,6 +320,7 @@ db_mount(const char *path)
 {
 	struct db *db;
 	int fd, cwd;
+	int esave;
 
 	db = NULL;
 	fd = cwd = -1;
@@ -299,8 +330,11 @@ db_mount(const char *path)
 		goto fail;
 
 	fd = openat(cwd, path, O_RDONLY | O_DIRECTORY);
-	if (fd < 0)
+	if (fd < 0) {
+		if (errno == ENOENT)
+			errno = BOLO_ENODBROOT;
 		goto fail;
+	}
 
 	db = calloc(1, sizeof(struct db));
 	if (!db)
@@ -308,10 +342,12 @@ db_mount(const char *path)
 
 	db->rootfd = fd;
 
-	errno = BOLO_ENOMAINDB;
 	fd = openat(db->rootfd, PATH_TO_MAINDB, O_RDONLY);
-	if (fd < 0)
+	if (fd < 0) {
+		if (errno == ENOENT)
+			errno = BOLO_ENOMAINDB;
 		goto fail;
+	}
 
 	db->main = hash_read(fd, 0);
 	if (!db->main)
@@ -321,10 +357,12 @@ db_mount(const char *path)
 	/* FIXME: scan the tags/ subdirectory */
 
 	empty(&db->idx);
+	s_ensure_dirat(db->rootfd, "idx", 0777);
 	if (s_scandir(db, "idx", ".idx", s_handle_idx) != 0)
 		goto fail;
 
 	empty(&db->slab);
+	s_ensure_dirat(db->rootfd, "slabs", 0777);
 	if (s_scandir(db, "slabs", ".slab", s_handle_slab) != 0)
 		goto fail;
 
@@ -332,6 +370,7 @@ db_mount(const char *path)
 	return db;
 
 fail:
+	esave = errno;
 	if (cwd >= 0) close(cwd);
 	if (fd  >= 0) close(fd);
 	if (db) {
@@ -339,6 +378,7 @@ fail:
 		hash_free(db->main);
 		free(db);
 	}
+	errno = esave;
 	return NULL;
 }
 
@@ -347,6 +387,7 @@ db_init(const char *path)
 {
 	struct db *db;
 	int cwd, fd;
+	int esave;
 
 	assert(path != NULL);
 
@@ -357,6 +398,8 @@ db_init(const char *path)
 	if (cwd < 0)
 		goto fail;
 
+	/* make sure we have a root directory */
+	s_ensure_dirat(db->rootfd, path, 0777);
 	fd = openat(cwd, path, O_RDONLY | O_DIRECTORY);
 	if (fd < 0)
 		goto fail;
@@ -376,10 +419,13 @@ db_init(const char *path)
 	if (!db->main)
 		goto fail;
 
+	/* create the main.db index */
 	fd = openat(db->rootfd, PATH_TO_MAINDB, O_WRONLY|O_CREAT, 0666);
-	if (fd < 0)
+	if (fd < 0) {
+		if (errno == ENOENT)
+			errno = BOLO_ENOMAINDB;
 		goto fail;
-
+	}
 	if (hash_write(db->main, fd) != 0)
 		goto fail;
 	close(fd);
@@ -391,6 +437,7 @@ db_init(const char *path)
 	return db;
 
 fail:
+	esave = errno;
 	if (cwd >= 0) close(cwd);
 	if (fd  >= 0) close(fd);
 	if (db) {
@@ -398,6 +445,7 @@ fail:
 		hash_free(db->main);
 		free(db);
 	}
+	errno = esave;
 	return NULL;
 }
 
@@ -454,6 +502,7 @@ db_sync(struct db *db)
 	struct idx   *idx;
 	char *copy;
 	int fd;
+	int esave;
 
 	fd = -1;
 	copy = NULL;
@@ -481,8 +530,10 @@ db_sync(struct db *db)
 	return 0;
 
 fail:
+	esave = errno;
 	if (fd >= 0) close(fd);
 	free(copy);
+	errno = esave;
 	return -1;
 }
 
@@ -517,6 +568,7 @@ db_unmount(struct db *db)
 static int
 s_newidx(struct db *db, struct idx **idx, uint64_t *id)
 {
+	int esave;
 	int fd;
 	char path[64];
 
@@ -556,14 +608,17 @@ s_newidx(struct db *db, struct idx **idx, uint64_t *id)
 	return 0;
 
 fail:
+	esave = errno;
 	if (fd >= 0) close(fd);
 	free(*idx);
+	errno = esave;
 	return -1;
 }
 
 static int
 s_newslab(struct db *db, bolo_msec_t ts, uint64_t *id)
 {
+	int esave;
 	int fd;
 	struct tslab *slab;
 	char path[64];
@@ -602,8 +657,10 @@ s_newslab(struct db *db, bolo_msec_t ts, uint64_t *id)
 	return 0;
 
 fail:
+	esave = errno;
 	if (fd >= 0) close(fd);
 	free(slab);
+	errno = esave;
 	return -1;
 }
 

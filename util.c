@@ -17,6 +17,7 @@ static const char *errors[] = {
 	/* BOLO_EBLKFULL */  "Database block is full",
 	/* BOLO_EBLKRANGE */ "Database block range insufficient",
 	/* BOLO_ENOMAINDB */ "main.db index not found in database root",
+	/* BOLO_ENODBROOT */ "Database root directory not found",
 };
 
 const char *
@@ -25,10 +26,10 @@ error(int num)
 	if (num < 0 || num > BOLO_ERROR_TOP)
 		return errors[BOLO_EUNKNOWN];
 
-	if (num <= BOLO_ERROR_BASE)
+	if (num < BOLO_ERROR_BASE)
 		return strerror(num);
 
-	return errors[num];
+	return errors[num - BOLO_ERROR_BASE];
 }
 
 int

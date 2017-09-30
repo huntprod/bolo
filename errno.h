@@ -12,7 +12,8 @@
 #define BOLO_EBLKFULL  __bolo_errno(5)
 #define BOLO_EBLKRANGE __bolo_errno(6)
 #define BOLO_ENOMAINDB __bolo_errno(7)
+#define BOLO_ENODBROOT __bolo_errno(8)
 
-#define BOLO_ERROR_TOP __bolo_errno(7)
+#define BOLO_ERROR_TOP __bolo_errno(8)
 
 #endif
