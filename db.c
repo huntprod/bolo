@@ -5,6 +5,10 @@
 #define PATH_TO_MAINDB "main.db"
 
 struct db {
+	/* tunables */
+	unsigned int  block_span;
+
+	/* internal state */
 	int           rootfd;  /* file descriptor of database root directory */
 	struct hash  *main;    /* primary time series (name|tag,tags,... => <block-id>) */
 
@@ -365,6 +369,7 @@ db_init(const char *path)
 	if (!db)
 		goto fail;
 
+	db->block_span = 1000 * 60 * 60 * 18; /* 18h */
 	db->rootfd = fd;
 	fd = -1;
 	db->main = hash_new(0);
@@ -509,9 +514,6 @@ db_unmount(struct db *db)
 	return ok;
 }
 
-#define BOLO_TS_BLOCK 512 /* FIXME completely arbitrary */
-#define s_normts(t) ((t) - ((t) % BOLO_TS_BLOCK))
-
 static int
 s_newidx(struct db *db, struct idx **idx, uint64_t *id)
 {
@@ -641,7 +643,8 @@ db_insert(struct db *db, const char *name, bolo_msec_t when, bolo_value_t what)
 	}
 	assert(idx != NULL);
 
-	slab_ts = s_normts(when);
+	assert(db->block_span > 0);
+	slab_ts = when % db->block_span;
 	slab_id = btree_find(idx->btree, slab_ts);
 	if (slab_id == MAX_U64) {
 		if (s_newslab(db, slab_ts, &slab_id) != 0)

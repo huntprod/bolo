@@ -86,6 +86,7 @@ void debugf(const char *fmt, ...);
 struct config {
 	int log_level;
 	char *secret_key;
+	unsigned int block_span;
 };
 
 int configure(struct config *, int fd) RETURNS;

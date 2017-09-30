@@ -51,6 +51,5 @@ sure: memtest
 
 fixme:
 	find . -name '*.[ch]' | xargs grep -rin fixme
-	#find . -name '*.[ch]' | xargs grep -rin -C4 --color fixme
 
 .PHONY: coverage

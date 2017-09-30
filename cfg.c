@@ -4,7 +4,7 @@
 int
 configure(struct config *cfg, int fd)
 {
-	char buf[8192];
+	char buf[8192], *p;
 	char *k, *v, *next, *eol;
 	ssize_t n, used;
 
@@ -99,6 +99,26 @@ configure(struct config *cfg, int fd)
 		} else if (streq(k, "secret_key")) {
 			free(cfg->secret_key);
 			cfg->secret_key = strdup(v);
+
+		} else if (streq(k, "block_span")) {
+			cfg->block_span = 0;
+			for (p = v; *p; p++) {
+				if (isdigit(*p)) {
+					cfg->block_span = (cfg->block_span * 10) + (*p - '0');
+				} else {
+					while (*p && isspace(*p))
+						p++;
+
+					     if (streq(p, "ms")) cfg->block_span *= 1;
+					else if (streq(p,  "s")) cfg->block_span *= 1000;
+					else if (streq(p,  "m")) cfg->block_span *= 1000 * 60;
+					else if (streq(p,  "h")) cfg->block_span *= 1000 * 60 * 60;
+					else if (streq(p,  "d")) cfg->block_span *= 1000 * 60 * 60 * 24;
+					else {
+						errorf("failed to read configuration: invalid unit in block_span value '%s'", v);
+					}
+				}
+			}
 
 		} else {
 			errorf("failed to read configuration: unrecognized configuration directive '%s'", k);
