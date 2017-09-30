@@ -354,6 +354,7 @@ db_mount(const char *path)
 	if (cwd < 0)
 		goto fail;
 
+	infof("mounting bolo database at %s", path);
 	fd = openat(cwd, path, O_RDONLY | O_DIRECTORY);
 	if (fd < 0) {
 		if (errno == ENOENT)
@@ -368,6 +369,7 @@ db_mount(const char *path)
 	db->block_span = DEFAULT_BLOCK_SPAN;
 	db->rootfd = fd;
 
+	infof("checking for main.db index file at %s/%s", path, PATH_TO_MAINDB);
 	fd = openat(db->rootfd, PATH_TO_MAINDB, O_RDONLY);
 	if (fd < 0) {
 		if (errno == ENOENT)
@@ -396,6 +398,7 @@ db_mount(const char *path)
 	if (s_scandir(db, "slabs", ".slab", s_handle_slab) != 0)
 		goto fail;
 
+	infof("database mounted successfully");
 	close(cwd);
 	return db;
 
