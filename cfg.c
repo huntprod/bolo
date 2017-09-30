@@ -5,7 +5,7 @@ int
 configure(struct config *cfg, int fd)
 {
 	char buf[8192];
-	char *k, *v, *eol, *ws;
+	char *k, *v, *next, *eol;
 	ssize_t n, used;
 
 	used = 0;
@@ -13,33 +13,51 @@ configure(struct config *cfg, int fd)
 	for (;;) {
 		for (;;) {
 			eol = strchr(buf, '\n');
-			if (!eol || !*eol) {
-				if (used == 8192) {
-					errorf("failed to read configuration: line too long (>8k)");
-					return -1;
-				}
+			if (eol && *eol) break;
 
-				n = read(fd, buf+used, 8192-used);
-				if (n == 0) break;
-				if (n <  0) {
-					errorf("failed to read configuration: %s (error %d)",
-							strerror(errno), errno);
-					return -1;
-				}
-
-				used += n;
-				continue;
+			if (used == 8191) {
+				errorf("failed to read configuration: line too long (>8k)");
+				return -1;
 			}
-			break;
+
+			n = read(fd, buf+used, 8191-used);
+			if (n == 0) {
+				if (!eol) {
+					buf[used] = '\n';
+					eol = buf + used;
+				}
+				break;
+			}
+			if (n <  0) {
+				errorf("failed to read configuration: %s (error %d)",
+						strerror(errno), errno);
+				return -1;
+			}
+
+			used += n;
 		}
 
 		if (used == 0)
 			return 0;
 
+		next = eol;
+		assert(next);
+		assert(*next == '\n');
+
+		/* treat comments as ending the line */
+		eol = strchr(buf, '#');
+		if (eol && *eol) *eol = '\n';
+		else              eol = next;
+		assert(eol);
+		assert(*eol == '\n');
+
 		/* find start of the key */
 		k = &buf[0];
 		while (k != eol && isspace(*k))
 			k++;
+
+		if (k == eol)
+			goto next;
 
 		/* find the end of the key */
 		v = k;
@@ -65,9 +83,8 @@ configure(struct config *cfg, int fd)
 			v++;
 
 		/* trim trailing line whitespace */
-		for (ws = eol; isspace(*ws) && ws != v; *ws-- = '\0')
-			;
-		eol++;
+		while (eol != v && isspace(*eol))
+			*eol-- = '\0';
 
 		/* check the key against known keys */
 		if (streq(k, "log_level")) {
@@ -80,12 +97,14 @@ configure(struct config *cfg, int fd)
 			}
 
 		} else {
-			errorf("failed to read configuration fie: unrecognized configuration directive '%s'", k);
+			errorf("failed to read configuration: unrecognized configuration directive '%s'", k);
 			return -1;
 		}
 
+next:
 		/* slide the buffer */
-		n = (eol - buf);
+		next++;
+		n = (next - buf);
 		memmove(buf, buf+n, used-n);
 		used -= n;
 		buf[used] = 0;
@@ -102,8 +121,6 @@ configure(struct config *cfg, int fd)
 	fd = memfd("cfg"); \
 	put(fd, raw "\n"); \
 \
-	startlog("test:cfg", 0, LOG_ERRORS); \
-\
 	lseek(fd, 0, SEEK_SET); \
 	ok(configure(&cfg, fd) == 0, \
 		"configure() should succeed for '%s'", (raw)); \
@@ -115,6 +132,9 @@ configure(struct config *cfg, int fd)
 } while (0)
 
 TESTS {
+	//logto(5);
+	startlog("test:cfg", 0, LOG_ERRORS); \
+
 	subtest { test1("log_level = warning");  }
 	subtest { test1(" log_level = warning"); }
 	subtest { test1("log_level=warning");    }
@@ -122,5 +142,25 @@ TESTS {
 	subtest { test1("log_level= warning");   }
 	subtest { test1("log_level = warning "); }
 	subtest { test1(" log_level = warning "); }
+
+	subtest {
+		int fd;
+		struct config cfg;
+		memset(&cfg, 0, sizeof(cfg));
+
+		fd = memfd("cfg");
+		put(fd, "# bolo configuration\n");
+		put(fd, "log_level = warning      # not in prod...\n");
+		put(fd, "#log_level = info\n");
+
+		lseek(fd, 0, SEEK_SET);
+		ok(configure(&cfg, fd) == 0,
+			"configure() should succeed for comment test");
+
+		is_unsigned(cfg.log_level, LOG_WARNINGS,
+			"configure() should ignore the comments");
+
+		close(fd);
+	}
 }
 #endif
