@@ -645,15 +645,13 @@ db_insert(struct db *db, const char *name, bolo_msec_t when, bolo_value_t what)
 
 	assert(db->block_span > 0);
 	slab_ts = when % db->block_span;
-	slab_id = btree_find(idx->btree, slab_ts);
-	if (slab_id == MAX_U64) {
+	if (btree_find(idx->btree, &slab_id, slab_ts) != 0) {
 		if (s_newslab(db, slab_ts, &slab_id) != 0)
 			return -1;
 
 		if (btree_insert(idx->btree, slab_ts, slab_id) != 0)
 			return -1;
 	}
-	assert(slab_id != MAX_U64);
 
 	slab = s_findslab(db, slab_id);
 	if (!slab)

@@ -390,25 +390,28 @@ btree_insert(struct btree *t, bolo_msec_t key, uint64_t block_number)
 	return 0;
 }
 
-uint64_t
-btree_find(struct btree *t, bolo_msec_t key)
+int
+btree_find(struct btree *t, uint64_t *dst, bolo_msec_t key)
 {
 	int i;
 
 	assert(t != NULL);
+	assert(dst != NULL);
 
 	i = s_find(t, key);
 
-	if (t->leaf)
-		return (keyat(t,i) == key) ? valueat(t,i)
-		                           : MAX_U64;
+	if (t->leaf) {
+		if (keyat(t, i) != key)
+			return -1;
+		*dst = valueat(t, i);
+		return 0;
+	}
 
 	if (!t->kids[i])
-		return MAX_U64;
+		return -1;
 
-	return btree_find(t->kids[i], key);
+	return btree_find(t->kids[i], dst, key);
 }
-
 
 #ifdef TEST
 /* LCOV_EXCL_START */
@@ -460,8 +463,7 @@ TESTS {
 		"new btree file should be exactly ONE page long");
 
 	for (key = KEYSTART; key <= KEYEND; key++) {
-		value = btree_find(t, key);
-		if (value != MAX_U64)
+		if (btree_find(t, &value, key) == 0)
 			fail("btree lookup(%lx) before insertion should fail, but got %#lx\n", key, value);
 	}
 	pass("btree lookups should fail before insertion");
@@ -473,8 +475,9 @@ TESTS {
 	pass("btree insertions should succeed");
 
 	for (key = KEYSTART; key <= KEYEND; key++) {
-		value = btree_find(t, key);
-		if (value != key + PERTURB)
+		if (btree_find(t, &value, key) != 0)
+			fail("btree lookup(%lx) should succeed", key);
+		else if (value != key + PERTURB)
 			is_unsigned(value, key + PERTURB, "btree lookup(%lx)", key);
 	}
 	pass("btree lookups should succeed");
@@ -488,8 +491,9 @@ TESTS {
 		BAIL_OUT("btree_read(fd) failed!");
 
 	for (key = KEYSTART; key <= KEYEND; key++) {
-		value = btree_find(t, key);
-		if (value != key + PERTURB)
+		if (btree_find(t, &value, key) != 0)
+			fail("btree lookup(%lx) failed after re-read", key);
+		else if (value != key + PERTURB)
 			is_unsigned(value, key + PERTURB, "btree lookup(%lx) after re-read", key);
 	}
 	pass("btree lookups after re-read should succeed");

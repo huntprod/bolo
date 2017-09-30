@@ -278,7 +278,7 @@ void btree_print(struct btree *t);
 
 int btree_insert(struct btree *t, bolo_msec_t key, uint64_t block_number);
 
-uint64_t btree_find(struct btree *t, bolo_msec_t key);
+int btree_find(struct btree *t, uint64_t *dst, bolo_msec_t key);
 
 /***************************************************************  database  ***/
 
