@@ -3,10 +3,10 @@ TEST_CFLAGS := -g -DTEST -fprofile-arcs -ftest-coverage -It
 
 all: main bolo
 
-bolo: bolo.o debug.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o btree.o
+bolo: bolo.o debug.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o btree.o log.o
 	$(CC) -o $@ $+
 
-main: main.o debug.o sha.o time.o util.o page.o tblock.o tslab.o
+main: main.o debug.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o btree.o log.o
 	$(CC) -o $@ $+
 
 clean:
