@@ -96,6 +96,10 @@ configure(struct config *cfg, int fd)
 				return -1;
 			}
 
+		} else if (streq(k, "secret_key")) {
+			free(cfg->secret_key);
+			cfg->secret_key = strdup(v);
+
 		} else {
 			errorf("failed to read configuration: unrecognized configuration directive '%s'", k);
 			return -1;

@@ -27,6 +27,12 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+/*************************************************  truly global variables  ***/
+
+/* belongs to db.o */
+extern const char *ENC_KEY;
+extern size_t      ENC_KEY_LEN;
+
 /*******************************************************  common utilities  ***/
 
 #define streq(a,b) (strcmp((a),(b)) == 0)
@@ -79,6 +85,7 @@ void debugf(const char *fmt, ...);
 
 struct config {
 	int log_level;
+	char *secret_key;
 };
 
 int configure(struct config *, int fd) RETURNS;
@@ -120,9 +127,6 @@ void hmac_sha512_seal (const char *key, size_t klen, const void *buf, size_t len
 int  hmac_sha512_check(const char *key, size_t klen, const void *buf, size_t len) RETURNS;
 #define hmac_seal  hmac_sha512_seal
 #define hmac_check hmac_sha512_check
-
-#define FIXME_DEFAULT_KEY "bolo-fixed-secret-FIXME"
-#define FIXME_DEFAULT_KEY_LEN strlen(FIXME_DEFAULT_KEY)
 
 
 /****************************************************************  hashing  ***/
@@ -303,6 +307,7 @@ uint64_t btree_find(struct btree *t, bolo_msec_t key);
 #define TBLOCKS_PER_TSLAB (TSLAB_MAX_SIZE  / TBLOCK_SIZE)
 #define TCELLS_PER_TBLOCK (TBLOCK_DATA_SIZE / TCELL_SIZE)
 
+
 /********************************************************  database blocks  ***/
 
 struct tblock {
@@ -366,6 +371,8 @@ int FIXME_log(struct tslab *s, bolo_msec_t when, bolo_value_t what) RETURNS;
 /***************************************************************  database  ***/
 
 struct db;
+
+void db_encrypt(const char *key, size_t len);
 struct db * db_mount(const char *path) RETURNS;
 struct db * db_init(const char *path) RETURNS;
 int db_sync(struct db *db) RETURNS;

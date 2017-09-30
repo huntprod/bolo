@@ -37,7 +37,8 @@ void tblock_init(struct tblock *b, uint64_t number, bolo_msec_t base)
 	tblock_write64(b,  8, b->base);
 	tblock_write64(b, 16, b->number);
 
-	tblock_seal(FIXME_DEFAULT_KEY, FIXME_DEFAULT_KEY_LEN, b);
+	if (ENC_KEY)
+		tblock_seal(ENC_KEY, ENC_KEY_LEN, b);
 }
 
 int tblock_isfull(struct tblock *b)
@@ -72,6 +73,7 @@ tblock_log(struct tblock *b, bolo_msec_t when, double what)
 	tblock_write32 (b, 24 + b->cells * 12,     when - b->base);
 	tblock_write64f(b, 24 + b->cells * 12 + 4, what);
 	tblock_write16 (b, 6, ++b->cells);
-	tblock_seal(FIXME_DEFAULT_KEY, FIXME_DEFAULT_KEY_LEN, b);
+	if (ENC_KEY)
+		tblock_seal(ENC_KEY, ENC_KEY_LEN, b);
 	return 0;
 }

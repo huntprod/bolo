@@ -23,7 +23,7 @@ int tslab_map(struct tslab *s, int fd)
 		return -1;
 
 	/* check the HMAC */
-	if (hmac_check(FIXME_DEFAULT_KEY, FIXME_DEFAULT_KEY_LEN, header, TSLAB_HEADER_SIZE) != 0)
+	if (ENC_KEY && hmac_check(ENC_KEY, ENC_KEY_LEN, header, TSLAB_HEADER_SIZE) != 0)
 		return -1;
 
 	/* check host endianness vs file endianness */
@@ -107,7 +107,8 @@ int tslab_init(struct tslab *s, int fd, uint64_t number, uint32_t block_size)
 	write8(header,   6, 19); /* from block_size, ostensibly */
 	write32(header,  8, TSLAB_ENDIAN_MAGIC);
 	write64(header, 16, number & ~0xff);
-	hmac_seal(FIXME_DEFAULT_KEY, FIXME_DEFAULT_KEY_LEN, header, sizeof(header));
+	if (ENC_KEY)
+		hmac_seal(ENC_KEY, ENC_KEY_LEN, header, sizeof(header));
 
 	lseek(fd, 0, SEEK_SET);
 	nwrit = write(fd, header, sizeof(header));

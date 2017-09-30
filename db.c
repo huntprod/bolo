@@ -24,6 +24,24 @@ struct idx {
    and the customization is provided by the fs_handler. */
 typedef int(*fs_handler)(struct db *, uint64_t, int);
 
+
+
+const char *ENC_KEY = NULL;
+size_t      ENC_KEY_LEN = 0;
+
+void
+encryptdb(const char *key, size_t len)
+{
+	assert(key != NULL);
+
+	if (len == 0)
+		len = strlen(key);
+
+	free((char *)ENC_KEY);
+	ENC_KEY     = strdup(key);
+	ENC_KEY_LEN = len;
+}
+
 static int
 s_handle_idx(struct db *db, uint64_t id, int fd)
 {
