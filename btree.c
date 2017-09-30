@@ -505,5 +505,5 @@ TESTS {
 	btree_close(tmp);
 	close(fd);
 }
-/* LCOV_EXCL_END */
+/* LCOV_EXCL_STOP */
 #endif

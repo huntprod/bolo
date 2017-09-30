@@ -603,5 +603,5 @@ TESTS {
 			"hmac_sha512_seal with large keys (> SHA-512 block size) should succeed");
 	}
 }
-/* LCOV_EXCL_END */
+/* LCOV_EXCL_STOP */
 #endif

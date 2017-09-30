@@ -29,5 +29,5 @@ TESTS {
 	writen(buf, 0, "Hello!", 6);
 	ok(memcmp(buf, "Hello!", 6) == 0, "writen() / direct memory access");
 }
-/* LCOV_EXCL_END */
+/* LCOV_EXCL_STOP */
 #endif

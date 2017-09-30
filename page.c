@@ -231,5 +231,5 @@ TESTS {
 	ok(page_sync(&p)  == 0, "page_sync() should succeed");
 	ok(page_unmap(&p) == 0, "page_unmap() should succeed");
 }
-/* LCOV_EXCL_END */
+/* LCOV_EXCL_STOP */
 #endif

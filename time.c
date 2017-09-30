@@ -47,5 +47,5 @@ TESTS {
 	ok(bolo_ms(NULL) != INVALID_MS, "bolo_ms(NULL) returns now");
 	ok(bolo_s(NULL)  != INVALID_S,  "bolo_s(NULL) returns now");
 }
-/* LCOV_EXCL_END */
+/* LCOV_EXCL_STOP */
 #endif

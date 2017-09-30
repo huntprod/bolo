@@ -352,5 +352,5 @@ TESTS {
 		hash_free(h);
 	}
 }
-/* LCOV_EXCL_END */
+/* LCOV_EXCL_STOP */
 #endif

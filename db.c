@@ -814,5 +814,5 @@ TESTS {
 			"db_unmount() should succeed");
 	}
 }
-/* LCOV_EXCL_END */
+/* LCOV_EXCL_STOP */
 #endif

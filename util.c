@@ -113,5 +113,5 @@ TESTS {
 			"stat(t/tmp/a/b/c/d/FILE) should fail, even after we call mktree()");
 	}
 }
-/* LCOV_EXCL_END */
+/* LCOV_EXCL_STOP */
 #endif
