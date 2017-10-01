@@ -12,6 +12,8 @@ struct db {
 
 	struct list   idx;
 	struct list   slab;
+
+	uint64_t next_tblock;  /* ID of the next tblock to hand out */
 };
 
 struct idx {
@@ -463,6 +465,7 @@ db_init(const char *path)
 
 	empty(&db->idx);
 	empty(&db->slab);
+	db->next_tblock = 0;
 
 	return db;
 
@@ -645,55 +648,6 @@ fail:
 	return -1;
 }
 
-static int
-s_newslab(struct db *db, bolo_msec_t ts, uint64_t *id)
-{
-	int esave;
-	int fd;
-	struct tslab *slab;
-	char path[64];
-
-	assert(db != NULL);
-	assert(id != NULL);
-
-	fd = -1;
-	if (isempty(&db->slab)) *id = INITIAL_SLAB;
-	else                    *id = item(db->slab.prev, struct tslab, l)->number + 1;
-
-	slab = malloc(sizeof(*slab));
-	if (!slab)
-		return -1;
-
-	snprintf(path, sizeof(path), "slabs/%04lx.%04lx/%04lx.%04lx.%04lx.%04lx.slab",
-		((*id & 0xffff000000000000ul) >> 48),
-		((*id & 0x0000ffff00000000ul) >> 32),
-		/* --- */
-		((*id & 0xffff000000000000ul) >> 48),
-		((*id & 0x0000ffff00000000ul) >> 32),
-		((*id & 0x00000000ffff0000ul) >> 16),
-		((*id & 0x000000000000fffful)));
-	if (mktree(db->rootfd, path, 0777) != 0)
-		goto fail;
-
-	fd = openat(db->rootfd, path, O_RDWR|O_CREAT, 0666);
-	if (fd < 0)
-		goto fail;
-
-	if (tslab_init(slab, fd, *id, 1<<19) != 0)
-		goto fail;
-
-	slab->number = *id;
-	push(&db->slab, &slab->l);
-	return 0;
-
-fail:
-	esave = errno;
-	if (fd >= 0) close(fd);
-	free(slab);
-	errno = esave;
-	return -1;
-}
-
 static struct tslab *
 s_findslab(struct db *db, uint64_t id)
 {
@@ -701,6 +655,7 @@ s_findslab(struct db *db, uint64_t id)
 
 	assert(db != NULL);
 
+	id = tslab_number(id);
 	for_each(slab, &db->slab, l)
 		if (slab->number == id)
 			return slab;
@@ -709,12 +664,106 @@ s_findslab(struct db *db, uint64_t id)
 	return NULL;
 }
 
+static struct tslab *
+s_newslab(struct db *db, uint64_t id)
+{
+	int fd, esave;
+	char path[64];
+	struct tslab *slab;
+
+	assert(db != NULL);
+
+	slab = malloc(sizeof(*slab));
+	if (!slab)
+		return NULL;
+
+	/* formulate a path, relative to db root, for this slab */
+	snprintf(path, sizeof(path), "slabs/%04lx.%04lx/%04lx.%04lx.%04lx.%04lx.slab",
+		((id & 0xffff000000000000ul) >> 48),
+		((id & 0x0000ffff00000000ul) >> 32),
+		/* --- */
+		((id & 0xffff000000000000ul) >> 48),
+		((id & 0x0000ffff00000000ul) >> 32),
+		((id & 0x00000000ffff0000ul) >> 16),
+		((id & 0x000000000000fffful)));
+
+	/* create the parent directory, if necessary */
+	if (mktree(db->rootfd, path, 0777) != 0)
+		goto fail;
+
+	/* create the slab file itself */
+	fd = openat(db->rootfd, path, O_RDWR|O_CREAT, 0666);
+	if (fd < 0)
+		goto fail;
+
+	/* initialize the slab file with tslab headers */
+	if (tslab_init(slab, fd, tslab_number(id), TBLOCK_SIZE) != 0)
+		goto fail;
+
+	/* keep track of the slab */
+	push(&db->slab, &slab->l);
+
+	return slab;
+
+fail:
+	esave = errno;
+	if (fd >= 0) close(fd);
+	free(slab);
+	errno = esave;
+	return NULL;
+}
+
+/*
+   s_newblock()
+
+   Extend the database to include the next available tblock.
+   If a new tslab needs to be allocated to accommodate the
+   new block, that happens transparently to the caller.
+ */
+static struct tblock *
+s_newblock(struct db *db, bolo_msec_t ts)
+{
+	uint64_t id;
+	struct tslab *slab;
+	struct tblock *block;
+
+	assert(db != NULL);
+
+	id = db->next_tblock;
+	slab = s_findslab(db, tslab_number(id));
+	if (!slab)
+		slab = s_newslab(db, tslab_number(id));
+	if (!slab)
+		return NULL;
+
+	block = tslab_tblock(slab, id, ts);
+	if (!block)
+		return NULL;
+
+	db->next_tblock++;
+	return block;
+}
+
+static struct tblock *
+s_findblock(struct db *db, uint64_t id, bolo_msec_t ts)
+{
+	struct tslab *slab;
+
+	assert(db != NULL);
+
+	slab = s_findslab(db, id);
+	if (!slab)
+		return NULL;
+
+	return tslab_tblock(slab, id, ts);
+}
+
 int
 db_insert(struct db *db, const char *name, bolo_msec_t when, bolo_value_t what)
 {
 	struct idx *idx;
-	struct tslab *slab;
-	uint64_t slab_id, idx_id;
+	struct tblock *block;
+	uint64_t idx_id, block_id;
 
 	assert(db != NULL);
 	assert(db->main != NULL);
@@ -730,19 +779,27 @@ db_insert(struct db *db, const char *name, bolo_msec_t when, bolo_value_t what)
 	}
 	assert(idx != NULL);
 
-	if (btree_find(idx->btree, &slab_id, when) != 0) {
-		if (s_newslab(db, when, &slab_id) != 0)
+	/* find the tblock ID, if we have one */
+	if (btree_find(idx->btree, &block_id, when) != 0) {
+		infof("allocating a new tblock for '%s'", name);
+		block = s_newblock(db, when);
+		if (!block)
 			return -1;
 
-		if (btree_insert(idx->btree, when, slab_id) != 0)
+		if (btree_insert(idx->btree, when, block->number) != 0)
+			return -1;
+
+	} else {
+		block = s_findblock(db, block_id, when);
+
+		if (block && (tblock_isfull(block) || !tblock_canhold(block, when)))
+			block = s_newblock(db, when);
+
+		if (!block)
 			return -1;
 	}
 
-	slab = s_findslab(db, slab_id);
-	if (!slab)
-		return -1;
-
-	if (tslab_insert(slab, when, what) != 0)
+	if (tblock_insert(block, when, what) != 0)
 		return -1;
 
 	/* FIXME: may need to sync */
@@ -789,6 +846,10 @@ TESTS {
 		isnt_null(db->main, "db->main hash table should exist for a new database");
 		ok(isempty(&db->idx), "db->idx list should be empty on a new database");
 		ok(isempty(&db->slab), "db->slab list should be empty on a new database");
+		is_unsigned(tslab_number(db->next_tblock), 0,
+			"first tblock address of a new db should be in tslab 0");
+		is_unsigned(tblock_number(db->next_tblock), 0,
+			"first tblock address of a new db should be in tblock 0");
 
 		ok(db_insert(db, "metric|tags", 1234567890, 4567.89) == 0,
 			"db_insert() should succeed on fresh database");

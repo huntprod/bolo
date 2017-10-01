@@ -296,6 +296,8 @@ int btree_find(struct btree *t, uint64_t *dst, bolo_msec_t key);
 #define TBLOCKS_PER_TSLAB (TSLAB_MAX_SIZE  / TBLOCK_SIZE)
 #define TCELLS_PER_TBLOCK (TBLOCK_DATA_SIZE / TCELL_SIZE)
 
+#define tslab_number(x)  ((x) & ~0x7ff)
+#define tblock_number(x) ((x) &  0x7ff)
 
 /********************************************************  database blocks  ***/
 
@@ -327,7 +329,7 @@ int tblock_map(struct tblock *b, int fd, off_t offset, size_t len) RETURNS;
 void tblock_init(struct tblock *b, uint64_t number, bolo_msec_t base);
 int tblock_isfull(struct tblock *b) RETURNS;
 int tblock_canhold(struct tblock *b, bolo_msec_t when) RETURNS;
-int tblock_log(struct tblock *b, bolo_msec_t when, bolo_value_t what) RETURNS;
+int tblock_insert(struct tblock *b, bolo_msec_t when, bolo_value_t what) RETURNS;
 #define tblock_unmap(b) page_unmap(&(b)->page)
 #define tblock_sync(b)  page_sync(&(b)->page)
 
@@ -354,8 +356,7 @@ int tslab_sync(struct tslab *s) RETURNS;
 int tslab_init(struct tslab *s, int fd, uint64_t number, uint32_t block_size) RETURNS;
 int tslab_isfull(struct tslab *s) RETURNS;
 int tslab_extend(struct tslab *s, bolo_msec_t base);
-
-int tslab_insert(struct tslab *s, bolo_msec_t when, bolo_value_t what) RETURNS;
+struct tblock * tslab_tblock(struct tslab *s, uint64_t id, bolo_msec_t ts);
 
 /***************************************************************  database  ***/
 

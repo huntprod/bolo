@@ -56,7 +56,7 @@ tblock_canhold(struct tblock *b, bolo_msec_t when)
 }
 
 int
-tblock_log(struct tblock *b, bolo_msec_t when, double what)
+tblock_insert(struct tblock *b, bolo_msec_t when, double what)
 {
 	assert(b != NULL);
 

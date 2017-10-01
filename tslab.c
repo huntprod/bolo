@@ -113,7 +113,7 @@ int tslab_init(struct tslab *s, int fd, uint64_t number, uint32_t block_size)
 	memcpy(header, "SLABv1", 6);
 	write8(header,   6, 19); /* from block_size, ostensibly */
 	write32(header,  8, ENDIAN_MAGIC);
-	write64(header, 16, number & ~0xff);
+	write64(header, 16, tslab_number(number));
 	if (ENC_KEY)
 		hmac_seal(ENC_KEY, ENC_KEY_LEN, header, sizeof(header));
 
@@ -177,7 +177,7 @@ int tslab_extend(struct tslab *s, bolo_msec_t base)
 
 		/* map the new block into memory */
 		if (tblock_map(&s->blocks[i], s->fd, start, len) == 0) {
-			tblock_init(&s->blocks[i], (s->number & ~0xff) | i, base);
+			tblock_init(&s->blocks[i], tslab_number(s->number) | i, base);
 			return 0;
 		}
 
@@ -193,46 +193,25 @@ int tslab_extend(struct tslab *s, bolo_msec_t base)
 	return -1;
 }
 
-int tslab_insert(struct tslab *s, bolo_msec_t when, double what)
+struct tblock *
+tslab_tblock(struct tslab *s, uint64_t id, bolo_msec_t ts)
 {
-	int i;
-
 	assert(s != NULL);
 
-	if (tslab_isfull(s))
-		bail("slab full!");
+	errno = BOLO_ENOBLOCK;
+	if (tslab_number(id) != s->number)
+		return NULL;
 
-	for (i = 0; i < TBLOCKS_PER_TSLAB; i++) {
-		if (!s->blocks[i].valid) {
-			if (tslab_extend(s, when) != 0)
-				bail("failed to add another block");
-			break;
-		}
+	if (!s->blocks[tblock_number(id)].valid) {
+		/* FIXME: right now, we require the tblock to be next in line */
+		if (tblock_number(id) > 0
+		 && !s->blocks[tblock_number(id - 1)].valid)
+			return NULL;
 
-		if (!tblock_isfull(&s->blocks[i])
-		  && tblock_canhold(&s->blocks[i], when))
-			break; /* found it! */
+		if (tslab_extend(s, ts) != 0)
+			return NULL;
+
+		assert(s->blocks[tblock_number(id)].valid);
 	}
-	assert(i < TBLOCKS_PER_TSLAB);
-
-	if (tblock_log(&s->blocks[i], when, what) != 0)
-		return -1;
-
-	/* START HERE:
-	   - need to mmap the file in create/open         DONE
-	   - maintain a pointer to the last open block
-	   - skip to that block via pointer addressing
-	   - calculate relative ts from block base ts
-	     - if relative ts would overflow,
-	       start a new block at ts
-	   - store relative ts and value
-	   - increment number of metrics
-	   - recalculate HMAC                             DONE
-
-	   alternatively, we can reserve space after the header for a work
-	   area, and store the (ts,v) tuples there as we insert, allowing
-	   for a certain amount of reordering before commiting to a full
-	   ordered block
-	 */
-	return 0;
+	return &(s->blocks[tblock_number(id)]);
 }

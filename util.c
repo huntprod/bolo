@@ -23,6 +23,7 @@ static const char *errors[] = {
 	/* BOLO_EBADHMAC */  "HMAC authentication check failed",
 	/* BOLO_EENDIAN */   "Datafile endian mismatch detected",
 	/* BOLO_ENOSLAB */   "No such database slab",
+	/* BOLO_ENOBLOCK */  "No such database block",
 };
 
 const char *

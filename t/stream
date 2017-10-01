@@ -6,6 +6,7 @@ if [[ -z "$1" ]]; then
 fi
 
 ./t/randata $1 | while read x; do
-  echo "cpu host=localhost $(date +%s)000 $x"
+  echo "cpu host=localhost,env=staging $(date +%s)000 $x"
+  echo "cpu host=localhost,env=develop $(date +%s)000 $x"
   sleep 0.1
 done
