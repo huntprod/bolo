@@ -154,7 +154,7 @@ do_stdin(int argc, char **argv)
 		infof("inserting [%s %s %s]",
 			       metric, time, value);
 		if (db_insert(db, metric, when, what) != 0)
-			errorf("failed to insert [%s %s %s %s]: %s (error %d)",
+			errorf("failed to insert [%s %s %s]: %s (error %d)",
 			       metric, time, value, error(errno), errno);
 
 		if (db_sync(db) != 0)
