@@ -1,0 +1,12 @@
+#!/bin/bash
+
+if [[ -z "$1" ]]; then
+  echo >&2 "USAGE: $0 N"
+  exit 1;
+fi
+
+start=$(date -d '2001-01-01 01:01:01' +%s)000
+./t/randata $(expr $1 \* 10000) | while read x; do
+  echo "cpu host=localhost $start $x"
+  start=$(expr $start + 250)
+done

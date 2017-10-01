@@ -5,5 +5,5 @@ use warnings;
 my $n = $ARGV[0] || 20;
 for (my $i = 0; $i < $n; $i++) {
 	print rand 10000, "\n";
-	sleep($ARGV[1] || 0.1);
+	sleep($ARGV[1]) if defined $ARGV[1];
 }

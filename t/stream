@@ -5,7 +5,7 @@ if [[ -z "$1" ]]; then
   exit 1;
 fi
 
-for x in $(./t/randata $1); do
+./t/randata $1 | while read x; do
   echo "cpu host=localhost $(date +%s)000 $x"
   sleep 0.1
 done
