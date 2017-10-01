@@ -23,7 +23,6 @@
   (t)->kids[(i)] = (c); \
 } while (0)
 
-#if 0
 static void
 _print(struct btree *t, int indent)
 {
@@ -63,7 +62,6 @@ btree_print(struct btree *bt)
 {
 	_print(bt, 0);
 }
-#endif
 
 static struct btree *
 s_mapat1(int fd, off_t offset)
@@ -525,6 +523,21 @@ TESTS {
 
 		ok(btree_find(t, &value, 1000) == 0, "lookup(1000) should succeed after insertion(s)");
 		is_unsigned(value, 501, "lookup(1000) should find nearest lesser key, 500 => 501");
+
+		btree_close(t);
+		close(fd);
+	}
+
+	subtest {
+		int fd;
+		struct btree *t;
+
+		fd = memfd("btree");
+		t = btree_create(fd);
+		if (!t)
+			BAIL_OUT("btree_create(fd) returned NULL");
+
+		btree_print(t);
 
 		btree_close(t);
 		close(fd);
