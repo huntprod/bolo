@@ -149,12 +149,13 @@ do_stdin(int argc, char **argv)
 			continue;
 		}
 
-		/* FIXME: compose metric|tags */
-		infof("inserting [%s %s %s %s]",
-			       metric, tags, time, value);
+		/* compose metric|tags */
+		metric[strlen(metric)] = '|';
+		infof("inserting [%s %s %s]",
+			       metric, time, value);
 		if (db_insert(db, metric, when, what) != 0)
 			errorf("failed to insert [%s %s %s %s]: %s (error %d)",
-			       metric, tags, time, value, error(errno), errno);
+			       metric, time, value, error(errno), errno);
 
 		if (db_sync(db) != 0)
 			errorf("failed to sync database to disk: %s (error %d)",
