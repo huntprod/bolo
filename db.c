@@ -854,6 +854,10 @@ TESTS {
 
 		ok(db_insert(db, "metric|tags", 1234567890, 4567.89) == 0,
 			"db_insert() should succeed on fresh database");
+		ok(db_insert(db, "metric|tags", 1234567890 + 1, 4567.91) == 0,
+			"db_insert() should succeed twice on fresh database");
+		ok(db_insert(db, "metric|tags", 1234567890ul + (1ul << 33), 4567.91) == 0,
+			"db_insert() should succeed after exhausting block capacity (in time)");
 
 		ok(db_sync(db) == 0,
 			"db_sync() should succeed");
