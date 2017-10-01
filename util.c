@@ -20,6 +20,9 @@ static const char *errors[] = {
 	/* BOLO_EBLKRANGE */ "Database block range insufficient",
 	/* BOLO_ENOMAINDB */ "main.db index not found in database root",
 	/* BOLO_ENODBROOT */ "Database root directory not found",
+	/* BOLO_EBADHMAC */  "HMAC authentication check failed",
+	/* BOLO_EENDIAN */   "Datafile endian mismatch detected",
+	/* BOLO_ENOSLAB */   "No such database slab",
 };
 
 const char *

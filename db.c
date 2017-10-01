@@ -705,6 +705,7 @@ s_findslab(struct db *db, uint64_t id)
 		if (slab->number == id)
 			return slab;
 
+	errno = BOLO_ENOSLAB;
 	return NULL;
 }
 
