@@ -3,14 +3,11 @@
 int
 tblock_map(struct tblock *b, int fd, off_t offset, size_t len)
 {
-	int rc;
-
 	assert(b != NULL);
 	memset(b, 0, sizeof(*b));
 
-	rc = page_map(&b->page, fd, offset, len);
-	if (rc != 0)
-		return rc;
+	if (page_map(&b->page, fd, offset, len) != 0)
+		return -1;
 
 	b->cells  = tblock_read16(b,  6);
 	b->base   = tblock_read64(b,  8);

@@ -44,7 +44,7 @@ mktree(int dirfd, const char *path, mode_t mode)
 
 	assert(path != 0);
 
-	if (!strncpy(buf, path, PATH_MAX))
+	if (!strncpy(buf, path, PATH_MAX - 1))
 		return -1;
 
 	for (p = strchr(buf, '/'); p && *p; p = strchr(p+1, '/')) {

@@ -12,8 +12,7 @@ page_map(struct page *p, int fd, off_t start, size_t len)
 	assert(start >= 0);
 	assert(len > 0);
 
-	flags = fcntl(fd, F_GETFL, 0);
-	if (flags < 0)
+	if ((flags = fcntl(fd, F_GETFL, 0)) == -1)
 		return -1;
 
 	switch (flags & O_ACCMODE) {
