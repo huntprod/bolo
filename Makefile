@@ -1,17 +1,13 @@
 CFLAGS += -Wall -Wextra -Wpedantic -Wunused -Wunused-result -Wno-unused-parameter
 TEST_CFLAGS := -g -DTEST -fprofile-arcs -ftest-coverage -It
 
-all: main bolo
+all: bolo
 
 bolo: bolo.o debug.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o btree.o log.o
 	$(CC) -o $@ $+
 
-main: main.o debug.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o btree.o log.o
-	$(CC) -o $@ $+
-
 clean:
 	rm -f *.o
-	rm -f main
 	rm -f sha time
 	rm -f *.gcno *.gcda
 	rm -f lcov.info
