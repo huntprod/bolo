@@ -465,7 +465,7 @@ db_init(const char *path)
 
 	empty(&db->idx);
 	empty(&db->slab);
-	db->next_tblock = 0;
+	db->next_tblock = 0x800;
 
 	return db;
 
@@ -741,6 +741,7 @@ s_newblock(struct db *db, bolo_msec_t ts)
 		return NULL;
 
 	db->next_tblock++;
+	assert(db->next_tblock >= 0x800); /* if we roll over */
 	return block;
 }
 
@@ -846,8 +847,8 @@ TESTS {
 		isnt_null(db->main, "db->main hash table should exist for a new database");
 		ok(isempty(&db->idx), "db->idx list should be empty on a new database");
 		ok(isempty(&db->slab), "db->slab list should be empty on a new database");
-		is_unsigned(tslab_number(db->next_tblock), 0,
-			"first tblock address of a new db should be in tslab 0");
+		is_unsigned(tslab_number(db->next_tblock), (1 << 11),
+			"first tblock address of a new db should be in tslab 1");
 		is_unsigned(tblock_number(db->next_tblock), 0,
 			"first tblock address of a new db should be in tblock 0");
 
