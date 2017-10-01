@@ -4,12 +4,7 @@
 
 #define PATH_TO_MAINDB "main.db"
 
-#define DEFAULT_BLOCK_SPAN 1000 * 60 * 60 * 18 /* 18h */
-
 struct db {
-	/* tunables */
-	unsigned int  block_span;
-
 	/* internal state */
 	int           rootfd;  /* file descriptor of database root directory */
 	struct hash  *main;    /* primary time series (name|tag,tags,... => <block-id>) */
@@ -369,7 +364,6 @@ db_mount(const char *path)
 	if (!db)
 		goto fail;
 
-	db->block_span = DEFAULT_BLOCK_SPAN;
 	db->rootfd = fd;
 
 	infof("checking for main.db index file at %s/%s", path, PATH_TO_MAINDB);
@@ -448,7 +442,6 @@ db_init(const char *path)
 	if (!db)
 		goto fail;
 
-	db->block_span = DEFAULT_BLOCK_SPAN;
 	db->rootfd = fd;
 	fd = -1;
 	db->main = hash_new(0);
@@ -717,7 +710,6 @@ s_findslab(struct db *db, uint64_t id)
 int
 db_insert(struct db *db, const char *name, bolo_msec_t when, bolo_value_t what)
 {
-	bolo_msec_t slab_ts;
 	struct idx *idx;
 	struct tslab *slab;
 	uint64_t slab_id, idx_id;
@@ -736,13 +728,11 @@ db_insert(struct db *db, const char *name, bolo_msec_t when, bolo_value_t what)
 	}
 	assert(idx != NULL);
 
-	assert(db->block_span > 0);
-	slab_ts = when % db->block_span;
-	if (btree_find(idx->btree, &slab_id, slab_ts) != 0) {
-		if (s_newslab(db, slab_ts, &slab_id) != 0)
+	if (btree_find(idx->btree, &slab_id, when) != 0) {
+		if (s_newslab(db, when, &slab_id) != 0)
 			return -1;
 
-		if (btree_insert(idx->btree, slab_ts, slab_id) != 0)
+		if (btree_insert(idx->btree, when, slab_id) != 0)
 			return -1;
 	}
 

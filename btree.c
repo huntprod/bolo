@@ -398,19 +398,21 @@ btree_find(struct btree *t, uint64_t *dst, bolo_msec_t key)
 	assert(t != NULL);
 	assert(dst != NULL);
 
+	if (t->leaf && t->used == 0)
+		return -1; /* empty root node */
+
 	i = s_find(t, key);
 
 	if (t->leaf) {
-		if (keyat(t, i) != key)
-			return -1;
-		*dst = valueat(t, i);
+		if (i == 0 || key == keyat(t,i))
+			*dst = valueat(t, i);
+		else
+			*dst = valueat(t, i-1);
 		return 0;
 	}
 
-	if (!t->kids[i])
-		return -1;
-
-	return btree_find(t->kids[i], dst, key);
+	return t->kids[i] ? btree_find(t->kids[i], dst, key)
+	                  : -1;
 }
 
 #ifdef TEST
@@ -440,70 +442,93 @@ iszero(const void *buf, off_t offset, size_t size)
 }
 
 TESTS {
-	int fd;
-	struct btree *t, *tmp;
-	bolo_msec_t key;
-	uint64_t value;
+	subtest {
+		int fd;
+		struct btree *t, *tmp;
+		bolo_msec_t key;
+		uint64_t value;
 
-	fd = memfd("btree");
-	t = btree_create(fd);
-	if (!t)
-		BAIL_OUT("btree: btree_create(fd) returned NULL");
+		fd = memfd("btree");
+		t = btree_create(fd);
+		if (!t)
+			BAIL_OUT("btree_create(fd) returned NULL");
 
-	if (!t->leaf)
-		BAIL_OUT("btree: initial root node is not considered a leaf");
+		if (!t->leaf)
+			BAIL_OUT("initial root node is not considered a leaf");
 
-	if (memcmp(t->page.data, "BTREE\x80\x00\x00", 8) != 0)
-		BAIL_OUT("btree: initial root node header incorrect");
+		if (memcmp(t->page.data, "BTREE\x80\x00\x00", 8) != 0)
+			BAIL_OUT("initial root node header incorrect");
 
-	if (!iszero(t->page.data, 8, BTREE_PAGE_SIZE - 8))
-		BAIL_OUT("btree: initial root node (less header) should be zeroed (but wasn't!)");
+		if (!iszero(t->page.data, 8, BTREE_PAGE_SIZE - 8))
+			BAIL_OUT("initial root node (less header) should be zeroed (but wasn't!)");
 
-	is_unsigned(lseek(fd, 0, SEEK_END), BTREE_PAGE_SIZE,
-		"new btree file should be exactly ONE page long");
+		is_unsigned(lseek(fd, 0, SEEK_END), BTREE_PAGE_SIZE,
+			"new btree file should be exactly ONE page long");
 
-	for (key = KEYSTART; key <= KEYEND; key++) {
-		if (btree_find(t, &value, key) == 0)
-			fail("btree lookup(%lx) before insertion should fail, but got %#lx\n", key, value);
+		for (key = KEYSTART; key <= KEYEND; key++) {
+			if (btree_find(t, &value, key) == 0)
+				fail("btree find(%lx) before insertion should fail, but got %#lx\n", key, value);
+		}
+		pass("lookups should fail before insertion");
+
+		for (key = KEYSTART; key <= KEYEND; key++) {
+			if (btree_insert(t, key, key + PERTURB) != 0)
+				fail("failed to insert %#lx => %#lx", key, key + PERTURB);
+		}
+		pass("btree insertions should succeed");
+
+		for (key = KEYSTART; key <= KEYEND; key++) {
+			if (btree_find(t, &value, key) != 0)
+				fail("find(%lx) should succeed", key);
+			else if (value != key + PERTURB)
+				is_unsigned(value, key + PERTURB, "find(%lx)", key);
+		}
+		pass("lookups should succeed");
+
+		if (btree_write(t) != 0)
+			BAIL_OUT("btree_write failed");
+
+		tmp = t;
+		t = btree_read(fd);
+		if (!t)
+			BAIL_OUT("btree_read(fd) failed!");
+
+		for (key = KEYSTART; key <= KEYEND; key++) {
+			if (btree_find(t, &value, key) != 0)
+				fail("find(%lx) failed after re-read", key);
+			else if (value != key + PERTURB)
+				is_unsigned(value, key + PERTURB, "find(%lx) after re-read", key);
+		}
+		pass("lookups after re-read should succeed");
+
+
+		if (btree_close(t) != 0)
+			BAIL_OUT("btree_close failed");
+
+		btree_close(tmp);
+		close(fd);
 	}
-	pass("btree lookups should fail before insertion");
 
-	for (key = KEYSTART; key <= KEYEND; key++) {
-		if (btree_insert(t, key, key + PERTURB) != 0)
-			fail("failed to insert %#lx => %#lx", key, key + PERTURB);
+	subtest {
+		int fd;
+		struct btree *t;
+		uint64_t value;
+
+		fd = memfd("btree");
+		t = btree_create(fd);
+		if (!t)
+			BAIL_OUT("btree_create(fd) returned NULL");
+
+		ok(btree_find(t, &value, 1000) != 0, "find(1000) should fail before insertion");
+		ok(btree_insert(t,  500,  501) == 0, "insert(500) should succeed");
+		ok(btree_insert(t, 1500, 1501) == 0, "insert(1500) should succeed");
+
+		ok(btree_find(t, &value, 1000) == 0, "lookup(1000) should succeed after insertion(s)");
+		is_unsigned(value, 501, "lookup(1000) should find nearest lesser key, 500 => 501");
+
+		btree_close(t);
+		close(fd);
 	}
-	pass("btree insertions should succeed");
-
-	for (key = KEYSTART; key <= KEYEND; key++) {
-		if (btree_find(t, &value, key) != 0)
-			fail("btree lookup(%lx) should succeed", key);
-		else if (value != key + PERTURB)
-			is_unsigned(value, key + PERTURB, "btree lookup(%lx)", key);
-	}
-	pass("btree lookups should succeed");
-
-	if (btree_write(t) != 0)
-		BAIL_OUT("btree_write failed");
-
-	tmp = t;
-	t = btree_read(fd);
-	if (!t)
-		BAIL_OUT("btree_read(fd) failed!");
-
-	for (key = KEYSTART; key <= KEYEND; key++) {
-		if (btree_find(t, &value, key) != 0)
-			fail("btree lookup(%lx) failed after re-read", key);
-		else if (value != key + PERTURB)
-			is_unsigned(value, key + PERTURB, "btree lookup(%lx) after re-read", key);
-	}
-	pass("btree lookups after re-read should succeed");
-
-
-	if (btree_close(t) != 0)
-		BAIL_OUT("btree_close failed");
-
-	btree_close(tmp);
-	close(fd);
 }
 /* LCOV_EXCL_STOP */
 #endif
