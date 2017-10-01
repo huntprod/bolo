@@ -2,6 +2,7 @@
 #include <ctype.h>
 #include <dirent.h>
 
+#define INITIAL_SLAB (uint64_t)(1 << 11)
 #define PATH_TO_MAINDB "main.db"
 
 struct db {
@@ -656,7 +657,7 @@ s_newslab(struct db *db, bolo_msec_t ts, uint64_t *id)
 	assert(id != NULL);
 
 	fd = -1;
-	if (isempty(&db->slab)) *id = (uint64_t)1;
+	if (isempty(&db->slab)) *id = INITIAL_SLAB;
 	else                    *id = item(db->slab.prev, struct tslab, l)->number + 1;
 
 	slab = malloc(sizeof(*slab));
