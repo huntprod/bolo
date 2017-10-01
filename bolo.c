@@ -86,7 +86,7 @@ do_stdin(int argc, char **argv)
 	if (!db && (errno == BOLO_ENODBROOT || errno == BOLO_ENOMAINDB))
 		db = db_init(argv[2]);
 	if (!db) {
-		fprintf(stderr, "%s: %s\n", argv[2], error(errno));
+		errorf("%s: %s", argv[2], error(errno));
 		return 2;
 	}
 
@@ -101,14 +101,14 @@ do_stdin(int argc, char **argv)
 
 		when = strtoull(time, &end, 10);
 		if (end && *end) {
-			errorf("failed to parse [%s %s] timestamp '%s'\n",
+			errorf("failed to parse [%s %s] timestamp '%s'",
 			       metric, tags, time);
 			continue;
 		}
 
 		what = strtod(time, &end);
 		if (end && *end) {
-			errorf("failed to parse [%s %s] measurement value '%s'\n",
+			errorf("failed to parse [%s %s] measurement value '%s'",
 			       metric, tags, value);
 			continue;
 		}
@@ -117,17 +117,16 @@ do_stdin(int argc, char **argv)
 		infof("inserting [%s %s %s %s]",
 			       metric, tags, time, value);
 		if (db_insert(db, metric, when, what) != 0)
-			errorf("failed to insert [%s %s %s %s]: %s (error %d)\n",
+			errorf("failed to insert [%s %s %s %s]: %s (error %d)",
 			       metric, tags, time, value, error(errno), errno);
 
 		if (db_sync(db) != 0)
-			errorf("failed to sync database to disk: %s (error %d)\n",
+			errorf("failed to sync database to disk: %s (error %d)",
 			       error(errno), errno);
 	}
 
 	if (db_unmount(db) != 0)
-		fprintf(stderr, "failed to unmount database: %s\n",
-		                error(errno));
+		errorf("failed to unmount database: %s", error(errno));
 
 	return 0;
 }
