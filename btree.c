@@ -204,9 +204,6 @@ btree_close(struct btree *t)
 			if (btree_close(t->kids[i]) != 0)
 				rc = -1;
 
-	if (s_flush(t) != 0)
-		rc = -1;
-
 	if (page_unmap(&t->page) != 0)
 		rc = -1;
 	free(t);
