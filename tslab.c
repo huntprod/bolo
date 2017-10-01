@@ -1,5 +1,12 @@
 #include "bolo.h"
 
+/* a SLAB endian-check magic number, to be
+   read/written as a 32-bit unsigned integer.
+
+   translates into BE as [hex 7e d1 32 4c]
+               and LE as [hex 4c 32 d1 7e] */
+#define ENDIAN_MAGIC 2127639116U
+
 int tslab_map(struct tslab *s, int fd)
 {
 	assert(s != NULL);
@@ -9,7 +16,6 @@ int tslab_map(struct tslab *s, int fd)
 	char header[TSLAB_HEADER_SIZE];
 	ssize_t nread;
 	off_t n;
-	uint32_t endian_check;
 
 	errno = BOLO_EBADSLAB;
 	nread = read(fd, header, TSLAB_HEADER_SIZE);
@@ -23,12 +29,13 @@ int tslab_map(struct tslab *s, int fd)
 		return -1;
 
 	/* check the HMAC */
+	errno = BOLO_EBADHMAC;
 	if (ENC_KEY && hmac_check(ENC_KEY, ENC_KEY_LEN, header, TSLAB_HEADER_SIZE) != 0)
 		return -1;
 
 	/* check host endianness vs file endianness */
-	endian_check = read32(header, 8);
-	if (endian_check != TSLAB_ENDIAN_MAGIC)
+	errno = BOLO_EENDIAN;
+	if (read32(header, 8) != ENDIAN_MAGIC)
 		return -1;
 
 	s->fd         = fd;
@@ -105,7 +112,7 @@ int tslab_init(struct tslab *s, int fd, uint64_t number, uint32_t block_size)
 	memset(header, 0, sizeof(header));
 	memcpy(header, "SLABv1", 6);
 	write8(header,   6, 19); /* from block_size, ostensibly */
-	write32(header,  8, TSLAB_ENDIAN_MAGIC);
+	write32(header,  8, ENDIAN_MAGIC);
 	write64(header, 16, number & ~0xff);
 	if (ENC_KEY)
 		hmac_seal(ENC_KEY, ENC_KEY_LEN, header, sizeof(header));

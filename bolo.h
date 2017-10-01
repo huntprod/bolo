@@ -285,13 +285,6 @@ int btree_find(struct btree *t, uint64_t *dst, bolo_msec_t key);
 #define TSLAB_MAX_SIZE    (1 << 30)
 #define TSLAB_HEADER_SIZE 88
 
-/* a SLAB endian-check magic number, to be
-   read/written as a 32-bit unsigned integer.
-
-   translates into BE as [hex 7e d1 32 4c]
-               and LE as [hex 4c 32 d1 7e] */
-#define TSLAB_ENDIAN_MAGIC 2127639116U
-
 /* a BLOCK in a SLAB is exactly 512k
    with a 24b header and an HMAC-SHA512
    footer, leaving 524,176b for data */
