@@ -8,7 +8,7 @@ bolo: bolo.o debug.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o btr
 
 clean:
 	rm -f *.o
-	rm -f sha time
+	rm -f bits util log cfg hash page btree sha time tags db
 	rm -f *.gcno *.gcda
 	rm -f lcov.info
 
@@ -23,11 +23,12 @@ check: util.o log.o page.o btree.o hash.o sha.o tblock.o tslab.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o btree btree.c  page.o util.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o sha   sha.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o time  time.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o tags  tags.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o db    db.c     btree.o page.o util.o hash.o sha.o tblock.o tslab.o log.o
-	prove -v ./bits ./util ./log ./cfg ./hash ./page ./btree ./sha ./time ./db
+	prove -v ./bits ./util ./log ./cfg ./hash ./page ./btree ./sha ./time ./tags ./db
 
 memtest: check
-	t/vg ./bits ./util ./log ./cfg ./hash ./page ./btree ./sha ./time ./db
+	t/vg ./bits ./util ./log ./cfg ./hash ./page ./btree ./sha ./time ./tags ./db
 	@echo "No memory leaks detected"
 
 coverage:

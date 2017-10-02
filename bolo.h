@@ -369,4 +369,11 @@ int db_sync(struct db *db) RETURNS;
 int db_unmount(struct db *db) RETURNS;
 int db_insert(struct db *, const char *name, bolo_msec_t when, bolo_value_t what) RETURNS;
 
+
+/****************************************************************  tagging  ***/
+
+int tags_valid(const char *tags);
+int tags_canonicalize(char *tags);
+
+
 #endif
