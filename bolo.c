@@ -149,6 +149,13 @@ do_stdin(int argc, char **argv)
 			continue;
 		}
 
+		if (tags_valid(tags) != 0
+		 || tags_canonicalize(tags) != 0) {
+			errorf("failed to parse tag set from [%s %s %s]; skipping",
+			       metric, tags, value);
+			continue;
+		}
+
 		/* compose metric|tags */
 		metric[strlen(metric)] = '|';
 		infof("inserting [%s %s %s]",
