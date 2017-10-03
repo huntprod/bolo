@@ -1,5 +1,6 @@
 #ifndef CTAP_H
 #define CTAP_H
+/* LCOV_EXCL_START */
 
 #define CTAP_VERSION_MAJOR 2
 #define CTAP_VERSION_MINOR 0
@@ -430,4 +431,5 @@ int main(int argc, char **argv)
 	ctap_tests();
 	done_testing();
 	return 0;
-} // LCOV_EXCL_LINE
+}
+/* LCOV_EXCL_STOP */

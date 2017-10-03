@@ -1,5 +1,6 @@
 #ifndef T_MEMFILE_H
 #define T_MEMFILE_H
+/* LCOV_EXCL_START */
 
 #include <unistd.h>
 #include <sys/syscall.h>
@@ -12,4 +13,5 @@ static inline int memfd(const char *test)
 	return fd;
 }
 
+/* LCOV_EXCL_STOP */
 #endif
