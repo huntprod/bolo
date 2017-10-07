@@ -25,6 +25,10 @@ struct bucket {
 struct hash {
 	size_t nset;
 	struct bucket *buckets[HASH_STRIDE];
+
+	/* for iteration */
+	int i;
+	struct bucket *last;
 };
 
 struct hash *
@@ -59,6 +63,39 @@ hash_free(struct hash *h)
 	}
 
 	free(h);
+}
+
+void
+_hash_ebegn(struct hash *h, const char **key, const void **val)
+{
+	assert(h != NULL);
+
+	h->i = 0;
+	h->last = NULL;
+	_hash_enext(h, key, val);
+}
+
+void
+_hash_enext(struct hash *h, const char **key, const void **val)
+{
+	assert(h != NULL);
+	assert(key != NULL || val != NULL);
+
+	while (h->i < HASH_STRIDE && !h->last) {
+		h->last = h->buckets[h->i++];
+	}
+
+	if (h->last) {
+		if (key) *key = h->last->key;
+		if (val) *val = h->last->ptr;
+		h->last = h->last->next;
+	}
+}
+
+int
+_hash_edone(struct hash *h)
+{
+	return h->i >= HASH_STRIDE && h->last == NULL;
 }
 
 size_t
