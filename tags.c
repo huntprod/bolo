@@ -40,23 +40,24 @@ s_iskvsep(char c)
 #define STATE_KVSEP   4
 #define STATE_VALUE   5
 
+/* "tag=value,tag=value"
+   ^^^  ^    ^^^  ^
+   |||  |    |||  |
+   |||  |    |||  `---- STATE_VALUE
+   |||  |    ||`------- STATE_KEY
+   |||  |    |`-------- STATE_KSTART
+   |||  |    `--------- STATE_BEFORE
+   |||  |
+   |||  `-------------- STATE_VALUE
+   ||`----------------- STATE_KEY
+   |`------------------ STATE_KSTART
+   `--------------------STATE_BEFORE
+                                      */
+
+
 int
 tags_valid(const char *tags)
 {
-	/* "tag=value,tag=value"
-	   ^^^  ^    ^^^  ^
-	   |||  |    |||  |
-	   |||  |    |||  `---- STATE_VALUE
-	   |||  |    ||`------- STATE_KEY
-	   |||  |    |`-------- STATE_KSTART
-	   |||  |    `--------- STATE_BEFORE
-	   |||  |
-	   |||  `-------------- STATE_VALUE
-	   ||`----------------- STATE_KEY
-	   |`------------------ STATE_KSTART
-	   `--------------------STATE_BEFORE
-	                                      */
-
 	const char *p;
 	int state;
 
@@ -142,6 +143,30 @@ tags_canonicalize(char *tags)
 	return 0;
 }
 
+char *
+tags_next(char *tags, char **tag, char **val)
+{
+	char *p;
+
+	assert(tags != NULL);
+	assert(tag != NULL);
+	assert(val != NULL);
+
+	assert(s_iskeystart(*tags));
+
+	*tag = tags;
+	for (p = tags; *p && !s_iskvsep(*p); p++);
+	*p++ = '\0'; *val = p;
+
+	for (; *p && s_isvalue(*p); p++);
+	if (*p) {
+		*p++ = '\0';
+		return p;
+	}
+
+	return NULL;
+}
+
 #ifdef TEST
 /* LCOV_EXCL_START */
 #define tags_ok(t) ok(tags_valid(t) == 0, "tag set '" #t "' should be valid")
@@ -180,6 +205,43 @@ TESTS {
 		canonicalize_ok("beta=2,alpha=1", "alpha=1,beta=2");
 		canonicalize_ok("a=one,c=three,b=two", "a=one,b=two,c=three");
 		canonicalize_ok("zebra=Z1,yak=Y2,xenops=X3", "xenops=X3,yak=Y2,zebra=Z1");
+
+		/* FIXME: handle duplicate tags */
+	}
+
+	subtest {
+		char *tags, *next, *tag, *val;
+
+		tags = strdup("host=localhost,env=prod,cluster=web,dc=buf1,os=linux");
+		if (!tags)
+			BAIL_OUT("failed to strdup in test setup!");
+
+		next = tags_next(tags, &tag, &val);
+		if (!next) BAIL_OUT("tags_next() returned a NULL pointer");
+		is_string(tag, "host", "first tag from tag_next()");
+		is_string(val, "localhost", "first tag value from tag_next()");
+
+		next = tags_next(next, &tag, &val);
+		if (!next) BAIL_OUT("tags_next() returned a NULL pointer");
+		is_string(tag, "env", "second tag from tag_next()");
+		is_string(val, "prod", "second tag value from tag_next()");
+
+		next = tags_next(next, &tag, &val);
+		if (!next) BAIL_OUT("tags_next() returned a NULL pointer");
+		is_string(tag, "cluster", "third tag from tag_next()");
+		is_string(val, "web", "third tag value from tag_next()");
+
+		next = tags_next(next, &tag, &val);
+		if (!next) BAIL_OUT("tags_next() returned a NULL pointer");
+		is_string(tag, "dc", "fourth tag from tag_next()");
+		is_string(val, "buf1", "fourth tag value from tag_next()");
+
+		next = tags_next(next, &tag, &val);
+		is_null(next, "tags_next() should return NULL when tags have been exhausted");
+		is_string(tag, "os", "fifth tag from tag_next()");
+		is_string(val, "linux", "fifth tag value from tag_next()");
+
+		free(tags);
 	}
 }
 /* LCOV_EXCL_STOP */

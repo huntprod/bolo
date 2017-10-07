@@ -374,6 +374,7 @@ int db_insert(struct db *, const char *name, bolo_msec_t when, bolo_value_t what
 
 int tags_valid(const char *tags);
 int tags_canonicalize(char *tags);
+char * tags_next(char *tags, char **tag, char **val);
 
 
 #endif
