@@ -5,37 +5,11 @@
 #define INITIAL_SLAB (uint64_t)(1 << 11)
 #define PATH_TO_MAINDB "main.db"
 
-struct db {
-	/* internal state */
-	int           rootfd;  /* file descriptor of database root directory */
-	struct hash  *main;    /* primary time series (name|tag,tags,... => <block-id>) */
-	struct hash  *tags;    /* auxiliary tag lookup (tag => [idx], tag=value => [idx]) */
-
-	struct list   idx;
-	struct list   slab;
-
-	uint64_t next_tblock;  /* ID of the next tblock to hand out */
-};
-
-struct idx {
-	struct list l;         /* list hook for database idxrefs */
-	struct btree *btree;   /* balanced B-tree of ts -> slabid */
-	uint64_t number;       /* unique identifier for this index */
-};
-
 /* Used as a callback for the directory traversal logic.
    Since the ts/slabs directories use the same structure, we
    reuse the traverseal logic in a single s_scandir function,
    and the customization is provided by the fs_handler. */
 typedef int(*fs_handler)(struct db *, uint64_t, int);
-
-struct idxtag {
-	struct idxtag *next;  /* list hook for chaining tag pointers */
-	struct idx    *idx;   /* pointer to a tagged time-series */
-};
-
-
-
 
 const char *ENC_KEY = NULL;
 size_t      ENC_KEY_LEN = 0;

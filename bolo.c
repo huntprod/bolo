@@ -5,6 +5,7 @@
 
     bolo [-v|--version]
 
+    bolo dbinfo DATADIR
     bolo idxinfo FILE
     bolo slabinfo FILE
     bolo version
@@ -13,6 +14,50 @@
     (other commands and options added as necessary)
 
  */
+
+static int
+do_dbinfo(int argc, char **argv)
+{
+	struct db *db;
+	struct tslab *slab;
+	struct idx *idx;
+
+	if (argc != 3) {
+		fprintf(stderr, "USAGE: bolo dbinfo DATADIR\n");
+		return 1;
+	}
+
+	db = db_mount(argv[2]);
+	if (!db) {
+		fprintf(stderr, "%s: %s\n", argv[2], error(errno));
+		return 2;
+	}
+
+	fprintf(stdout, "%s:\n", argv[2]);
+	fprintf(stdout, "next tblock #: [%#06lx]\n", db->next_tblock);
+
+	if (isempty(&db->slab)) {
+		fprintf(stdout, "slabs: (none)\n");
+	} else {
+		fprintf(stdout, "slabs:\n");
+		for_each(slab, &db->slab, l) {
+			fprintf(stdout, "  - [%#06lx] %dk\n", slab->number, slab->block_size / 1024);
+		}
+		fprintf(stdout, "\n");
+	}
+
+	if (isempty(&db->idx)) {
+		fprintf(stdout, "indices: (none)\n");
+	} else {
+		fprintf(stdout, "indices:\n");
+		for_each(idx, &db->idx, l) {
+			fprintf(stdout, "  - [%#06lx]\n", idx->number);
+		}
+		fprintf(stdout, "\n");
+	}
+
+	return 0;
+}
 
 static int
 do_idxinfo(int argc, char **argv)
@@ -185,7 +230,7 @@ do_usage(int argc, char **argv)
 static int
 do_version(int argc, char **argv)
 {
-	printf("bolo v0.0\n");
+	fprintf(stdout, "bolo v0.0\n");
 	return 0;
 }
 
@@ -219,6 +264,9 @@ int main(int argc, char **argv)
 
 	if (strcmp(command, "stdin") == 0)
 		return do_stdin(argc, argv);
+
+	if (strcmp(command, "dbinfo") == 0)
+		return do_dbinfo(argc, argv);
 
 	if (strcmp(command, "idxinfo") == 0)
 		return do_idxinfo(argc, argv);

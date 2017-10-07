@@ -360,7 +360,27 @@ struct tblock * tslab_tblock(struct tslab *s, uint64_t id, bolo_msec_t ts);
 
 /***************************************************************  database  ***/
 
-struct db;
+struct idx {
+	struct list l;         /* list hook for database idxrefs */
+	struct btree *btree;   /* balanced B-tree of ts -> slabid */
+	uint64_t number;       /* unique identifier for this index */
+};
+
+struct idxtag {
+	struct idxtag *next;  /* list hook for chaining tag pointers */
+	struct idx    *idx;   /* pointer to a tagged time-series */
+};
+
+struct db {
+	int           rootfd;  /* file descriptor of database root directory */
+	struct hash  *main;    /* primary time series (name|tag,tags,... => <block-id>) */
+	struct hash  *tags;    /* auxiliary tag lookup (tag => [idx], tag=value => [idx]) */
+
+	struct list   idx;     /* unsorted list of time series indices */
+	struct list   slab;    /* unsorted list of tslab structures */
+
+	uint64_t next_tblock;  /* ID of the next tblock to hand out */
+};
 
 void db_encrypt(const char *key, size_t len);
 struct db * db_mount(const char *path) RETURNS;
