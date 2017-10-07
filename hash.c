@@ -157,7 +157,7 @@ hash_read(int from, hash_reader_fn reader, void *udata)
 		if (b && *b)
 			goto fail;
 
-		ptr = reader(value, udata);
+		ptr = reader(buf, value, udata);
 		if (!ptr)
 			goto fail;
 
@@ -199,7 +199,7 @@ hash_write(struct hash *h, int to, hash_writer_fn writer, void *udata)
 
 	for (i = 0; i < HASH_STRIDE; i++)
 		for (b = h->buckets[i]; b; b = b->next)
-			fprintf(out, "%s\t%lu\n", b->key, writer(b->ptr, udata));
+			fprintf(out, "%s\t%lu\n", b->key, writer(b->key, b->ptr, udata));
 
 	fclose(out);
 	return 0;
@@ -219,14 +219,14 @@ struct data {
 	/* don't need any other fields... */
 };
 
-static uint64_t test_writer1(void *_ptr, void *_)
+static uint64_t test_writer1(const char *k, void *_ptr, void *_)
 {
 	assert(_ptr != NULL);
 	return ((struct data *)_ptr)->id;
 }
 /* _u (userdata) will be a contiguous array of
    struct data pointers, NULL-terminated. */
-static void * test_reader1(uint64_t v, void *_u)
+static void * test_reader1(const char *k, uint64_t v, void *_u)
 {
 	struct data **u, *i;
 

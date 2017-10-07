@@ -133,8 +133,8 @@ int  hmac_sha512_check(const char *key, size_t klen, const void *buf, size_t len
 /****************************************************************  hashing  ***/
 
 struct hash;
-typedef void *   (*hash_reader_fn)(uint64_t v, void *udata);
-typedef uint64_t (*hash_writer_fn)(void    *v, void *udata);
+typedef void *   (*hash_reader_fn)(const char *k, uint64_t v, void *udata);
+typedef uint64_t (*hash_writer_fn)(const char *k, void    *v, void *udata);
 
 struct hash * hash_new();
 void hash_free(struct hash *h);

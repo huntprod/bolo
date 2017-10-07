@@ -13,7 +13,7 @@ clean:
 	rm -f lcov.info
 
 test: check
-check: util.o log.o page.o btree.o hash.o sha.o tblock.o tslab.o
+check: util.o log.o page.o btree.o hash.o sha.o tblock.o tslab.o tags.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o bits  bits.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o util  util.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o log   log.c    util.o
@@ -24,7 +24,7 @@ check: util.o log.o page.o btree.o hash.o sha.o tblock.o tslab.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o sha   sha.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o time  time.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o tags  tags.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o db    db.c     btree.o page.o util.o hash.o sha.o tblock.o tslab.o log.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o db    db.c     btree.o page.o util.o hash.o sha.o tblock.o tslab.o log.o tags.o
 	prove -v ./bits ./util ./log ./cfg ./hash ./page ./btree ./sha ./time ./tags ./db
 
 memtest: check

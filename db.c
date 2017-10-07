@@ -9,6 +9,7 @@ struct db {
 	/* internal state */
 	int           rootfd;  /* file descriptor of database root directory */
 	struct hash  *main;    /* primary time series (name|tag,tags,... => <block-id>) */
+	struct hash  *tags;    /* auxiliary tag lookup (tag => [idx], tag=value => [idx]) */
 
 	struct list   idx;
 	struct list   slab;
@@ -27,6 +28,12 @@ struct idx {
    reuse the traverseal logic in a single s_scandir function,
    and the customization is provided by the fs_handler. */
 typedef int(*fs_handler)(struct db *, uint64_t, int);
+
+struct idxtag {
+	struct idxtag *next;  /* list hook for chaining tag pointers */
+	struct idx    *idx;   /* pointer to a tagged time-series */
+};
+
 
 
 
@@ -319,24 +326,51 @@ fail:
 }
 
 static uint64_t
-s_maindb_writer(void *_idx, void *_)
+s_maindb_writer(const char *key, void *_idx, void *_)
 {
 	assert(_idx != NULL);
 	return ((struct idx *)_idx)->number;
 }
 
 static void *
-s_maindb_reader(uint64_t id, void *udata)
+s_maindb_reader(const char *key, uint64_t id, void *udata)
 {
 	struct db *db;
 	struct idx *i;
+	char *tags, *tag, *val, *next;
+	struct idxtag *idxtag;
 
 	assert(udata != NULL);
 
 	db = (struct db *)udata;
-	for_each(i, &db->idx, l)
-		if (i->number == id)
-			return i;
+	for_each(i, &db->idx, l) {
+		if (i->number != id)
+			continue;
+
+		/* expand out the tags hash */
+		tags = strdup(key); assert(tags != NULL);
+		next = strchr(tags, '|');
+		if (next) next++;
+		while (next) {
+			next = tags_next(tags, &tag, &val);
+
+			idxtag = malloc(sizeof(*idxtag));
+			assert(idxtag != NULL);
+
+			if (hash_get(db->tags, &idxtag->next, tag) != 0)
+				idxtag->next = NULL;
+			hash_set(db->tags, tag, idxtag);
+
+			idxtag = malloc(sizeof(*idxtag));
+			assert(idxtag != NULL);
+
+			*(val-1) = '='; /* overwrite the \0 teminator on tag */
+			if (hash_get(db->tags, &idxtag->next, tag) != 0)
+				idxtag->next = NULL;
+			hash_set(db->tags, tag, idxtag);
+		}
+		return i;
+	}
 
 	return NULL;
 }
@@ -385,6 +419,9 @@ db_mount(const char *path)
 		goto fail;
 
 	infof("mounting main.db index file at %s/%s", path, PATH_TO_MAINDB);
+	db->tags = hash_new(0);
+	if (!db->tags)
+		goto fail;
 	db->main = hash_read(fd, s_maindb_reader, db);
 	if (!db->main)
 		goto fail;
@@ -450,6 +487,9 @@ db_init(const char *path)
 	db->main = hash_new(0);
 	if (!db->main)
 		goto fail;
+	db->tags = hash_new(0);
+	if (!db->tags)
+		goto fail;
 
 	/* create the main.db index */
 	fd = openat(db->rootfd, PATH_TO_MAINDB, O_WRONLY|O_CREAT, 0666);
@@ -476,6 +516,7 @@ fail:
 	if (db) {
 		if (db->rootfd >= 0) close(db->rootfd);
 		hash_free(db->main);
+		hash_free(db->tags);
 		free(db);
 	}
 	errno = esave;
@@ -593,6 +634,7 @@ db_unmount(struct db *db)
 	}
 
 	hash_free(db->main);
+	hash_free(db->tags);
 	close(db->rootfd);
 	free(db);
 	return ok;
@@ -852,11 +894,11 @@ TESTS {
 		is_unsigned(tblock_number(db->next_tblock), 0,
 			"first tblock address of a new db should be in tblock 0");
 
-		ok(db_insert(db, "metric|tags", 1234567890, 4567.89) == 0,
+		ok(db_insert(db, "metric|host=localhost,env=test", 1234567890, 4567.89) == 0,
 			"db_insert() should succeed on fresh database");
-		ok(db_insert(db, "metric|tags", 1234567890 + 1, 4567.91) == 0,
+		ok(db_insert(db, "metric|host=localhost,env=test", 1234567890 + 1, 4567.91) == 0,
 			"db_insert() should succeed twice on fresh database");
-		ok(db_insert(db, "metric|tags", 1234567890ul + (1ul << 33), 4567.91) == 0,
+		ok(db_insert(db, "metric|host=localhost,env=test", 1234567890ul + (1ul << 33), 4567.91) == 0,
 			"db_insert() should succeed after exhausting block capacity (in time)");
 
 		ok(db_sync(db) == 0,
