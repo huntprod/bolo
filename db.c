@@ -56,8 +56,9 @@ fail:
 static int
 s_handle_slab(struct db *db, uint64_t id, int fd)
 {
-	int esave;
+	int i, esave;
 	struct tslab *slab;
+	uint64_t max_tblock;
 
 	slab = malloc(sizeof(*slab));
 	if (!slab)
@@ -68,6 +69,16 @@ s_handle_slab(struct db *db, uint64_t id, int fd)
 		goto fail;
 
 	push(&db->slab, &slab->l);
+
+	max_tblock = slab->number;
+	for (i = 0; i < TBLOCKS_PER_TSLAB; i++) {
+		if (!slab->blocks[i].valid)
+			break;
+		max_tblock++;
+	}
+	if (max_tblock >= db->next_tblock)
+		db->next_tblock = max_tblock + 1;
+
 	return 0;
 
 fail:
@@ -819,11 +830,17 @@ db_insert(struct db *db, const char *name, bolo_msec_t when, bolo_value_t what)
 	} else {
 		block = s_findblock(db, block_id, when);
 
-		if (block && (tblock_isfull(block) || !tblock_canhold(block, when)))
+		if (block && (tblock_isfull(block) || !tblock_canhold(block, when))) {
 			block = s_newblock(db, when);
+			if (!block)
+				return -1;
 
-		if (!block)
+			if (btree_insert(idx->btree, when, block->number) != 0)
+				return -1;
+
+		} else if (!block) {
 			return -1;
+		}
 	}
 
 	if (tblock_insert(block, when, what) != 0)
