@@ -330,6 +330,7 @@ s_maindb_reader(const char *key, uint64_t id, void *udata)
 
 			idxtag = malloc(sizeof(*idxtag));
 			assert(idxtag != NULL);
+			push(&db->idxtag, &idxtag->l);
 
 			if (hash_get(db->tags, &idxtag->next, tag) != 0)
 				idxtag->next = NULL;
@@ -337,12 +338,14 @@ s_maindb_reader(const char *key, uint64_t id, void *udata)
 
 			idxtag = malloc(sizeof(*idxtag));
 			assert(idxtag != NULL);
+			push(&db->idxtag, &idxtag->l);
 
 			*(val-1) = '='; /* overwrite the \0 teminator on tag */
 			if (hash_get(db->tags, &idxtag->next, tag) != 0)
 				idxtag->next = NULL;
 			hash_set(db->tags, tag, idxtag);
 		}
+		free(tags);
 		return i;
 	}
 
@@ -393,6 +396,7 @@ db_mount(const char *path)
 		goto fail;
 
 	infof("mounting main.db index file at %s/%s", path, PATH_TO_MAINDB);
+	empty(&db->idxtag);
 	db->tags = hash_new(0);
 	if (!db->tags)
 		goto fail;
@@ -478,6 +482,7 @@ db_init(const char *path)
 	fd = -1;
 
 	empty(&db->idx);
+	empty(&db->idxtag);
 	empty(&db->slab);
 	db->next_tblock = 0x800;
 
@@ -588,8 +593,9 @@ fail:
 int
 db_unmount(struct db *db)
 {
-	struct tslab *slab, *tmp_slab;
-	struct idx   *idx,  *tmp_idx;
+	struct tslab  *slab,   *tmp_slab;
+	struct idx    *idx,    *tmp_idx;
+	struct idxtag *idxtag, *tmp_idxtag;
 	int ok;
 
 	assert(db != NULL);
@@ -605,6 +611,10 @@ db_unmount(struct db *db)
 		if (btree_close(idx->btree) != 0)
 			ok = -1;
 		free(idx);
+	}
+
+	for_eachx(idxtag, tmp_idxtag, &db->idxtag, l) {
+		free(idxtag);
 	}
 
 	hash_free(db->main);

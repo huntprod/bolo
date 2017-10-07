@@ -367,8 +367,9 @@ struct idx {
 };
 
 struct idxtag {
-	struct idxtag *next;  /* list hook for chaining tag pointers */
-	struct idx    *idx;   /* pointer to a tagged time-series */
+	struct list l;         /* list hook for memory management (free) */
+	struct idxtag *next;   /* list hook for chaining tag pointers */
+	struct idx    *idx;    /* pointer to a tagged time-series */
 };
 
 struct db {
@@ -378,6 +379,7 @@ struct db {
 
 	struct list   idx;     /* unsorted list of time series indices */
 	struct list   slab;    /* unsorted list of tslab structures */
+	struct list   idxtag;  /* list of allocated idxtags, for freeing later */
 
 	uint64_t next_tblock;  /* ID of the next tblock to hand out */
 };
