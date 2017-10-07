@@ -326,7 +326,7 @@ s_maindb_reader(const char *key, uint64_t id, void *udata)
 		next = strchr(tags, '|');
 		if (next) next++;
 		while (next) {
-			next = tags_next(tags, &tag, &val);
+			next = tags_next(next, &tag, &val);
 
 			idxtag = malloc(sizeof(*idxtag));
 			assert(idxtag != NULL);

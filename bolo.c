@@ -21,6 +21,7 @@ do_dbinfo(int argc, char **argv)
 	struct db *db;
 	struct tslab *slab;
 	struct idx *idx;
+	const char *k;
 
 	if (argc != 3) {
 		fprintf(stderr, "USAGE: bolo dbinfo DATADIR\n");
@@ -56,6 +57,20 @@ do_dbinfo(int argc, char **argv)
 		fprintf(stdout, "\n");
 	}
 
+	if (hash_isempty(db->tags)) {
+		fprintf(stdout, "tags: (none)\n");
+	} else {
+		fprintf(stdout, "tags:\n");
+		hash_each(db->tags, &k, NULL) {
+			fprintf(stdout, "  - %s\n", k);
+		}
+		fprintf(stdout, "\n");
+	}
+
+	if (db_unmount(db) != 0) {
+		fprintf(stderr, "warning: had trouble unmounting database at %s: %s\n",
+		                argv[2], error(errno));
+	}
 	return 0;
 }
 
