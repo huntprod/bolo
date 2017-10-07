@@ -28,9 +28,9 @@ _print(struct btree *t, int indent)
 {
 	int i;
 
-	assert(t != NULL);
-	assert(indent >= 0);
-	assert(indent < 7 * 8); /* 7-levels deep seems unlikely... */
+	BUG(t != NULL,      "btree_print() given a NULL btree to print");
+	BUG(indent >= 0,    "btree_print() given a negative indent");
+	BUG(indent < 7 * 8, "btree_print() recursed more than 7 levels deep; possible recursion loop");
 
 	fprintf(stderr, "%*s[btree %p @%lu page %p // %d keys %s]\n",
 		indent, "", (void *)t, t->id,  t->page.data, t->used, t->leaf ? "LEAF" : "interior");
@@ -125,7 +125,7 @@ s_extend(int fd)
 		return NULL;
 
 	lseek(fd, -1 * BTREE_PAGE_SIZE, SEEK_END);
-	assert(BTREE_HEADER_SIZE == 8);
+	BUG(BTREE_HEADER_SIZE == 8, "BTREE_HEADER_SIZE constant is under- or oversized");
 	if (write(fd, "BTREE\x80\x00\x00", BTREE_HEADER_SIZE) != BTREE_HEADER_SIZE)
 		return NULL;
 
@@ -162,8 +162,8 @@ btree_read(int fd)
 static int
 s_flush(struct btree *t)
 {
-	assert(t != NULL);
-	assert(t->page.data != NULL);
+	BUG(t != NULL,            "btree_write() given a NULL btree to flush");
+	BUG(t->page.data != NULL, "btree_write() given a btree without a backing page");
 
 	page_write8 (&t->page, 5, t->leaf ? BTREE_LEAF : 0);
 	page_write16(&t->page, 6, t->used);
@@ -175,7 +175,7 @@ btree_write(struct btree *t)
 {
 	int i, rc;
 
-	assert(t != NULL);
+	BUG(t != NULL, "btree_write() given a NULL btree to write");
 
 	rc = 0;
 
@@ -214,7 +214,7 @@ btree_close(struct btree *t)
 static int
 s_find(struct btree *t, bolo_msec_t key)
 {
-	assert(t != NULL);
+	BUG(t != NULL, "s_find (by way of btree_find or btree_insert) given a NULL btree node");
 
 	int lo, mid, hi;
 
@@ -265,14 +265,14 @@ s_clone(struct btree *t)
 static void
 s_divide(struct btree *l, struct btree *r, int mid)
 {
-	assert(l != NULL);
-	assert(r != NULL);
-	assert(l != r);
-	assert(l->page.data != NULL);
-	assert(r->page.data != NULL);
-	assert(l->page.data != r->page.data);
-	assert(mid != 0);
-	assert(l->used >= mid);
+	BUG(l != NULL,                    "btree_insert() divide given a NULL left node");
+	BUG(r != NULL,                    "btree_insert() divide given a NULL right node");
+	BUG(l != r,                       "btree_insert() divide given identical left and right nodes");
+	BUG(l->page.data != NULL,         "btree_insert() divide given a left node with no backing page");
+	BUG(r->page.data != NULL,         "btree_insert() divide given a right node with no backing page");
+	BUG(l->page.data != r->page.data, "btree_insert() divide given left and right nodes that use the same backing page");
+	BUG(mid != 0,                     "btree_insert() divide attempted to divide with midpoint of 0");
+	BUG(l->used >= mid,               "btree_insert() divide attempted to divide with out-of-range midpoint");
 
 	r->used = l->used - mid - 1;
 	l->used = mid;
@@ -306,8 +306,8 @@ s_insert(struct btree *t, bolo_msec_t key, uint64_t block_number, bolo_msec_t *m
 	int i, mid;
 	struct btree *r;
 
-	assert(t != NULL);
-	assert(t->used <= BTREE_DEGREE);
+	BUG(t != NULL,               "btree_insert() given a NULL node to insert into");
+	BUG(t->used <= BTREE_DEGREE, "btree_insert() given a node that was impossibly full");
 	/* invariant: Each node in the btree will always have enough
 	              free space in it to insert at least one value
 	              (either a literal, or a node pointer).
@@ -363,7 +363,7 @@ btree_insert(struct btree *t, bolo_msec_t key, uint64_t block_number)
 	struct btree *l, *r;
 	bolo_msec_t m;
 
-	assert(t != NULL);
+	BUG(t != NULL, "btree_insert() given a NULL node to insert into");
 
 	r = s_insert(t, key, block_number, &m);
 	if (r) {
@@ -390,8 +390,8 @@ btree_find(struct btree *t, uint64_t *dst, bolo_msec_t key)
 {
 	int i;
 
-	assert(t != NULL);
-	assert(dst != NULL);
+	BUG(t != NULL, "btree_find() given a NULL btree node");
+	BUG(dst != NULL, "btree_find() told to place results in a NULL pointer");
 
 	if (t->leaf && t->used == 0)
 		return -1; /* empty root node */
@@ -426,8 +426,8 @@ iszero(const void *buf, off_t offset, size_t size)
 {
 	size_t i;
 
-	assert(buf != NULL);
-	assert(offset >= 0);
+	insist(buf != NULL, "buf must not be NULL");
+	insist(offset >= 0, "offset must be positive or zero");
 
 	for (i = 0; i < size; i++)
 		if (((const uint8_t *)buf)[offset + i] != 0)

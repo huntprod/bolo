@@ -10,10 +10,16 @@
 #  include "t/memfd.h"
 #endif
 
+#define GITHUB_REPO   "jhunt/bolo-roboto"
+#define THIS_IS_A_BUG " - this is a bug; please open an issue against https://" GITHUB_REPO
+
+#define ASSERTION_VERBOSE 1
+#include "insist.h"
+#define BUG(t,msg) insist(t,msg THIS_IS_A_BUG)
+
 #include "compiler.h"
 #include "errno.h"
 
-#include <assert.h>
 #include <errno.h>
 
 #include <stdint.h>

@@ -1,5 +1,4 @@
-#include <assert.h>
-#include <stdio.h>
+#include "bolo.h"
 #include <stdarg.h>
 
 static FILE *stddbg = NULL;
@@ -9,7 +8,7 @@ debugto(int fd)
 {
 	FILE *f;
 
-	assert(fd >= 0);
+	BUG(fd >= 0, "debugto() given an invalid file descriptor to send debug output to");
 
 	f = fdopen(fd, "w");
 	if (f == NULL)
@@ -30,7 +29,7 @@ debugf(const char *fmt, ...)
 	if (!stddbg)
 		return;
 
-	assert(fmt != NULL);
+	BUG(fmt != NULL, "debugf() given a NULL format string to print");
 
 	va_start(ap, fmt);
 	vfprintf(stddbg, fmt, ap);

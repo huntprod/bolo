@@ -10,8 +10,8 @@ void startlog(const char *bin, pid_t pid, int level)
 {
 	ssize_t n;
 
-	assert(bin);
-	assert(level >= LOG_ERRORS || level <= LOG_INFO);
+	BUG(bin, "startlog() given a NULL program name");
+	BUG(level >= LOG_ERRORS || level <= LOG_INFO, "startlog() given an out-of-range log level");
 
 	if (!OUT)
 		OUT = stdout;
@@ -29,7 +29,7 @@ void logto(int fd)
 {
 	FILE *out;
 
-	assert(fd >= 0);
+	BUG(fd >= 0, "logto() given an invalid file descriptor to log to");
 
 	out = fdopen(fd, "w");
 	if (!out)
@@ -73,8 +73,8 @@ void errorf(const char *fmt, ...)
 {
 	va_list args;
 
-	assert(fmt != NULL);
-	assert(OUT != NULL);
+	BUG(fmt != NULL, "errorf() given a NULL format string to print");
+	BUG(OUT != NULL, "errorf() has nowhere to print output");
 
 	va_start(args, fmt);
 	_vlogf("ERROR", fmt, args);
@@ -85,8 +85,8 @@ void warningf(const char *fmt, ...)
 {
 	va_list args;
 
-	assert(fmt != NULL);
-	assert(OUT != NULL);
+	BUG(fmt != NULL, "warningf() given a NULL format string to print");
+	BUG(OUT != NULL, "warningf() has nowhere to print output");
 
 	if (LEVEL < LOG_WARNINGS)
 		return;
@@ -100,8 +100,8 @@ void infof(const char *fmt, ...)
 {
 	va_list args;
 
-	assert(fmt != NULL);
-	assert(OUT != NULL);
+	BUG(fmt != NULL, "infof() given a NULL format string to print");
+	BUG(OUT != NULL, "infof() has nowhere to print output");
 
 	if (LEVEL < LOG_INFO)
 		return;

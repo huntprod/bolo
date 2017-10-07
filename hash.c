@@ -68,7 +68,7 @@ hash_free(struct hash *h)
 void
 _hash_ebegn(struct hash *h, const char **key, const void **val)
 {
-	assert(h != NULL);
+	BUG(h != NULL, "hash_each() { ... } given a NULL hash to iterate over");
 
 	h->i = 0;
 	h->last = NULL;
@@ -78,8 +78,8 @@ _hash_ebegn(struct hash *h, const char **key, const void **val)
 void
 _hash_enext(struct hash *h, const char **key, const void **val)
 {
-	assert(h != NULL);
-	assert(key != NULL || val != NULL);
+	BUG(h != NULL,                  "hash_each() { ... } given a NULL hash to iterate over");
+	BUG(key != NULL || val != NULL, "hash_each() { ... } given NULL key and value destination pointers");
 
 	while (h->i < HASH_STRIDE && !h->last) {
 		h->last = h->buckets[h->i++];
@@ -101,7 +101,7 @@ _hash_edone(struct hash *h)
 size_t
 hash_nset(struct hash *h)
 {
-	assert(h != NULL);
+	BUG(h != NULL, "hash_nset() given a NULL hash to query");
 	return h->nset;
 }
 
@@ -111,8 +111,8 @@ hash_set(struct hash *h, const char *key, void *val)
 	unsigned int k;
 	struct bucket *b;
 
-	assert(h != NULL);
-	assert(key != NULL);
+	BUG(h != NULL,   "hash_set() given a NULL hash to insert into");
+	BUG(key != NULL, "hash_set() given a NULL key to insert");
 
 	k = s_hash(key) % HASH_STRIDE;
 
@@ -144,8 +144,8 @@ hash_get(struct hash *h, void *dst, const char *key)
 	unsigned int k;
 	struct bucket *b;
 
-	assert(h != NULL);
-	assert(key != NULL);
+	BUG(h != NULL,   "hash_get() given a NULL hash to query");
+	BUG(key != NULL, "hash_get() given a NULL key to lookup");
 
 	k = s_hash(key) % HASH_STRIDE;
 
@@ -174,7 +174,7 @@ hash_read(int from, hash_reader_fn reader, void *udata)
 	uint64_t value;
 	void *ptr;
 
-	assert(from >= 0);
+	BUG(from >= 0, "hash_read() given an invalid file descriptor to read from");
 
 	lseek(from, 0, SEEK_SET);
 
@@ -227,8 +227,8 @@ hash_write(struct hash *h, int to, hash_writer_fn writer, void *udata)
 	int i, fd;
 	struct bucket *b;
 
-	assert(h != NULL);
-	assert(to >= 0);
+	BUG(h != NULL, "hash_write() given a NULL hash pointer to write");
+	BUG(to >= 0,   "hash_write() given an invalid file descriptor to write to");
 
 	ftruncate(to, 0);
 	lseek(to, 0, SEEK_SET);
@@ -267,7 +267,7 @@ struct data {
 
 static uint64_t test_writer1(const char *k, void *_ptr, void *_)
 {
-	assert(_ptr != NULL);
+	insist(_ptr != NULL, "_ptr must not be NULL");
 	return ((struct data *)_ptr)->id;
 }
 /* _u (userdata) will be a contiguous array of
@@ -276,7 +276,7 @@ static void * test_reader1(const char *k, uint64_t v, void *_u)
 {
 	struct data **u, *i;
 
-	assert(_u != NULL);
+	insist(_u != NULL, "_u must not be NULL");
 
 	u = (struct data **)_u;
 	for (i = *u; i; i++)

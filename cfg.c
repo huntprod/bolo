@@ -41,15 +41,16 @@ configure(struct config *cfg, int fd)
 			return 0;
 
 		next = eol;
-		assert(next);
-		assert(*next == '\n');
+		BUG(next != NULL,  "configure() ended up with a NULL eol marker somehow (this is curious)");
+		BUG(*next == '\n', "configure() ended up with a non-newline eol marker somehow (this is curious)");
 
 		/* treat comments as ending the line */
 		eol = strchr(buf, '#');
 		if (eol && *eol) *eol = '\n';
 		else              eol = next;
-		assert(eol);
-		assert(*eol == '\n');
+
+		BUG(eol != NULL,  "configure() ended up with a NULL eol marker somehow (this is curious)");
+		BUG(*eol == '\n', "configure() ended up with a non-newline eol marker somehow (this is curious)");
 
 		/* find start of the key */
 		k = &buf[0];

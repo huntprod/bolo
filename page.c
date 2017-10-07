@@ -6,11 +6,11 @@ page_map(struct page *p, int fd, off_t start, size_t len)
 {
 	int prot, flags;
 
-	assert(p != NULL);
-	assert(p->data == NULL);
-	assert(fd >= 0);
-	assert(start >= 0);
-	assert(len > 0);
+	BUG(p != NULL,       "page_map() given a NULL page to map");
+	BUG(p->data == NULL, "page_map() given a page that has already been mapped");
+	BUG(fd >= 0,         "page_map() given an invalid file descriptor to map");
+	BUG(start >= 0,      "page_map() given an invalid offset to start mapping from");
+	BUG(len > 0,         "page_map() given an invalid length to map");
 
 	if ((flags = fcntl(fd, F_GETFL, 0)) == -1)
 		return -1;
@@ -46,9 +46,9 @@ page_map(struct page *p, int fd, off_t start, size_t len)
 int
 page_sync(struct page *p)
 {
-	assert(p != NULL);
-	assert(p->data != NULL);
-	assert(p->len > 0);
+	BUG(p != NULL,       "page_sync() given a NULL page to synchronize");
+	BUG(p->data != NULL, "page_sync() given a page without a mapped region");
+	BUG(p->len > 0,      "page_sync() given a page with an invalid region length");
 
 	return msync(p->data, p->len, MS_SYNC);
 }
@@ -74,109 +74,110 @@ page_unmap(struct page *p)
 
 uint8_t page_read8(struct page *p, size_t offset)
 {
-	assert(p != NULL);
-	assert(p->data != NULL);
-	assert(offset + 1 < p->len);
+	BUG(p != NULL,           "page_read8() given a NULL page to read from");
+	BUG(p->data != NULL,     "page_read8() given an unmapped page to read from");
+	BUG(offset + 1 < p->len, "page_read8() given an out-of-range offset to read from");
 
 	return read8(p->data, offset);
 }
 
 uint16_t page_read16(struct page *p, size_t offset)
 {
-	assert(p != NULL);
-	assert(p->data != NULL);
-	assert(offset + 2 < p->len);
+	BUG(p != NULL,           "page_read16() given a NULL page to read from");
+	BUG(p->data != NULL,     "page_read16() given an unmapped page to read from");
+	BUG(offset + 2 < p->len, "page_read16() given an out-of-range offset to read from");
 
 	return read16(p->data, offset);
 }
 
 uint32_t page_read32(struct page *p, size_t offset)
 {
-	assert(p != NULL);
-	assert(p->data != NULL);
-	assert(offset + 4 < p->len);
+	BUG(p != NULL,           "page_read32() given a NULL page to read from");
+	BUG(p->data != NULL,     "page_read32() given an unmapped page to read from");
+	BUG(offset + 4 < p->len, "page_read32() given an out-of-range offset to read from");
 
 	return read32(p->data, offset);
 }
 
 uint64_t page_read64(struct page *p, size_t offset)
 {
-	assert(p != NULL);
-	assert(p->data != NULL);
-	assert(offset + 8 < p->len);
+	BUG(p != NULL,           "page_read64() given a NULL page to read from");
+	BUG(p->data != NULL,     "page_read64() given an unmapped page to read from");
+	BUG(offset + 8 < p->len, "page_read64() given an out-of-range offset to read from");
 
 	return read64(p->data, offset);
 }
 
 double page_read64f(struct page *p, size_t offset)
 {
-	assert(p != NULL);
-	assert(p->data != NULL);
-	assert(offset + 8 < p->len);
+	BUG(p != NULL,           "page_read64f() given a NULL page to read from");
+	BUG(p->data != NULL,     "page_read64f() given an unmapped page to read from");
+	BUG(offset + 8 < p->len, "page_read64f() given an out-of-range offset to read from");
 
 	return read64f(p->data, offset);
 }
 
 void page_write8(struct page *p, size_t offset, uint8_t v)
 {
-	assert(p != NULL);
-	assert(p->data != NULL);
-	assert(offset + 1 < p->len);
+	BUG(p != NULL,           "page_write8() given a NULL page to write to");
+	BUG(p->data != NULL,     "page_write8() given an unmapped page to write to");
+	BUG(offset + 1 < p->len, "page_write8() given an out-of-range offset to write to");
 
 	write8(p->data, offset, v);
 }
 
 void page_write16(struct page *p, size_t offset, uint16_t v)
 {
-	assert(p != NULL);
-	assert(p->data != NULL);
-	assert(offset + 2 < p->len);
+	BUG(p != NULL,           "page_write16() given a NULL page to write to");
+	BUG(p->data != NULL,     "page_write16() given an unmapped page to write to");
+	BUG(offset + 2 < p->len, "page_write16() given an out-of-range offset to write to");
 
 	write16(p->data, offset, v);
 }
 
 void page_write32(struct page *p, size_t offset, uint32_t v)
 {
-	assert(p != NULL);
-	assert(p->data != NULL);
-	assert(offset + 4 < p->len);
+	BUG(p != NULL,           "page_write32() given a NULL page to write to");
+	BUG(p->data != NULL,     "page_write32() given an unmapped page to write to");
+	BUG(offset + 4 < p->len, "page_write32() given an out-of-range offset to write to");
 
 	write32(p->data, offset, v);
 }
 
 void page_write64(struct page *p, size_t offset, uint64_t v)
 {
-	assert(p != NULL);
-	assert(p->data != NULL);
-	assert(offset + 8 < p->len);
+	BUG(p != NULL,           "page_write64() given a NULL page to write to");
+	BUG(p->data != NULL,     "page_write64() given an unmapped page to write to");
+	BUG(offset + 8 < p->len, "page_write64() given an out-of-range offset to write to");
 
 	write64(p->data, offset, v);
 }
 
 void page_write64f(struct page *p, size_t offset, double v)
 {
-	assert(p != NULL);
-	assert(p->data != NULL);
-	assert(offset + 8 < p->len);
+	BUG(p != NULL,           "page_write64f() given a NULL page to write to");
+	BUG(p->data != NULL,     "page_write64f() given an unmapped page to write to");
+	BUG(offset + 8 < p->len, "page_write64f() given an out-of-range offset to write to");
 
 	write64f(p->data, offset, v);
 }
 
 void page_writen(struct page *p, size_t offset, const void *buf, size_t len)
 {
-	assert(p != NULL);
-	assert(p->data != NULL);
-	assert(offset + len < p->len);
+	BUG(p != NULL,             "page_writen() given a NULL page to write to");
+	BUG(p->data != NULL,       "page_writen() given an unmapped page to write to");
+	BUG(buf != NULL,           "page_writen() given a NULL buffer to copy data from");
+	BUG(offset + len < p->len, "page_writen() given an out-of-range offset to write to");
 
 	writen(p->data, offset, buf, len);
 }
 
 ssize_t page_readn(struct page *p, size_t offset, void *buf, size_t len)
 {
-	assert(p != NULL);
-	assert(p->data != NULL);
-	assert(buf != NULL);
-	assert(offset + len < p->len);
+	BUG(p != NULL,             "page_readn() given a NULL page to read from");
+	BUG(p->data != NULL,       "page_readn() given an unmapped page to read from");
+	BUG(buf != NULL,           "page_readn() given a NULL buffer to copy read data to");
+	BUG(offset + len < p->len, "page_readn() given an out-of-range offset to read from");
 
 	memcpy(buf, (uint8_t *)p->data + offset, len);
 	return len;

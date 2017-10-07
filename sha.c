@@ -94,7 +94,7 @@ static char HEX[16] = "0123456789abcdef";
 void
 sha512_init(struct sha512 *c)
 {
-	assert(c != NULL);
+	BUG(c != NULL, "sha512_init() given a NULL sha512 context to initialize");
 
 	memset(c, 0, sizeof(*c));
 	memcpy(c->state, H0, SHA512_DIGEST);
@@ -263,7 +263,7 @@ sha512_done(struct sha512 *c)
 int
 sha512_raw(struct sha512 *c, void *d, size_t len)
 {
-	assert(c != NULL);
+	BUG(c != NULL, "sha512_raw() given a NULL sha512 context to query");
 
 	errno = EINVAL;
 	if (!d || len < SHA512_DIGEST)
@@ -280,7 +280,7 @@ sha512_raw(struct sha512 *c, void *d, size_t len)
 int
 sha512_hex(struct sha512 *c, void *d, size_t len)
 {
-	assert(c != NULL);
+	BUG(c != NULL, "sha512_hex() given a NULL sha512 context to query");
 
 	errno = EINVAL;
 	if (!d || len < 2 * SHA512_DIGEST)
@@ -320,9 +320,9 @@ hmac_sha512_init(struct hmac_sha512 *c, const char *k, size_t len)
 	char ipad[SHA512_BLOCK];
 	int i;
 
-	assert(c != NULL);
-	assert(k != NULL);
-	assert(len > 0);
+	BUG(c != NULL, "hmac_sha512_init() given a NULL hmac-sha512 context to initialize");
+	BUG(k != NULL, "hmac_sha512_init() given a NULL encryption key to seal with");
+	BUG(len > 0,   "hmac_sha512_init() given an invalid encryption key length");
 
 	memset(c->key, 0, SHA512_BLOCK);
 	if (len > SHA512_BLOCK) {
@@ -413,10 +413,10 @@ hmac_sha512_seal(const char *key, size_t key_len, const void *buf, size_t len)
 	struct hmac_sha512 c;
 	uint8_t zeros[64];
 
-	assert(key != NULL);
-	assert(key_len > 0);
-	assert(buf != NULL);
-	assert(len > 64);
+	BUG(key != NULL, "hmac_sha512_seal() given a NULL encryption key to seal with");
+	BUG(key_len > 0, "hmac_sha512_seal() given an invalid encryption key length");
+	BUG(buf != NULL, "hmac_sha512_seal() given a NULL buffer to seal");
+	BUG(len > 64,    "hmac_sha512_seal() given an invalid buffer length");
 
 	memset(zeros, 0, 64);
 	hmac_sha512_init(&c, key, key_len);
@@ -435,10 +435,10 @@ hmac_sha512_check(const char *key, size_t key_len, const void *buf, size_t len)
 	uint8_t zeros[64];
 	uint8_t digest[64];
 
-	assert(key != NULL);
-	assert(key_len > 0);
-	assert(buf != NULL);
-	assert(len > 64);
+	BUG(key != NULL, "hmac_sha512_check() given a NULL encryption key to validate the seal with");
+	BUG(key_len > 0, "hmac_sha512_check() given an invalid encryption key length");
+	BUG(buf != NULL, "hmac_sha512_check() given a NULL buffer to check");
+	BUG(len > 64,    "hmac_sha512_check() given an invalid buffer length");
 
 	memset(zeros, 0, 64);
 	hmac_sha512_init(&c, key, key_len);

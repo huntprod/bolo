@@ -9,8 +9,8 @@
 
 int tslab_map(struct tslab *s, int fd)
 {
-	assert(s != NULL);
-	assert(fd >= 0);
+	BUG(s != NULL, "tslab_map() given a NULL tslab to map");
+	BUG(fd >= 0,   "tslab_map() given an invalid file descriptor");
 
 	int i, rc;
 	char header[TSLAB_HEADER_SIZE];
@@ -67,7 +67,7 @@ int tslab_unmap(struct tslab *s)
 {
 	int i, ok;
 
-	assert(s != NULL);
+	BUG(s != NULL, "tslab_unmap() given a NULL tslab");
 
 	ok = 0;
 	for (i = 0; i < TBLOCKS_PER_TSLAB; i++) {
@@ -87,7 +87,7 @@ int tslab_sync(struct tslab *s)
 {
 	int i, ok;
 
-	assert(s != NULL);
+	BUG(s != NULL, "tslab_sync() given a NULL tslab to synchronize");
 
 	ok = 0;
 	for (i = 0; i < TBLOCKS_PER_TSLAB; i++) {
@@ -106,8 +106,8 @@ int tslab_init(struct tslab *s, int fd, uint64_t number, uint32_t block_size)
 	char header[TSLAB_HEADER_SIZE];
 	size_t nwrit;
 
-	assert(s != NULL);
-	assert(block_size == (1 << 19));
+	BUG(s != NULL, "tslab_init() given a NULL tslab to initialize");
+	BUG(block_size == (1 << 19), "tslab_init() given a non-standard block size");
 
 	memset(header, 0, sizeof(header));
 	memcpy(header, "SLABv1", 6);
@@ -139,7 +139,7 @@ int tslab_isfull(struct tslab *s)
 {
 	int i;
 
-	assert(s != NULL);
+	BUG(s != NULL, "tslab_isfull() given a NULL tslab to query");
 
 	for (i = 0; i < TBLOCKS_PER_TSLAB; i++)
 		if (!s->blocks[i].valid)
@@ -154,7 +154,7 @@ int tslab_extend(struct tslab *s, bolo_msec_t base)
 	off_t start;
 	size_t len;
 
-	assert(s != NULL);
+	BUG(s != NULL, "tslab_extend() given a NULL tslab to extend");
 
 	/* seek to the end of the fd, so we can extend it */
 	if (lseek(s->fd, 0, SEEK_END) < 0)
@@ -167,7 +167,7 @@ int tslab_extend(struct tslab *s, bolo_msec_t base)
 
 		len   = s->block_size;
 		start = sysconf(_SC_PAGESIZE) + i * len;
-		assert(len == (1 << 19));
+		BUG(len == (1 << 19), "tslab_extend() was told to extend a tslab with a non-standard block size");
 
 		/* extend the file descriptor one TBLOCK's worth */
 		if (lseek(s->fd, start + len - 1, SEEK_SET) < 0)
@@ -196,7 +196,7 @@ int tslab_extend(struct tslab *s, bolo_msec_t base)
 struct tblock *
 tslab_tblock(struct tslab *s, uint64_t id, bolo_msec_t ts)
 {
-	assert(s != NULL);
+	BUG(s != NULL, "tslab_tblock() given a NULL tslab to query");
 
 	errno = BOLO_ENOBLOCK;
 	if (tslab_number(id) != s->number)
@@ -211,7 +211,7 @@ tslab_tblock(struct tslab *s, uint64_t id, bolo_msec_t ts)
 		if (tslab_extend(s, ts) != 0)
 			return NULL;
 
-		assert(s->blocks[tblock_number(id)].valid);
+		BUG(s->blocks[tblock_number(id)].valid, "tslab_tblock() detected tblock corruption; the desired tblock was not marked as valid after extension");
 	}
 	return &(s->blocks[tblock_number(id)]);
 }

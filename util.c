@@ -43,7 +43,8 @@ mktree(int dirfd, const char *path, mode_t mode)
 {
 	char buf[PATH_MAX], *p, c;
 
-	assert(path != 0);
+	BUG(path != NULL, "mktree() given a NULL path to make");
+	BUG(mode  < 0700, "mktree() given a suspicious mode (not rwx for owner)");
 
 	if (!strncpy(buf, path, PATH_MAX - 1))
 		return -1;
@@ -64,7 +65,7 @@ len(const struct list *lst)
 	struct list *i;
 	size_t n;
 
-	assert(lst != NULL);
+	BUG(lst != NULL, "len() given a NULL list to query");
 
 	for (n = 0, i = lst->next; i != lst; i = i->next)
 		n++;
@@ -75,8 +76,8 @@ len(const struct list *lst)
 static void
 _splice(struct list *prev, struct list *next)
 {
-	assert(prev != NULL);
-	assert(next != NULL);
+	BUG(prev != NULL, "splice() given a NULL previous pointer");
+	BUG(next != NULL, "splice() given a NULL next pointer");
 
 	prev->next = next;
 	next->prev = prev;
@@ -85,8 +86,8 @@ _splice(struct list *prev, struct list *next)
 void
 push(struct list *lst, struct list *add)
 {
-	assert(lst != NULL);
-	assert(add != NULL);
+	BUG(lst != NULL, "psuh() given a NULL list to append to");
+	BUG(add != NULL, "psuh() given a NULL list to append");
 
 	_splice(lst->prev, add);
 	_splice(add,       lst);
