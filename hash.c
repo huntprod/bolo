@@ -23,6 +23,7 @@ struct bucket {
 
 #define HASH_STRIDE  255
 struct hash {
+	size_t nset;
 	struct bucket *buckets[HASH_STRIDE];
 };
 
@@ -60,6 +61,13 @@ hash_free(struct hash *h)
 	free(h);
 }
 
+size_t
+hash_nset(struct hash *h)
+{
+	assert(h != NULL);
+	return h->nset;
+}
+
 int
 hash_set(struct hash *h, const char *key, void *val)
 {
@@ -89,6 +97,7 @@ hash_set(struct hash *h, const char *key, void *val)
 	b->ptr = val;
 	b->next = h->buckets[k];
 	h->buckets[k] = b;
+	h->nset++;
 	return 0;
 }
 
@@ -260,6 +269,7 @@ TESTS {
 
 		new_hash(h);
 
+		is_unsigned(hash_nset(h), 0, "hash initially has 0 keys");
 		ok(!hash_isset(h, "one"), "h[one] should not be set");
 
 		v = NULL;
@@ -269,6 +279,7 @@ TESTS {
 		ok(hash_set(h, "one", "the first value") == 0,
 			"hash_set(k,v) should succeed");
 
+		is_unsigned(hash_nset(h), 1, "hash has 1 key after a hash_set");
 		ok(hash_isset(h, "one"), "h[one] should be set");
 
 		v = NULL;
@@ -299,6 +310,7 @@ TESTS {
 		if (hash_set(h, "key", data) != 0)
 			BAIL_OUT("failed to set up the test for hash_read/write");
 
+		is_unsigned(hash_nset(h), 1, "hash has 1 value set before write/read");
 		ok(hash_write(h, fd, test_writer1, lst) == 0,
 			"hash_write() should succeed");
 
@@ -308,6 +320,7 @@ TESTS {
 		if (!h)
 			BAIL_OUT("failed to read hash back in from the fd");
 
+		is_unsigned(hash_nset(h), 1, "hash has 1 value set after re-read");
 		ok(hash_get(h, &result, "key") == 0,
 			"hash_get() should succeed after re-read");
 		is_ptr(result, data, "hash_get() should return pointer set by reader fn");
@@ -324,6 +337,7 @@ TESTS {
 		struct data d;
 
 		new_hash(h);
+		is_unsigned(hash_nset(h), 0, "hash initially has 0 keys");
 		for (i = 0; i < HASH_STRIDE + 1; i++) {
 			if (asprintf(&key, "key%d", i) <= 0)
 				BAIL_OUT("failed to generate a key for pigeon-hole test");
@@ -332,6 +346,7 @@ TESTS {
 				fail("failed to set key %s => (data) in pigeon-hole test");
 			free(key);
 		}
+		is_unsigned(hash_nset(h), HASH_STRIDE + 1, "each unique key/value increments hash cardinality");
 
 		hash_free(h);
 	}

@@ -144,7 +144,9 @@ int hash_write(struct hash *h, int fd, hash_writer_fn fn, void *udata);
 
 int hash_set(struct hash *h, const char *key, void *value);
 int hash_get(struct hash *h, void *dst, const char *key);
+size_t hash_nset(struct hash *h);
 #define hash_isset(h,k) (hash_get((h), NULL, (k)) == 0)
+#define hash_isempty(h) (hash_nset((h)) == 0)
 
 /********************************************************************  time ***/
 
