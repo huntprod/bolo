@@ -399,7 +399,7 @@ struct db * db_mount(const char *path) RETURNS;
 struct db * db_init(const char *path) RETURNS;
 int db_sync(struct db *db) RETURNS;
 int db_unmount(struct db *db) RETURNS;
-int db_insert(struct db *, const char *name, bolo_msec_t when, bolo_value_t what) RETURNS;
+int db_insert(struct db *, char *name, bolo_msec_t when, bolo_value_t what) RETURNS;
 
 
 /****************************************************************  tagging  ***/

@@ -317,13 +317,48 @@ s_maindb_writer(const char *key, void *_idx, void *_)
 	return ((struct idx *)_idx)->number;
 }
 
+static void
+s_settags(struct db *db, char *name, struct idx *idx)
+{
+	char *key, *val;
+	struct idxtag *idxtag, *this;
+
+	while (name) {
+		name = tags_next(name, &key, &val);
+
+again:
+		idxtag = NULL;
+		if (hash_get(db->tags, &idxtag, key) == 0) {
+			/* run through the full list */
+			for (; idxtag; idxtag = idxtag->next)
+				if (idxtag->idx == idx)
+					goto next;
+		}
+
+		this = malloc(sizeof(*this));
+		if (!this) bail("malloc failed");
+
+		push(&db->idxtag, &this->l);
+		this->idx  = idx;
+		this->next = idxtag;
+
+		if (hash_set(db->tags, key, this) != 0)
+			errorf("failed to track tag '%s' => idx %p: %s", key, idx, error(errno));
+
+next:
+		if (*(val - 1) == '=')
+			continue;
+		*(val - 1) = '='; /* clever hack */
+		goto again;
+	}
+}
+
 static void *
 s_maindb_reader(const char *key, uint64_t id, void *udata)
 {
 	struct db *db;
 	struct idx *i;
-	char *tags, *tag, *val, *next;
-	struct idxtag *idxtag;
+	char *tags, *next;
 
 	assert(udata != NULL);
 
@@ -336,27 +371,9 @@ s_maindb_reader(const char *key, uint64_t id, void *udata)
 		tags = strdup(key); assert(tags != NULL);
 		next = strchr(tags, '|');
 		if (next) next++;
-		while (next) {
-			next = tags_next(next, &tag, &val);
-
-			idxtag = malloc(sizeof(*idxtag));
-			assert(idxtag != NULL);
-			push(&db->idxtag, &idxtag->l);
-
-			if (hash_get(db->tags, &idxtag->next, tag) != 0)
-				idxtag->next = NULL;
-			hash_set(db->tags, tag, idxtag);
-
-			idxtag = malloc(sizeof(*idxtag));
-			assert(idxtag != NULL);
-			push(&db->idxtag, &idxtag->l);
-
-			*(val-1) = '='; /* overwrite the \0 teminator on tag */
-			if (hash_get(db->tags, &idxtag->next, tag) != 0)
-				idxtag->next = NULL;
-			hash_set(db->tags, tag, idxtag);
-		}
+		s_settags(db, next, i);
 		free(tags);
+
 		return i;
 	}
 
@@ -797,7 +814,7 @@ s_findblock(struct db *db, uint64_t id, bolo_msec_t ts)
 }
 
 int
-db_insert(struct db *db, const char *name, bolo_msec_t when, bolo_value_t what)
+db_insert(struct db *db, char *name, bolo_msec_t when, bolo_value_t what)
 {
 	struct idx *idx;
 	struct tblock *block;
@@ -846,6 +863,11 @@ db_insert(struct db *db, const char *name, bolo_msec_t when, bolo_value_t what)
 	if (tblock_insert(block, when, what) != 0)
 		return -1;
 
+	/* ingest the tags */
+	name = strchr(name, '|');
+	if (name) name++;
+	if (name) s_settags(db, name, idx);
+
 	/* FIXME: may need to sync */
 	return 0;
 }
@@ -875,6 +897,7 @@ TESTS {
 
 	subtest {
 		struct db *db;
+		char metric[256];
 
 		if (system("./t/setup/db-init") != 0)
 			BAIL_OUT("t/setup/db-init failed!");
@@ -895,11 +918,16 @@ TESTS {
 		is_unsigned(tblock_number(db->next_tblock), 0,
 			"first tblock address of a new db should be in tblock 0");
 
-		ok(db_insert(db, "metric|host=localhost,env=test", 1234567890, 4567.89) == 0,
+		strcpy(metric, "metric|host=localhost,env=test");
+		ok(db_insert(db, metric, 1234567890, 4567.89) == 0,
 			"db_insert() should succeed on fresh database");
-		ok(db_insert(db, "metric|host=localhost,env=test", 1234567890 + 1, 4567.91) == 0,
+
+		strcpy(metric, "metric|host=localhost,env=test");
+		ok(db_insert(db, metric, 1234567890 + 1, 4567.91) == 0,
 			"db_insert() should succeed twice on fresh database");
-		ok(db_insert(db, "metric|host=localhost,env=test", 1234567890ul + (1ul << 33), 4567.91) == 0,
+
+		strcpy(metric, "metric|host=localhost,env=test");
+		ok(db_insert(db, metric, 1234567890ul + (1ul << 33), 4567.91) == 0,
 			"db_insert() should succeed after exhausting block capacity (in time)");
 
 		ok(db_sync(db) == 0,
@@ -910,6 +938,43 @@ TESTS {
 
 		db = db_mount("t/tmp/new");
 		isnt_null(db, "db_mount() should succeed with newly-init'd data directories");
+
+		ok(db_unmount(db) == 0,
+			"db_unmount() should succeed");
+	}
+
+	subtest {
+		struct db *db;
+		uint64_t ts;
+		char metric[256];
+
+		if (system("./t/setup/db-init") != 0)
+			BAIL_OUT("t/setup/db-init failed!");
+
+		db = db_init("t/tmp/new");
+		for (ts = 0; ts < TCELLS_PER_TBLOCK * 2 + 1; ts++) {
+			strcpy(metric, "metric|host=localhost,env=test");
+			if (db_insert(db, metric, 10001 + ts, 4567.89) != 0)
+				BAIL_OUT("failed to insert into db\n");
+		}
+
+		ok(hash_isset(db->tags, "host"),           "the 'host' tag should be set in the tag index");
+		ok(hash_isset(db->tags, "host=localhost"), "the 'host=localhost' tag should be set in the tag index");
+		ok(hash_isset(db->tags, "env"),            "the 'env' tag should be set in the tag index");
+		ok(hash_isset(db->tags, "env=test"),       "the 'env=test' tag should be set in the tag index");
+
+		ok(db_sync(db) == 0,
+			"db_sync() should succeed");
+		ok(db_unmount(db) == 0,
+			"db_unmount() should succeed");
+
+		db = db_mount("t/tmp/new");
+		isnt_null(db, "mounted t/tmp/new a second time");
+
+		ok(hash_isset(db->tags, "host"),           "the 'host' tag should be set in the tag index (post-read)");
+		ok(hash_isset(db->tags, "host=localhost"), "the 'host=localhost' tag should be set in the tag index (post-read)");
+		ok(hash_isset(db->tags, "env"),            "the 'env' tag should be set in the tag index (post-read)");
+		ok(hash_isset(db->tags, "env=test"),       "the 'env=test' tag should be set in the tag index (post-read)");
 
 		ok(db_unmount(db) == 0,
 			"db_unmount() should succeed");
