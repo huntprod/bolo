@@ -1,10 +1,17 @@
 CFLAGS += -Wall -Wextra -Wpedantic -Wunused -Wunused-result -Wno-unused-parameter
 TEST_CFLAGS := -g -DTEST -fprofile-arcs -ftest-coverage -It
 
+ifeq ($(PROF),yes)
+	# BOTH -p and -pg seem to be necessary, if you want
+	# the gmon.out file to include timing information.
+	CFLAGS  += -p -pg
+	LDFLAGS += -p -pg
+endif
+
 all: bolo
 
 bolo: bolo.o debug.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o btree.o log.o tags.o
-	$(CC) -o $@ $+
+	$(CC) $(LDFLAGS) -o $@ $+ $(LDLIBS)
 
 clean:
 	rm -f *.o
