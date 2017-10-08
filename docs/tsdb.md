@@ -31,10 +31,4 @@ $dataroot/
       0000.0001.1111.1111.slb
       0000.0001.1111.1112.slb
       ... etc ...
-
-  tags/
-    host.tbl
-    env.tbl
-    platform.tbl
-    ... etc ...
 ```

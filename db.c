@@ -436,8 +436,6 @@ db_mount(const char *path)
 		goto fail;
 	close(fd);
 
-	/* FIXME: scan the tags/ subdirectory */
-
 	infof("scanning time series slab storage files at %s/slabs", path);
 	empty(&db->slab);
 	s_ensure_dirat(db->rootfd, "slabs", 0777);
