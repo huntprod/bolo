@@ -44,7 +44,7 @@ mktree(int dirfd, const char *path, mode_t mode)
 	char buf[PATH_MAX], *p, c;
 
 	BUG(path != NULL, "mktree() given a NULL path to make");
-	BUG(mode  < 0700, "mktree() given a suspicious mode (not rwx for owner)");
+	BUG(mode >= 0700, "mktree() given a suspicious mode (not rwx for owner)");
 
 	if (!strncpy(buf, path, PATH_MAX - 1))
 		return -1;
