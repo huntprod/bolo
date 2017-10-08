@@ -56,4 +56,4 @@ sure: memtest
 fixme:
 	find . -name '*.[ch]' | xargs grep -rin fixme
 
-.PHONY: coverage
+.PHONY: all clean test check memtest coverage copycov ccov sure fixme
