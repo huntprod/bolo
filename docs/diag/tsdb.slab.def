@@ -3,7 +3,7 @@
 1 (resv)
 
 4 ENDIAN CANARY
-4 (reserved)
+4 (resv)
 
 8 FILE NUMBER
 
