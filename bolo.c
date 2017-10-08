@@ -153,6 +153,7 @@ do_slabinfo(int argc, char **argv)
 			char unit, date[64];
 			struct tm tm;
 			time_t ts;
+			unsigned d, h, m, s, ms;
 
 			if (!slab.blocks[j].valid)
 				break;
@@ -171,15 +172,26 @@ do_slabinfo(int argc, char **argv)
 				if (tmp > span)
 					span = tmp;
 			}
+			ms = span % 1000; span /= 1000;
+			s  = span % 60;   span /= 60;
+			m  = span % 60;   span /= 60;
+			h  = span % 24;   span /= 24;
+			d  = span;
 
-			time(&ts);
+			ts = (time_t)(slab.blocks[j].base / 1000);
 			if (!localtime_r(&ts, &tm))
 				strcpy(date, "xxx, xx xx xxxx xx:xx:xx+xxxx");
 			else
 				strftime(date, 64, "%a, %d %b %Y %H:%M:%S%z", &tm);
 
-			fprintf(stdout, "    @%lu (%#016lx) ts %lu [%s] %i measurements, %5.2lf%% full, spanning %ums; %7.2lf%c/measurement\n",
-				slab.blocks[j].number, slab.blocks[j].number, slab.blocks[j].base, date, slab.blocks[j].cells, full, span, bitsper, unit);
+			fprintf(stdout, "    @%lu (%#016lx) ts %lu [%s] % 6i measurements;"
+			                   " %6.2lf%% full, spanning %ud %02u:%02u:%02u.%04u;"
+			                   " %7.2lf%c/measurement\n",
+				slab.blocks[j].number, slab.blocks[j].number,
+				slab.blocks[j].base, date,
+				slab.blocks[j].cells,
+				full, d, h, m, s, ms,
+				bitsper, unit);
 		}
 
 		if (tslab_unmap(&slab) != 0)
