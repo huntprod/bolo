@@ -148,9 +148,9 @@ do_slabinfo(int argc, char **argv)
 		fprintf(stdout, "slab %lu (%#016lx) %dk %d/%d blocks present\n",
 			slab.number, slab.number, slab.block_size / 1024, nvalid, TBLOCKS_PER_TSLAB);
 		for (j = 0; j < TBLOCKS_PER_TSLAB; j++) {
-			double full;
+			double full, bitsper;
 			uint32_t span, tmp;
-			char date[64];
+			char unit, date[64];
 			struct tm tm;
 			time_t ts;
 
@@ -158,6 +158,13 @@ do_slabinfo(int argc, char **argv)
 				break;
 
 			full = 100.0 * slab.blocks[j].cells / TCELLS_PER_TBLOCK;
+
+			unit = 'b';
+			bitsper = (TBLOCK_SIZE * 8.0) / slab.blocks[j].cells;
+			if (bitsper > 1024.0) {
+				bitsper /= 1024.0;
+				unit = 'k';
+			}
 			span = 0;
 			for (k = 0; k < slab.blocks[j].cells; k++) {
 				tmp = tblock_read32(slab.blocks+j, 24 + k * 12);
@@ -170,8 +177,9 @@ do_slabinfo(int argc, char **argv)
 				strcpy(date, "xxx, xx xx xxxx xx:xx:xx+xxxx");
 			else
 				strftime(date, 64, "%a, %d %b %Y %H:%M:%S%z", &tm);
-			fprintf(stdout, "    @%lu (%#016lx) ts %lu [%s] %i measurements, %5.2lf%% full, spanning %ums\n",
-				slab.blocks[j].number, slab.blocks[j].number, slab.blocks[j].base, date, slab.blocks[j].cells, full, span);
+
+			fprintf(stdout, "    @%lu (%#016lx) ts %lu [%s] %i measurements, %5.2lf%% full, spanning %ums; %7.2lf%c/measurement\n",
+				slab.blocks[j].number, slab.blocks[j].number, slab.blocks[j].base, date, slab.blocks[j].cells, full, span, bitsper, unit);
 		}
 
 		if (tslab_unmap(&slab) != 0)
