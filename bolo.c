@@ -1,5 +1,6 @@
 #include "bolo.h"
 #include <sys/stat.h>
+#include <time.h>
 
 /* USAGE:
 
@@ -114,7 +115,7 @@ do_slabinfo(int argc, char **argv)
 {
 	struct tslab slab;
 	const char *path;
-	int i, j, rc, fd;
+	int i, j, k, rc, fd;
 	int nvalid;
 
 	if (argc < 3) {
@@ -143,19 +144,34 @@ do_slabinfo(int argc, char **argv)
 			nvalid++;
 		}
 
-		fprintf(stdout, "SLAB %lu (%lx)\n", slab.number, slab.number);
-		fprintf(stdout, "  block-size %u bytes\n", slab.block_size);
-		fprintf(stdout, "  %d valid blocks\n", nvalid);
+		fprintf(stdout, "%s:\n", path);
+		fprintf(stdout, "slab %lu (%#016lx) %dk %d/%d blocks present\n",
+			slab.number, slab.number, slab.block_size / 1024, nvalid, TBLOCKS_PER_TSLAB);
 		for (j = 0; j < TBLOCKS_PER_TSLAB; j++) {
 			double full;
+			uint32_t span, tmp;
+			char date[64];
+			struct tm tm;
+			time_t ts;
 
 			if (!slab.blocks[j].valid)
 				break;
 
 			full = 100.0 * slab.blocks[j].cells / TCELLS_PER_TBLOCK;
-			fprintf(stdout, "    Block %lu (%lx) [#%d]\n", slab.blocks[j].number, slab.blocks[j].number, j+1);
-			fprintf(stdout, "      %i measurements, %5.2lf%% full\n", slab.blocks[j].cells, full);
-			fprintf(stdout, "      base timestamp %lu\n", slab.blocks[j].base);
+			span = 0;
+			for (k = 0; k < slab.blocks[j].cells; k++) {
+				tmp = tblock_read32(slab.blocks+j, 24 + k * 12);
+				if (tmp > span)
+					span = tmp;
+			}
+
+			time(&ts);
+			if (!localtime_r(&ts, &tm))
+				strcpy(date, "xxx, xx xx xxxx xx:xx:xx+xxxx");
+			else
+				strftime(date, 64, "%a, %d %b %Y %H:%M:%S%z", &tm);
+			fprintf(stdout, "    @%lu (%#016lx) ts %lu [%s] %i measurements, %5.2lf%% full, spanning %ums\n",
+				slab.blocks[j].number, slab.blocks[j].number, slab.blocks[j].base, date, slab.blocks[j].cells, full, span);
 		}
 
 		if (tslab_unmap(&slab) != 0)
