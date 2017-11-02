@@ -1,0 +1,13 @@
+diff --git a/bql/lexer.c b/bql/lexer.c
+index 5896939..79973ee 100644
+--- a/bql/lexer.c
++++ b/bql/lexer.c
+@@ -3677,7 +3677,7 @@ static int yy_get_next_buffer (yyscan_t yyscanner)
+ 	else
+ 		ret_val = EOB_ACT_CONTINUE_SCAN;
+ 
+-	if ((int) (yyg->yy_n_chars + number_to_move) > YY_CURRENT_BUFFER_LVALUE->yy_buf_size) {
++	if ((yyg->yy_n_chars + number_to_move) > YY_CURRENT_BUFFER_LVALUE->yy_buf_size) {
+ 		/* Extend the array by 50%, plus the number we really need. */
+ 		int new_size = yyg->yy_n_chars + number_to_move + (yyg->yy_n_chars >> 1);
+ 		YY_CURRENT_BUFFER_LVALUE->yy_ch_buf = (char *) yyrealloc((void *) YY_CURRENT_BUFFER_LVALUE->yy_ch_buf,new_size ,yyscanner );

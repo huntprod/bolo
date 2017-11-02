@@ -10,17 +10,23 @@ endif
 
 all: bolo
 
-bolo: bolo.o debug.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o btree.o log.o tags.o
+bolo: bolo.o debug.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o btree.o log.o tags.o query.o bql/bql.a
 	$(CC) $(LDFLAGS) -o $@ $+ $(LDLIBS)
 
+bqlx: bql/main.o bql/bql.a util.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -Wno-error -o $@ $+ $(LDLIBS)
+
 clean:
-	rm -f *.o
-	rm -f bits util log cfg hash page btree sha time tags db
-	rm -f *.gcno *.gcda
+	rm -f *.o *.gcno *.gcda
+	rm -f bql/*.o bql/*.gcno bql/*.gcda
+	rm -f bits util log cfg hash page btree sha time tags query db
 	rm -f lcov.info
 
+distclean: clean
+	rm -f bql/grammar.c bql/lexer.c
+
 test: check
-check: util.o log.o page.o btree.o hash.o sha.o tblock.o tslab.o tags.o
+check: util.o log.o page.o btree.o hash.o sha.o tblock.o tslab.o tags.o bql/bql.a
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o bits  bits.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o util  util.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o log   log.c    util.o
@@ -31,8 +37,9 @@ check: util.o log.o page.o btree.o hash.o sha.o tblock.o tslab.o tags.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o sha   sha.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o time  time.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o tags  tags.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o query query.c  util.o bql/bql.a
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o db    db.c     btree.o page.o util.o hash.o sha.o tblock.o tslab.o log.o tags.o
-	prove -v ./bits ./util ./log ./cfg ./hash ./page ./btree ./sha ./time ./tags ./db
+	prove -v ./bits ./util ./log ./cfg ./hash ./page ./btree ./sha ./time ./tags ./query ./db
 
 memtest: check
 	t/vg ./bits ./util ./log ./cfg ./hash ./page ./btree ./sha ./time ./tags ./db
@@ -56,4 +63,23 @@ sure: memtest
 fixme:
 	find . -name '*.[ch]' | xargs grep -rin fixme
 
-.PHONY: all clean test check memtest coverage copycov ccov sure fixme
+bql/lexer.c: bql/lexer.l
+	flex -FTvs -o $@ $<
+	#patch -p1 <bql/flex.patch
+bql/lexer.o: bql/grammar.h bql/lexer.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ bql/lexer.c
+
+bql/grammar.h: bql/grammar.y
+	bison --report all --graph=bql/graph --defines=bql/grammar.h --output bql/grammar.c bql/grammar.y
+bql/grammar.c: bql/grammar.y
+	bison --report all --graph=bql/graph --defines=bql/grammar.h --output bql/grammar.c bql/grammar.y
+bql/grammar.o: bql/grammar.h bql/grammar.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ bql/grammar.c
+
+bql/bql.a: bql/grammar.o bql/lexer.o
+	ar cr $@ $+
+
+.PHONY: all clean distclean test check memtest coverage copycov ccov sure fixme
+
+ll: l/bql.ll.o l/main.o
+	$(CC) -o $@ $+

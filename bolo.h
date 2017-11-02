@@ -415,4 +415,48 @@ int tags_canonicalize(char *tags);
 char * tags_next(char *tags, char **tag, char **val);
 
 
+/*********************************************************  query language  ***/
+
+#define COND_EQ    1
+#define COND_AND   2
+#define COND_OR    3
+#define COND_NOT   4
+#define COND_EXIST 5
+
+struct qcond {
+	int op;
+	void *a;
+	void *b;
+};
+
+
+#define EXPR_REF   1
+#define EXPR_ALIAS 2
+#define EXPR_ADD   3
+#define EXPR_SUB   4
+#define EXPR_MULT  5
+#define EXPR_DIV   6
+#define EXPR_FUNC  7
+
+struct qexpr {
+	int type;
+	void *a;
+	void *b;
+
+	struct qexpr *next;
+};
+
+struct query {
+	struct qexpr *select;
+	int           aggr;
+	struct qcond *where;
+	int           from;
+	int           until;
+};
+
+struct query * bql_parse(const char *q);
+struct query * query_parse(const char *q);
+void query_free(struct query *q);
+
+
 #endif

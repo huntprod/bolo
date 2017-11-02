@@ -1,4 +1,5 @@
 /bolo
+/bqlx
 
 /bits
 /btree
@@ -11,6 +12,14 @@
 /tags
 /time
 /util
+/query
+
+/bql/lang.c
+/bql/grammar.c
+/bql/grammar.h
+/bql/grammar.output
+/bql/lexer.c
+/bql/bql.a
 
 *.db
 /coverage
