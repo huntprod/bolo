@@ -318,29 +318,55 @@ s_maindb_writer(const char *key, void *_idx, void *_)
 }
 
 static void
+s_setmetric(struct db *db, char *name, struct idx *idx)
+{
+	struct multidx *tmp, *set, *this;
+
+	if (!name) return;
+
+	set = NULL;
+	if (hash_get(db->metrics, &set, name) == 0) {
+		/* run through the full list */
+		for (tmp = set; tmp; tmp = tmp->next)
+			if (tmp->idx == idx)
+				return;
+	}
+
+	this = malloc(sizeof(*this));
+	if (!this) bail("malloc failed");
+
+	push(&db->multidx, &this->l);
+	this->idx  = idx;
+	this->next = set;
+
+	if (hash_set(db->metrics, name, this) != 0)
+		errorf("failed to track metric '%s' => idx %p: %s", name, idx, error(errno));
+}
+
+static void
 s_settags(struct db *db, char *name, struct idx *idx)
 {
 	char *key, *val;
-	struct idxtag *idxtag, *this;
+	struct multidx *tmp, *set, *this;
 
 	while (name) {
 		name = tags_next(name, &key, &val);
 
 again:
-		idxtag = NULL;
-		if (hash_get(db->tags, &idxtag, key) == 0) {
+		set = NULL;
+		if (hash_get(db->tags, &set, key) == 0) {
 			/* run through the full list */
-			for (; idxtag; idxtag = idxtag->next)
-				if (idxtag->idx == idx)
+			for (tmp = set; tmp; tmp = tmp->next)
+				if (tmp->idx == idx)
 					goto next;
 		}
 
 		this = malloc(sizeof(*this));
 		if (!this) bail("malloc failed");
 
-		push(&db->idxtag, &this->l);
+		push(&db->multidx, &this->l);
 		this->idx  = idx;
-		this->next = idxtag;
+		this->next = set;
 
 		if (hash_set(db->tags, key, this) != 0)
 			errorf("failed to track tag '%s' => idx %p: %s", key, idx, error(errno));
@@ -372,8 +398,10 @@ s_maindb_reader(const char *key, uint64_t id, void *udata)
 		insist(tags != NULL, "main.db reader unable to allocate memory during strdup(tags)");
 
 		next = strchr(tags, '|');
-		if (next) next++;
+		if (next)
+			*next++ = '\0';
 
+		s_setmetric(db, tags, i);
 		s_settags(db, next, i);
 		free(tags);
 
@@ -427,10 +455,15 @@ db_mount(const char *path)
 		goto fail;
 
 	infof("mounting main.db index file at %s/%s", path, PATH_TO_MAINDB);
-	empty(&db->idxtag);
+	empty(&db->multidx);
+
 	db->tags = hash_new(0);
 	if (!db->tags)
 		goto fail;
+	db->metrics = hash_new(0);
+	if (!db->metrics)
+		goto fail;
+
 	db->main = hash_read(fd, s_maindb_reader, db);
 	if (!db->main)
 		goto fail;
@@ -497,6 +530,9 @@ db_init(const char *path)
 	db->tags = hash_new(0);
 	if (!db->tags)
 		goto fail;
+	db->metrics = hash_new(0);
+	if (!db->metrics)
+		goto fail;
 
 	/* create the main.db index */
 	fd = openat(db->rootfd, PATH_TO_MAINDB, O_WRONLY|O_CREAT, 0666);
@@ -511,7 +547,7 @@ db_init(const char *path)
 	fd = -1;
 
 	empty(&db->idx);
-	empty(&db->idxtag);
+	empty(&db->multidx);
 	empty(&db->slab);
 	db->next_tblock = 0x800;
 
@@ -525,6 +561,7 @@ fail:
 		if (db->rootfd >= 0) close(db->rootfd);
 		hash_free(db->main);
 		hash_free(db->tags);
+		hash_free(db->metrics);
 		free(db);
 	}
 	errno = esave;
@@ -622,9 +659,9 @@ fail:
 int
 db_unmount(struct db *db)
 {
-	struct tslab  *slab,   *tmp_slab;
-	struct idx    *idx,    *tmp_idx;
-	struct idxtag *idxtag, *tmp_idxtag;
+	struct tslab   *slab, *tmp_slab;
+	struct idx     *idx,  *tmp_idx;
+	struct multidx *set,  *tmp_set;
 	int ok;
 
 	BUG(db != NULL, "db_unmount() given a NULL db pointer to unmount");
@@ -642,12 +679,13 @@ db_unmount(struct db *db)
 		free(idx);
 	}
 
-	for_eachx(idxtag, tmp_idxtag, &db->idxtag, l) {
-		free(idxtag);
+	for_eachx(set, tmp_set, &db->multidx, l) {
+		free(set);
 	}
 
 	hash_free(db->main);
 	hash_free(db->tags);
+	hash_free(db->metrics);
 	close(db->rootfd);
 	free(db);
 	return ok;
@@ -820,6 +858,7 @@ db_insert(struct db *db, char *name, bolo_msec_t when, bolo_value_t what)
 	struct idx *idx;
 	struct tblock *block;
 	uint64_t idx_id, block_id;
+	char *next;
 
 	BUG(db != NULL,       "db_insert() given a NULL database to insert into");
 	BUG(db->main != NULL, "db_insert() given a database without a main.db hash");
@@ -865,9 +904,10 @@ db_insert(struct db *db, char *name, bolo_msec_t when, bolo_value_t what)
 		return -1;
 
 	/* ingest the tags */
-	name = strchr(name, '|');
-	if (name) name++;
-	if (name) s_settags(db, name, idx);
+	next = strchr(name, '|');
+	if (next) *next++ = '\0';
+	s_setmetric(db, name, idx);
+	s_settags(db, next, idx);
 
 	/* FIXME: may need to sync */
 	return 0;
@@ -959,6 +999,8 @@ TESTS {
 				BAIL_OUT("failed to insert into db\n");
 		}
 
+		ok(hash_isset(db->metrics, "metric"),      "the 'metric' metric should be set in the metric index");
+
 		ok(hash_isset(db->tags, "host"),           "the 'host' tag should be set in the tag index");
 		ok(hash_isset(db->tags, "host=localhost"), "the 'host=localhost' tag should be set in the tag index");
 		ok(hash_isset(db->tags, "env"),            "the 'env' tag should be set in the tag index");
@@ -971,6 +1013,8 @@ TESTS {
 
 		db = db_mount("t/tmp/new");
 		isnt_null(db, "mounted t/tmp/new a second time");
+
+		ok(hash_isset(db->metrics, "metric"),      "the 'metric' metric should be set in the metric index (post-read)");
 
 		ok(hash_isset(db->tags, "host"),           "the 'host' tag should be set in the tag index (post-read)");
 		ok(hash_isset(db->tags, "host=localhost"), "the 'host=localhost' tag should be set in the tag index (post-read)");

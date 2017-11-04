@@ -382,22 +382,23 @@ struct idx {
 	uint64_t number;       /* unique identifier for this index */
 };
 
-struct idxtag {
-	struct list l;         /* list hook for memory management (free) */
-	struct idxtag *next;   /* list hook for chaining tag pointers */
-	struct idx    *idx;    /* pointer to a tagged time-series */
+struct multidx {
+	struct list l;          /* list hook for memory management (free) */
+	struct multidx *next;   /* list hook for chaining tag pointers */
+	struct idx     *idx;    /* pointer to a tagged time-series */
 };
 
 struct db {
-	int           rootfd;  /* file descriptor of database root directory */
-	struct hash  *main;    /* primary time series (name|tag,tags,... => <block-id>) */
-	struct hash  *tags;    /* auxiliary tag lookup (tag => [idx], tag=value => [idx]) */
+	int           rootfd;   /* file descriptor of database root directory */
+	struct hash  *main;     /* primary time series (name|tag,tags,... => <block-id>) */
+	struct hash  *tags;     /* auxiliary tag lookup (tag => [idx], tag=value => [idx]) */
+	struct hash  *metrics;  /* auxiliary metric lookup (name => [idx]) */
 
-	struct list   idx;     /* unsorted list of time series indices */
-	struct list   slab;    /* unsorted list of tslab structures */
-	struct list   idxtag;  /* list of allocated idxtags, for freeing later */
+	struct list   idx;      /* unsorted list of time series indices */
+	struct list   slab;     /* unsorted list of tslab structures */
+	struct list   multidx;  /* list of allocated multidx's, for freeing later */
 
-	uint64_t next_tblock;  /* ID of the next tblock to hand out */
+	uint64_t next_tblock;   /* ID of the next tblock to hand out */
 };
 
 void db_encrypt(const char *key, size_t len);
