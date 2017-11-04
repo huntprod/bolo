@@ -23,6 +23,7 @@ do_dbinfo(int argc, char **argv)
 	struct db *db;
 	struct tslab *slab;
 	struct idx *idx;
+	struct multidx *set;
 	const char *k;
 
 	if (argc != 3) {
@@ -59,12 +60,38 @@ do_dbinfo(int argc, char **argv)
 		fprintf(stdout, "\n");
 	}
 
+	if (hash_isempty(db->main)) {
+		fprintf(stdout, "series: (none)\n");
+	} else {
+		fprintf(stdout, "series:\n");
+		hash_each(db->main, &k, &idx) {
+			fprintf(stdout, "  - %s @[%#06lx]\n", k, idx->number);
+		}
+		fprintf(stdout, "\n");
+	}
+
+	if (hash_isempty(db->metrics)) {
+		fprintf(stdout, "metrics: (none)\n");
+	} else {
+		fprintf(stdout, "metrics:\n");
+		hash_each(db->metrics, &k, &set) {
+			fprintf(stdout, "  - %s\n", k);
+			for (; set; set = set->next) {
+				fprintf(stdout, "      @[%#06lx]\n", set->idx->number);
+			}
+		}
+		fprintf(stdout, "\n");
+	}
+
 	if (hash_isempty(db->tags)) {
 		fprintf(stdout, "tags: (none)\n");
 	} else {
 		fprintf(stdout, "tags:\n");
-		hash_each(db->tags, &k, NULL) {
+		hash_each(db->tags, &k, &set) {
 			fprintf(stdout, "  - %s\n", k);
+			for (; set; set = set->next) {
+				fprintf(stdout, "      @[%#06lx]\n", set->idx->number);
+			}
 		}
 		fprintf(stdout, "\n");
 	}
