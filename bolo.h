@@ -362,6 +362,9 @@ int tblock_insert(struct tblock *b, bolo_msec_t when, bolo_value_t what) RETURNS
 #define tblock_seal( k,l,b) hmac_seal ((k),(l),(b)->page.data,(b)->page.len)
 #define tblock_check(k,l,b) hmac_check((k),(l),(b)->page.data,(b)->page.len)
 
+#define tblock_value(b,n)              tblock_read64f((b), 24 + (n) * 12 + 4)
+#define tblock_ts(b,n)    ((b)->base + tblock_read32 ((b), 24 + (n) * 12))
+
 /*********************************************************  database slabs  ***/
 
 struct tslab {
