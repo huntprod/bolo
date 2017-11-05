@@ -410,6 +410,35 @@ btree_find(struct btree *t, uint64_t *dst, bolo_msec_t key)
 	                  : -1;
 }
 
+int
+btree_isempty(struct btree *t)
+{
+	BUG(t != NULL, "btree_isempty() given a NULL btree node");
+	return t->used == 0;
+}
+
+bolo_msec_t
+btree_first(struct btree *t)
+{
+	BUG(t != NULL, "btree_first() given a NULL btree node");
+	BUG(!btree_isempty(t), "btree_first() given an empty btree");
+
+	while (!t->leaf)
+		t = t->kids[0];
+	return keyat(t, 0);
+}
+
+bolo_msec_t
+btree_last(struct btree *t)
+{
+	BUG(t != NULL, "btree_last() given a NULL btree node");
+	BUG(!btree_isempty(t), "btree_last() given an empty btree");
+
+	while (!t->leaf)
+		t = t->kids[t->used];
+	return keyat(t, t->used - 1);
+}
+
 #ifdef TEST
 /* LCOV_EXCL_START */
 /* Tests will be inserting arbitrary values,
@@ -447,6 +476,9 @@ TESTS {
 		t = btree_create(fd);
 		if (!t)
 			BAIL_OUT("btree_create(fd) returned NULL");
+
+		if (!btree_isempty(t))
+			BAIL_OUT("btree_create(fd) created a non-empty btree, somehow");
 
 		if (!t->leaf)
 			BAIL_OUT("initial root node is not considered a leaf");
@@ -514,12 +546,19 @@ TESTS {
 		if (!t)
 			BAIL_OUT("btree_create(fd) returned NULL");
 
-		ok(btree_find(t, &value, 1000) != 0, "find(1000) should fail before insertion");
+		ok(btree_find(t, &value,   100) != 0, "find(100) should fail before insertion");
+		ok(btree_find(t, &value,  1000) != 0, "find(1000) should fail before insertion");
+		ok(btree_find(t, &value, 10000) != 0, "find(10000) should fail before insertion");
+
 		ok(btree_insert(t,  500,  501) == 0, "insert(500) should succeed");
 		ok(btree_insert(t, 1500, 1501) == 0, "insert(1500) should succeed");
 
-		ok(btree_find(t, &value, 1000) == 0, "lookup(1000) should succeed after insertion(s)");
-		is_unsigned(value, 501, "lookup(1000) should find nearest lesser key, 500 => 501");
+		ok(btree_find(t, &value,   100) == 0, "find(100) should succeed after insertion(s)");
+		is_unsigned(value,  501, "find(100) should find first key, 500 => 501");
+		ok(btree_find(t, &value,  1000) == 0, "find(1000) should succeed after insertion(s)");
+		is_unsigned(value,  501, "find(1000) should find nearest lesser key, 500 => 501");
+		ok(btree_find(t, &value, 10000) == 0, "find(10000) should succeed after insertion(s)");
+		is_unsigned(value, 1501, "find(10000) should find nearest lesser key, 1500 => 1501");
 
 		btree_close(t);
 		close(fd);
