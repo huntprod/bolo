@@ -83,6 +83,7 @@ double rsv_average(struct rsv *rsv)
 	if (rsv->len == 0)
 		return NAN;
 
+	v = 0.0;
 	for (i = 0; i < rsv->len; i++)
 		v += rsv->items[i] / rsv->len;
 	return v;
@@ -98,6 +99,7 @@ double rsv_sum(struct rsv *rsv)
 	if (rsv->len == 0)
 		return NAN;
 
+	v = 0.0;
 	for (i = 0; i < rsv->len; i++)
 		v += rsv->items[i];
 	return v;
