@@ -8,6 +8,12 @@ ifeq ($(PROF),yes)
 	LDFLAGS += -p -pg
 endif
 
+TESTS := bits util
+TESTS += rsv log cfg
+TESTS += hash page btree
+TESTS += sha time
+TESTS += tags query db
+
 all: bolo
 
 bolo: bolo.o debug.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o btree.o log.o tags.o query.o bql/bql.a
@@ -19,7 +25,7 @@ bqlx: bql/main.o bql/bql.a util.o
 clean:
 	rm -f *.o *.gcno *.gcda
 	rm -f bql/*.o bql/*.gcno bql/*.gcda
-	rm -f bits util log cfg hash page btree sha time tags query db
+	rm -f $(TESTS)
 	rm -f lcov.info
 
 distclean: clean
@@ -29,6 +35,7 @@ test: check
 check: util.o log.o page.o btree.o hash.o sha.o tblock.o tslab.o tags.o bql/bql.a
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o bits  bits.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o util  util.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o rsv   rsv.c    util.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o log   log.c    util.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o cfg   cfg.c    log.o util.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o hash  hash.c
@@ -39,10 +46,10 @@ check: util.o log.o page.o btree.o hash.o sha.o tblock.o tslab.o tags.o bql/bql.
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o tags  tags.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o query query.c  util.o bql/bql.a
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o db    db.c     btree.o page.o util.o hash.o sha.o tblock.o tslab.o log.o tags.o
-	prove -v ./bits ./util ./log ./cfg ./hash ./page ./btree ./sha ./time ./tags ./query ./db
+	prove -v $(addprefix ./,$(TESTS))
 
 memtest: check
-	t/vg ./bits ./util ./log ./cfg ./hash ./page ./btree ./sha ./time ./tags ./db
+	t/vg $(addprefix ./,$(TESTS))
 	@echo "No memory leaks detected"
 
 coverage:

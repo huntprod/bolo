@@ -33,6 +33,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <math.h>
 
 /*************************************************  truly global variables  ***/
 
@@ -45,6 +46,11 @@ extern size_t      ENC_KEY_LEN;
 #define streq(a,b) (strcmp((a),(b)) == 0)
 void bail(const char *msg);
 const char * error(int num) RETURNS;
+
+#define DEV_URANDOM "/dev/urandom"
+uint32_t urandn(uint32_t n);
+uint32_t urand32();
+uint64_t urand64();
 
 int mktree(int dirfd, const char *path, mode_t mode) RETURNS;
 
@@ -415,6 +421,28 @@ int db_insert(struct db *, char *name, bolo_msec_t when, bolo_value_t what) RETU
 int tags_valid(const char *tags);
 int tags_canonicalize(char *tags);
 char * tags_next(char *tags, char **tag, char **val);
+
+
+/*****************************************************  reservoir sampling  ***/
+
+struct rsv {
+	size_t len;
+	size_t cap;
+	size_t n;
+	double items[];
+};
+
+struct rsv *rsv_new(size_t cap);
+void rsv_free(struct rsv *rsv);
+
+void rsv_reset(struct rsv *rsv);
+void rsv_sample(struct rsv *rsv, double v);
+
+double rsv_median(struct rsv *rsv);
+double rsv_average(struct rsv *rsv);
+double rsv_sum(struct rsv *rsv);
+double rsv_min(struct rsv *rsv);
+double rsv_max(struct rsv *rsv);
 
 
 /*********************************************************  query language  ***/

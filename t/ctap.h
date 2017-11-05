@@ -87,6 +87,11 @@ void ctap_cmp_ok(int a, const char *op, int b, const char *file, unsigned long l
 #define   is_int(x, y, ...)      ctap_eq_i64((x), (y), __FILE__, __LINE__, __VA_ARGS__)
 #define isnt_int(x, y, ...)      ctap_ne_i64((x), (y), __FILE__, __LINE__, __VA_ARGS__)
 
+#define   is_double(x, y, ...)    ctap_eq_f64((x), (y), 0.00001, __FILE__, __LINE__, __VA_ARGS__)
+#define isnt_double(x, y, ...)    ctap_ne_f64((x), (y), 0.00001, __FILE__, __LINE__, __VA_ARGS__)
+#define   is_within(x, y, e, ...) ctap_eq_f64((x), (y), (e),     __FILE__, __LINE__, __VA_ARGS__)
+#define isnt_within(x, y, e, ...) ctap_ne_f64((x), (y), (e),     __FILE__, __LINE__, __VA_ARGS__)
+
 
 #define   is_pointer(x, y, ...)  ctap_eq_ptr((x), (y), __FILE__, __LINE__, __VA_ARGS__)
 #define isnt_pointer(x, y, ...)  ctap_ne_ptr((x), (y), __FILE__, __LINE__, __VA_ARGS__)
@@ -361,6 +366,35 @@ void ctap_ne_i64(int64_t x, int64_t y, const char *file, unsigned long line, con
 	if (!_assert(x != y, 1, file, line, msg)) {
 		ctap_diag(stderr, "         got: %lli (%x)", x, x);
 		ctap_diag(stderr, "    expected: <anything else>");
+	}
+}
+
+void ctap_eq_f64(double x, double y, double e, const char *file, unsigned long line, const char *fmt, ...)
+{
+	double diff;
+
+	diff = (x > y) ? x - y : y - x;
+	e = e < 0.0 ? -e : e;
+
+	vmsg(fmt, msg);
+	if (!_assert(diff <= e, 1, file, line, msg)) {
+		ctap_diag(stderr, "         got: %e (%lf)", x, x);
+		ctap_diag(stderr, "    expected: %e (%lf) ±%lf\n", y, y, e);
+	}
+}
+
+void ctap_ne_f64(double x, double y, double e, const char *file, unsigned long line, const char *fmt, ...)
+{
+	double diff;
+
+	diff = (x > y) ? x - y : y - x;
+	e = e < 0.0 ? -e : e;
+
+	vmsg(fmt, msg);
+	if (!_assert(diff > e, 1, file, line, msg)) {
+		ctap_diag(stderr, "         got: %e (%lf)", x, x);
+		ctap_diag(stderr, "    expected: > %e (%lf)", y - e, y - e);
+		ctap_diag(stderr, "          or  < %e (%lf)", y + e, y + e);
 	}
 }
 

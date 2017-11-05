@@ -1,0 +1,30 @@
+#!/bin/bash
+set -e
+
+# t/stress - a small utility for stressing tests
+#
+# USAGE: t/stress test-name [#]
+#
+# For example, to stress the reservoir sampling test suite,
+# looking for possible instability / non-determinism in the
+# randomness portion of the test:
+#
+#    ./t/stress rsv
+#
+# That will run `./rsv` 100 times, and bail if any single
+# run fails (i.e. due to non-determinism).
+#
+# You can crank up the stress levels:
+#
+#    ./t/stress rsv 10000
+#    ./t/stress rsv 100000
+#    ./t/stress rsv 1000000
+#
+# (you get the idea)
+#
+for i in $(seq 1 ${2:-100}); do
+	echo -n .
+	./$1 >/dev/null
+done
+echo
+echo "ALL GOOD"

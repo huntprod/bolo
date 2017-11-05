@@ -38,6 +38,76 @@ error(int num)
 	return errors[num - BOLO_ERROR_BASE];
 }
 
+static int  _urand_fd  = -1;
+static char _urand_buf[8192];
+static int  _urand_off = 0;
+
+static void
+_urand_init() {
+	ssize_t n;
+
+	/* make sure we have a file handle to /dev/urandom */
+	if (_urand_fd < 0) {
+		_urand_fd = open(DEV_URANDOM, O_RDONLY);
+		if (_urand_fd < 0)
+			bail("failed to open " DEV_URANDOM " to find randomness");
+		_urand_off = 8192; /* pretend we've already exhausted the buffer */
+	}
+
+	/* do we need to get some new randomness? */
+	if (_urand_off > 8192 - 8) { /* not enough to pull 64 bits... */
+		n = read(_urand_fd, _urand_buf, 8192);
+		if (n != 8192)
+			bail("unable to read sufficient randomness from " DEV_URANDOM);
+		_urand_off = 0;
+	}
+}
+
+uint32_t
+urand32()
+{
+	uint32_t v;
+
+	_urand_init();
+
+	memcpy(&v, _urand_buf + _urand_off, 4);
+	_urand_off += 4;
+
+	return v;
+}
+
+uint64_t
+urand64()
+{
+	uint64_t v;
+
+	_urand_init();
+
+	memcpy(&v, _urand_buf + _urand_off, 8);
+	_urand_off += 8;
+
+	return v;
+}
+
+uint32_t
+urandn(uint32_t n)
+{
+	uint32_t v, min;
+
+	/* pathological callers get what they deserve. */
+	if (n < 2) return 0;
+
+	/* 2**32 % n == (2**32 - n) % n */
+	min = -n % n;
+	/* loop until we find a number in-range
+	   that doesn't suffer from modulo bias. */
+	for (v = 0; v < min; v = urand32())
+		;
+
+	/* we can safely modulo v. */
+	return v % n;
+}
+
 int
 mktree(int dirfd, const char *path, mode_t mode)
 {
@@ -173,6 +243,30 @@ TESTS {
 			"error() should revert to the unknown error for out-of-range errnos");
 		is_string(error(-3), errors[BOLO_EUNKNOWN - BOLO_ERROR_BASE],
 			"error() should revert to the unknown error for out-of-range errnos");
+	}
+
+	subtest {
+		int i;
+
+		/* simple 32-bit wrap-around at 2048 urand32() calls... */
+		for (i = 0; i < 2049; i++) urand32();
+		pass("urand32() wrap-around works");
+		/* re-align to 0 */
+		for (     ; i < 4096; i++) urand32();
+
+		/* simple 64-but wrap-around at 1024 urand64() calls... */
+		for (i = 0; i < 1025; i++) urand64();
+		pass("urand64() wrap-around works");
+		/* re-align to 0 */
+		for (     ; i < 2048; i++) urand64();
+
+		/* 64-bit premature wrap-around after 2047 urand32() calls...
+		   (4 octets will be left in _urand_buf; they will be discarded) */
+		for (i = 0; i < 2047; i++) urand32();
+		urand64();
+		pass("urand64() wrap-around (with discard) works");
+		/* re-align to 0 */
+		for (i = 1; i < 1024; i++) urand64();
 	}
 }
 /* LCOV_EXCL_STOP */
