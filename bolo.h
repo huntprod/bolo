@@ -460,6 +460,7 @@ struct qcond {
 	int op;
 	void *a;
 	void *b;
+	struct multidx *midx;
 };
 
 
@@ -476,7 +477,8 @@ struct qexpr {
 	void *a;
 	void *b;
 
-	struct qexpr *next;
+	struct qexpr   *next;
+	struct multidx *set;
 };
 
 struct query {
@@ -490,6 +492,8 @@ struct query {
 struct query * bql_parse(const char *q);
 struct query * query_parse(const char *q);
 void query_free(struct query *q);
+
+int query_plan(struct query *q, struct db *db);
 
 
 #endif

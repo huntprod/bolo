@@ -29,6 +29,91 @@ fail:
 }
 
 static void
+qcond_plan(struct qcond *qc, struct db *db)
+{
+	static char buf[8192]; /* FIXME define a max len for key=value */
+
+	switch (qc->op) {
+	default: return;
+	case COND_AND:
+	case COND_OR:     qcond_plan(qc->a, db);
+	case COND_NOT:    qcond_plan(qc->b, db);
+	                  return;
+
+	case COND_EQ:     snprintf(buf, 8192, "%s=%s", (char *)qc->a, (char *)qc->b);
+	                  break;
+
+	case COND_EXIST:  snprintf(buf, 8192, "%s", (char *)qc->a);
+	                  break;
+	}
+
+	/* look up the tag and copy in the midx */
+	if (hash_get(db->tags, &qc->midx, buf) != 0)
+		qc->midx = NULL;
+}
+
+static int
+qcond_check(struct qcond *qc, struct idx *idx)
+{
+	struct multidx *set;
+
+	switch (qc->op) {
+	case COND_AND:
+		return (qcond_check(qc->a, idx) == 0
+		     && qcond_check(qc->b, idx) == 0) ? 0 : 1;
+	case COND_OR:
+		return (qcond_check(qc->a, idx) == 0
+		     || qcond_check(qc->b, idx) == 0) ? 0 : 1;
+	case COND_NOT:
+		return  qcond_check(qc->a, idx) == 0  ? 1 : 0;
+	case COND_EQ:
+	case COND_EXIST:
+		for (set = qc->midx; set; set = set->next)
+			if (set->idx == idx)
+				return 0;
+		return 1;
+
+	default:
+		return 1;
+	}
+}
+
+int
+query_plan(struct query *q, struct db *db)
+{
+	struct qexpr *expr;
+	struct multidx *set, *full, *tmp;
+
+	/* compile conditions into the subset of
+	   applicable index subsets for each clause */
+	if (q->where)
+		qcond_plan(q->where, db);
+
+	/* compile field specifications into
+	   the index subsets they reference. */
+	for (expr = q->select; expr; expr = expr->next) {
+		if (expr->type != EXPR_REF)
+			return -1;
+
+		if (hash_get(db->metrics, &full, expr->a) != 0)
+			return -1;
+
+		expr->set = NULL;
+		for (tmp = full; tmp; tmp = tmp->next) {
+			if (qcond_check(q->where, tmp->idx) == 0) {
+				if (!(set = malloc(sizeof(*set))))
+					bail("malloc failed");
+				set->next = expr->set;
+				set->idx  = tmp->idx;
+				expr->set = set;
+			}
+		}
+	}
+
+	return 0;
+}
+
+static void
 qcond_free(struct qcond *qcond)
 {
 	if (!qcond) return;
