@@ -97,13 +97,19 @@ int yywrap() {
 struct query *
 bql_parse(const char *q)
 {
+	int rc;
+	YY_BUFFER_STATE buf;
+
 	QUERY = NULL;
 
-	yy_scan_string(q);
-	if (yyparse() == 0)
+	buf = yy_scan_string(q);
+	rc = yyparse();
+	yy_delete_buffer(buf);
+
+	if (rc == 0)
 		return QUERY;
 
-	free(QUERY);
+	query_free(QUERY);
 	QUERY = NULL;
 	return NULL;
 }
