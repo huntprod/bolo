@@ -268,6 +268,39 @@ TESTS {
 		/* re-align to 0 */
 		for (i = 1; i < 1024; i++) urand64();
 	}
+
+	subtest {
+		int i;
+		uint32_t v;
+#define always_eq(x,y) do {\
+	v = (x);\
+	for (i = 0; i < 100; i++) \
+		if (v != (y)) \
+			is_unsigned(v, (y), #x " always returns " #y); \
+	if (i == 100)\
+		pass(#x " always returns " #y);\
+} while(0)
+
+		always_eq(urandn(0), 0);
+		always_eq(urandn(1), 0);
+		always_eq(urandn(2), 0);
+
+#define always_lt(x,y) do {\
+	v = (x);\
+	for (i = 0; i < 100; i++) \
+		if (v > (y)) \
+			cmp_ok(v, ">", (y), #x " always returns a value strictly less than " #y); \
+	if (i == 100)\
+		pass(#x " always returns a value strictly less than " #y);\
+} while(0)
+
+		always_lt(urandn(5),       5);
+		always_lt(urandn(10),     10);
+		always_lt(urandn(100),   100);
+		always_lt(urandn(1000), 1000);
+
+#undef always_eq
+	}
 }
 /* LCOV_EXCL_STOP */
 #endif
