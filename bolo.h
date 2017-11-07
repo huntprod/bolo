@@ -429,6 +429,53 @@ int tags_canonicalize(char *tags);
 char * tags_next(char *tags, char **tag, char **val);
 
 
+/*****************************************************  data serialization  ***/
+
+#define BOSON_STACK_DEPTH   128
+
+#define BOSON_NONE          0
+#define BOSON_OBJECT_START  1
+#define BOSON_OBJECT_FINISH 2
+#define BOSON_LIST_START    3
+#define BOSON_LIST_FINISH   4
+#define BOSON_KEY           5
+#define BOSON_STRING        6
+#define BOSON_INTEGER       7
+#define BOSON_DECIMAL       8
+#define BOSON_FLOATP        9
+#define BOSON_TRUE         10
+#define BOSON_FALSE        11
+#define BOSON_NULL         12
+#define BOSON_ERROR      0xfe
+#define BOSON_EOF        0xff
+
+struct boson_value {
+	int type;
+	union {
+		char  *string;
+		long   integer;
+		double decimal;
+	} data;
+};
+
+struct boson {
+	int    fd;
+	char   buf[8192];
+	size_t len;
+	size_t off;
+
+	char  *strbuf;
+	int    strlen;
+
+	int    state[BOSON_STACK_DEPTH];
+	int    top;
+	int    error;
+};
+
+void boson_init(struct boson *b, int fd);
+int boson_read(struct boson *b, struct boson_value *v);
+int boson_write(struct boson *b, int event, void *data, size_t len);
+
 /*****************************************************  reservoir sampling  ***/
 
 struct rsv {

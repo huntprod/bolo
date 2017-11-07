@@ -1,0 +1,14 @@
+#!/bin/bash
+
+mkdir -p t/fuzz/{in,out}
+
+if [[ -d t/fuzz/out/$1 ]]; then
+	echo >&2 "output dir t/fuzz/out/$1 exists; cowardly refusing to continue..."
+	exit 1
+fi
+if [[ ! -d t/fuzz/in/$1 ]]; then
+	echo >&2 "input test case dir t/fuzz/in/$1 not found..."
+	exit 2
+fi
+
+afl-fuzz -i t/fuzz/in/$1 -o t/fuzz/out/$1 t/fuzz/$1

@@ -1,0 +1,17 @@
+digraph json {
+  { edge [label="'{'"]    s_init      -> s_obj_start }
+  { edge [label="STRING"] s_obj_start -> s_obj_key   }
+  { edge [label="'}'"]    s_obj_start -> s_done      }
+  { edge [label="':'"]    s_obj_key   -> s_obj_val   }
+  { edge [label="value"]  s_obj_val   -> s_obj_post  }
+  { edge [label="','"]    s_obj_post  -> s_obj_next  }
+  { edge [label="STRING"] s_obj_next  -> s_obj_key   }
+  { edge [label="'}'"]    s_obj_post  -> s_done      }
+
+  { edge [label="'['"]    s_init      -> s_lst_start }
+  { edge [label="value"]  s_lst_start -> s_lst_post  }
+  { edge [label="']'"]    s_lst_start -> s_done      }
+  { edge [label="','"]    s_lst_post  -> s_lst_item  }
+  { edge [label="value"]  s_lst_item  -> s_lst_post  }
+  { edge [label="']'"]    s_lst_post  -> s_done      }
+}

@@ -1,5 +1,6 @@
 CFLAGS += -Wall -Wextra -Wpedantic -Wunused -Wunused-result -Wno-unused-parameter
 TEST_CFLAGS := -g -DTEST -fprofile-arcs -ftest-coverage -It
+LDLIBS += -lm
 
 ifeq ($(PROF),yes)
 	# BOTH -p and -pg seem to be necessary, if you want
@@ -13,6 +14,7 @@ TESTS += rsv log cfg
 TESTS += hash page btree
 TESTS += sha time
 TESTS += tags query db
+TESTS += boson
 
 all: bolo
 
@@ -46,11 +48,21 @@ check: util.o log.o page.o btree.o hash.o sha.o tblock.o tslab.o tags.o bql/bql.
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o tags  tags.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o query query.c  hash.o util.o bql/bql.a
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o db    db.c     btree.o page.o util.o hash.o sha.o tblock.o tslab.o log.o tags.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o boson boson.c  util.o $(LDLIBS)
 	prove -v $(addprefix ./,$(TESTS))
 
 memtest: check
 	t/vg $(addprefix ./,$(TESTS))
 	@echo "No memory leaks detected"
+
+fuzztest: t/fuzz/boson
+	./t/afl boson
+
+t/fuzz/boson: t/fuzz/boson.fuzz.o boson.fuzz.o util.fuzz.o
+	afl-gcc $(LDFLAGS) -o $@ $+
+
+%.fuzz.o: %.c
+	afl-gcc $(CPPFLAGS) $(CFLAGS) -c -o $@ $+
 
 coverage:
 	rm -rf coverage/
@@ -85,6 +97,10 @@ bql/grammar.o: bql/grammar.h bql/grammar.c
 
 bql/bql.a: bql/grammar.o bql/lexer.o
 	ar cr $@ $+
+
+
+docs/diag/json.png: docs/diag/json.dot
+	dot -Tpng <$< >$@
 
 .PHONY: all clean distclean test check memtest coverage copycov ccov sure fixme
 

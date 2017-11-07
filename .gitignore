@@ -2,6 +2,7 @@
 /bqlx
 
 /bits
+/boson
 /btree
 /cfg
 /db
@@ -21,6 +22,8 @@
 /bql/grammar.output
 /bql/lexer.c
 /bql/bql.a
+
+/t/fuzz/boson
 
 *.db
 /coverage
