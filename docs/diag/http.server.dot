@@ -1,0 +1,7 @@
+digraph http_server {
+  { edge [label="accept()"]   s_init      -> s_connected }
+  { edge [label="<request"]   s_connected -> s_dispatch  }
+  { edge [label="reply>"]     s_dispatch  -> s_replied   }
+  { edge [label="keepalive?"] s_replied   -> s_connected }
+  { edge [label="close?"]     s_replied   -> s_closed    }
+}

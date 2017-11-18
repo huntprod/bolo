@@ -23,6 +23,8 @@ bolo: bolo.o debug.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o btr
 
 bqlx: bql/main.o bql/bql.a util.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -Wno-error -o $@ $+ $(LDLIBS)
+httpx: httpx.o http.o util.o hash.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -Wno-error -o $@ $+ $(LDLIBS)
 
 clean:
 	rm -f *.o *.gcno *.gcda

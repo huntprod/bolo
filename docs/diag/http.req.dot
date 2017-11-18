@@ -1,0 +1,21 @@
+digraph http_req {
+  { edge [label="{token}"] s_init -> s_method }
+  { edge [label="{token}"] s_method -> s_method }
+  { edge [label="(sp)"]      s_method -> s_expect_uri }
+  { edge [label="(not sp)"]  s_expect_uri -> s_uri }
+  { edge [label="(not sp)"]  s_uri -> s_uri }
+  { edge [label="(sp)"] s_uri -> s_version }
+  { edge [label="[HTP/.0-9]"] s_version -> s_version }
+  { edge [label="(cr+lf)"]   s_version -> s_header_init }
+  { edge [label="(cr+lf)"]   s_header_init -> s_body } // kind of an error
+
+  { edge [label="<token>"]   s_header_init -> s_header_field }
+  { edge [label="<token>"]   s_header_field -> s_header_field }
+  { edge [label=":"]         s_header_field -> s_header_sep }
+  { edge [label="(sp)"]      s_header_sep -> s_header_value }
+  { edge [label="^(cr|lf)"]  s_header_value -> s_header_value }
+  { edge [label="(cr+lf)"]   s_header_value -> s_header_cont }
+  { edge [label="(sp)"]      s_header_cont -> s_header_value }
+  { edge [label="<token>"]   s_header_cont -> s_header_field }
+  { edge [label="(cr+lf)"]   s_header_cont -> s_body }
+}
