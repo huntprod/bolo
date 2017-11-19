@@ -18,7 +18,7 @@ TESTS += boson
 
 all: bolo
 
-bolo: bolo.o debug.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o btree.o log.o tags.o query.o bql/bql.a
+bolo: bolo.o debug.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o btree.o log.o tags.o query.o rsv.o bql/bql.a
 	$(CC) $(LDFLAGS) -o $@ $+ $(LDLIBS)
 
 bqlx: bql/main.o bql/bql.a util.o
