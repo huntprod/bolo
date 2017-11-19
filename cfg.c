@@ -117,7 +117,9 @@ configure(struct config *cfg, int fd)
 					else if (streq(p,  "d")) cfg->block_span *= 1000 * 60 * 60 * 24;
 					else {
 						errorf("failed to read configuration: invalid unit in block_span value '%s'", v);
+						return -1;
 					}
+					break;
 				}
 			}
 
@@ -155,6 +157,18 @@ next:
 \
 	close(fd); \
 } while (0)
+#define try(cfg,raw) do { \
+	int fd; \
+	memset(&(cfg), 0, sizeof(cfg)); \
+\
+	fd = memfd("cfg"); \
+	put(fd, raw "\n"); \
+	lseek(fd, 0, SEEK_SET); \
+	ok(configure(&(cfg), fd) == 0, \
+		"configure() should succeed for '%s'", (raw)); \
+\
+	close(fd); \
+} while (0)
 
 TESTS {
 	//logto(5);
@@ -186,6 +200,55 @@ TESTS {
 			"configure() should ignore the comments");
 
 		close(fd);
+	}
+
+	subtest {
+		struct config cfg;
+
+		try(cfg, "log_level = error");
+		is_unsigned(cfg.log_level, LOG_ERRORS, "log_level error is parsed properly");
+
+		try(cfg, "log_level = warning");
+		is_unsigned(cfg.log_level, LOG_WARNINGS, "log_level warning is parsed properly");
+
+		try(cfg, "log_level = info");
+		is_unsigned(cfg.log_level, LOG_INFO, "log_level info is parsed properly");
+	}
+
+	subtest {
+		struct config cfg;
+
+		try(cfg, "block_span = 1");
+		ok(cfg.block_span == 1, "without units, block_span is treated as milliseconds");
+
+		try(cfg, "block_span = 12345");
+		ok(cfg.block_span == 12345, "block_span handles multiple digits");
+
+		try(cfg, "block_span = 10ms");
+		is_unsigned(cfg.block_span, 10, "unit ms == milliseconds (no multiplier)");
+		ok(cfg.block_span == 10, "unit ms == milliseconds (no multiplier)");
+
+		try(cfg, "block_span = 15s");
+		ok(cfg.block_span == 15 * 1000, "multi-digit, s-unit block_span is good");
+
+		try(cfg, "block_span = 3m");
+		ok(cfg.block_span == 3 * 60000, "unit m == minutes (x60000 multiplier)");
+
+		try(cfg, "block_span = 12h");
+		ok(cfg.block_span == 12 * 3600000, "unit h == hours (x3600000 multiplier)");
+
+		try(cfg, "block_span = 90d");
+		ok(cfg.block_span == 90lu * 86400000, "unit d == days (x86400000 multiplier)");
+
+		try(cfg, "block_span = 7 s");
+		ok(cfg.block_span == 7 * 1000, "whitespace between number and digit is ignored");
+	}
+
+	subtest {
+		struct config cfg;
+
+		try(cfg, "secret_key = /path/to/key # should be chmod 0600");
+		is_string(cfg.secret_key, "/path/to/key", "secret_key parsed properly");
 	}
 }
 #endif
