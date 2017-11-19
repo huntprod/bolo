@@ -55,7 +55,15 @@ do_dbinfo(int argc, char **argv)
 	} else {
 		fprintf(stdout, "indices:\n");
 		for_each(idx, &db->idx, l) {
-			fprintf(stdout, "  - [%#06lx]\n", idx->number);
+			fprintf(stdout, "  - [%#06lx]", idx->number);
+			if (btree_isempty(idx->btree)) {
+				fprintf(stdout, " (empty)\n");
+			} else {
+				bolo_msec_t first, last;
+				first = btree_first(idx->btree);
+				last  = btree_last(idx->btree);
+				fprintf(stdout, " spans %lu (from %lu to %lu)\n", last - first, first, last);
+			}
 		}
 		fprintf(stdout, "\n");
 	}
