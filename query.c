@@ -181,6 +181,7 @@ query_free(struct query *q)
 }
 
 #ifdef TEST
+/* LCOV_EXCL_START */
 TESTS {
 	subtest {
 		struct query *q;
@@ -413,4 +414,5 @@ TESTS {
 		query_free(q);
 	}
 }
+/* LCOV_EXCL_STOP */
 #endif
