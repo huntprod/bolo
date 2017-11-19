@@ -403,6 +403,30 @@ TESTS {
 
 		hash_free(h);
 	}
+
+	subtest {
+		struct hash *before, *after;
+		struct data d1, d2, *v;
+		char *key;
+
+		new_hash(before);
+		ok(hash_set(before, "d1", &d1) == 0, "should set before[d1] => d1");
+		ok(hash_set(before, "d2", &d2) == 0, "should set before[d2] => d2");
+
+		new_hash(after);
+		ok(hash_get(after, &v, "d1") != 0, "after[d1] is not set pre-traversal");
+		ok(hash_get(after, &v, "d2") != 0, "after[d2] is not set pre-traversal");
+
+		hash_each(before, &key, &v) {
+			hash_set(after, key, v);
+		}
+
+		ok(hash_get(after, &v, "d1") == 0, "after[d1] is set pre-traversal");
+		ok(hash_get(after, &v, "d2") == 0, "after[d2] is set pre-traversal");
+
+		hash_free(before);
+		hash_free(after);
+	}
 }
 /* LCOV_EXCL_STOP */
 #endif
