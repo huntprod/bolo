@@ -161,8 +161,8 @@ size_t hash_nset(struct hash *h);
 #define hash_isset(h,k) (hash_get((h), NULL, (k)) == 0)
 #define hash_isempty(h) (hash_nset((h)) == 0)
 
-void _hash_ebegn(struct hash *h, const char **key, void *val);
-void _hash_enext(struct hash *h, const char **key, void *val);
+void _hash_ebegn(struct hash *h, void *key, void *val);
+void _hash_enext(struct hash *h, void *key, void *val);
 int  _hash_edone(struct hash *h);
 #define hash_each(h,k,v) \
 	for (_hash_ebegn((h), k, v); \

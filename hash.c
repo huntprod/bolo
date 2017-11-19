@@ -66,7 +66,7 @@ hash_free(struct hash *h)
 }
 
 void
-_hash_ebegn(struct hash *h, const char **key, void *val)
+_hash_ebegn(struct hash *h, void *key, void *val)
 {
 	BUG(h != NULL, "hash_each() { ... } given a NULL hash to iterate over");
 
@@ -76,7 +76,7 @@ _hash_ebegn(struct hash *h, const char **key, void *val)
 }
 
 void
-_hash_enext(struct hash *h, const char **key, void *val)
+_hash_enext(struct hash *h, void *key, void *val)
 {
 	BUG(h != NULL,                  "hash_each() { ... } given a NULL hash to iterate over");
 	BUG(key != NULL || val != NULL, "hash_each() { ... } given NULL key and value destination pointers");
@@ -86,7 +86,7 @@ _hash_enext(struct hash *h, const char **key, void *val)
 	}
 
 	if (h->last) {
-		if (key) *key = h->last->key;
+		if (key) *(char **)key = h->last->key;
 		if (val) *(void **)val = h->last->ptr;
 		h->last = h->last->next;
 	}
