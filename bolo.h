@@ -35,6 +35,15 @@
 #include <fcntl.h>
 #include <math.h>
 
+#ifndef MIN
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#endif
+
+#ifndef MAX
+#define MAX(a,b) (((a)>(b))?(a):(b))
+#endif
+
+
 /*************************************************  truly global variables  ***/
 
 /* belongs to db.o */
@@ -544,6 +553,19 @@ struct query * query_parse(const char *q);
 void query_free(struct query *q);
 
 int query_plan(struct query *q, struct db *db);
+
+
+/*********************************************************************  io  ***/
+
+struct io;
+struct io * io_new(const char *tmp, size_t hwm);
+int io_init(struct io *io, const char *tmp, size_t hwm);
+void io_close(struct io *io);
+void io_free(struct io *io);
+
+void io_rewind(struct io *io);
+ssize_t io_write(struct io *io, const void *buf, size_t len);
+ssize_t io_read(struct io *io, void *buf, size_t len);
 
 
 /*******************************************************************  http  ***/

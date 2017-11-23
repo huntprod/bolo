@@ -1,10 +1,6 @@
 #include "bolo.h"
 #include <stdarg.h>
 
-#ifndef MIN
-#define MIN(a,b) (((a)<(b))?(a):(b))
-#endif
-
 #define HTTP_UNRECOGNIZED  0
 #define HTTP_0_9           1
 #define HTTP_1_0           2
