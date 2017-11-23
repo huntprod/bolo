@@ -14,7 +14,7 @@ TESTS += rsv log cfg
 TESTS += hash page btree
 TESTS += sha time
 TESTS += tags query db
-TESTS += boson
+TESTS += json
 
 all: bolo
 
@@ -58,10 +58,10 @@ memtest: check
 	t/vg $(addprefix ./,$(TESTS))
 	@echo "No memory leaks detected"
 
-fuzztest: t/fuzz/boson
-	./t/afl boson
+fuzztest: t/fuzz/json
+	./t/afl json
 
-t/fuzz/boson: t/fuzz/boson.fuzz.o boson.fuzz.o util.fuzz.o
+t/fuzz/json: t/fuzz/json.fuzz.o json.fuzz.o util.fuzz.o
 	afl-gcc $(LDFLAGS) -o $@ $+
 
 %.fuzz.o: %.c
