@@ -138,6 +138,12 @@ next:
 	}
 }
 
+void deconfigure(struct config *config)
+{
+	free(config->secret_key);
+	config->secret_key = NULL;
+}
+
 #ifdef TEST
 #define put(fd,s) write((fd), (s), strlen(s))
 #define test1(raw) do { \
@@ -199,6 +205,7 @@ TESTS {
 		is_unsigned(cfg.log_level, LOG_WARNINGS,
 			"configure() should ignore the comments");
 
+		deconfigure(&cfg);
 		close(fd);
 	}
 
@@ -213,6 +220,8 @@ TESTS {
 
 		try(cfg, "log_level = info");
 		is_unsigned(cfg.log_level, LOG_INFO, "log_level info is parsed properly");
+
+		deconfigure(&cfg);
 	}
 
 	subtest {
@@ -242,6 +251,8 @@ TESTS {
 
 		try(cfg, "block_span = 7 s");
 		ok(cfg.block_span == 7 * 1000, "whitespace between number and digit is ignored");
+
+		deconfigure(&cfg);
 	}
 
 	subtest {
@@ -249,6 +260,8 @@ TESTS {
 
 		try(cfg, "secret_key = /path/to/key # should be chmod 0600");
 		is_string(cfg.secret_key, "/path/to/key", "secret_key parsed properly");
+
+		deconfigure(&cfg);
 	}
 }
 #endif

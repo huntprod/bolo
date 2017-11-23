@@ -112,6 +112,7 @@ struct config {
 };
 
 int configure(struct config *, int fd) RETURNS;
+void deconfigure(struct config *);
 
 
 /****************************************************************  SHA-512  ***/
