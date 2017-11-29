@@ -439,6 +439,30 @@ int tags_canonicalize(char *tags);
 char * tags_next(char *tags, char **tag, char **val);
 
 
+/*********************************************************************  io  ***/
+
+struct io;
+
+struct io * io_new(const char *tmp, size_t hwm);
+int io_init(struct io *io, const char *tmp, size_t hwm);
+void io_reinit(struct io *io);
+void io_close(struct io *io);
+void io_free(struct io *io);
+
+struct io *io_bufnew(char *buf, size_t len);
+int io_buf(struct io *io, char *buf, size_t len);
+
+int io_catfd(struct io *io, int fd);
+int io_copyfd(struct io *io, int fd);
+
+int io_catbuf(struct io *io, const void *buf, size_t len);
+int io_copybuf(struct io *io, const void *buf, size_t len);
+
+void io_rewind(struct io *io);
+ssize_t io_write(struct io *io, const void *buf, size_t len);
+ssize_t io_read(struct io *io, void *buf, size_t len);
+
+
 /*****************************************************  data serialization  ***/
 
 #define JSON_NONE          0
@@ -542,17 +566,7 @@ void query_free(struct query *q);
 int query_plan(struct query *q, struct db *db);
 
 
-/*********************************************************************  io  ***/
-
-struct io;
-struct io * io_new(const char *tmp, size_t hwm);
-int io_init(struct io *io, const char *tmp, size_t hwm);
-void io_close(struct io *io);
-void io_free(struct io *io);
-
-void io_rewind(struct io *io);
-ssize_t io_write(struct io *io, const void *buf, size_t len);
-ssize_t io_read(struct io *io, void *buf, size_t len);
+/*******************************************************************  http  ***/
 
 
 /*******************************************************************  http  ***/

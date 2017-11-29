@@ -8,6 +8,8 @@ struct io {
 	int     fd;
 	size_t  hwm;
 	char   *tmp;
+
+	int     own_buf;
 };
 
 struct io * io_new(const char *tmp, size_t hwm)
@@ -16,7 +18,7 @@ struct io * io_new(const char *tmp, size_t hwm)
 
 	io = calloc(1, sizeof(*io));
 	if (io && io_init(io, tmp, hwm) == 0) return io;
-	free(io);
+	io_free(io);
 	return NULL;
 }
 
@@ -32,14 +34,23 @@ int io_init(struct io *io, const char *tmp, size_t hwm)
 	if (asprintf(&io->tmp, "%s/bolo.io.XXXXXXXX", tmp) < 0)
 		goto fail;
 
+	io->own_buf = 1;
 	io->buf = calloc(hwm, sizeof(char));
 	if (!io->buf) goto fail;
 
 	return 0;
 
 fail:
-	io_free(io);
 	return -1;
+}
+
+void io_reinit(struct io *io)
+{
+	io->len = io->pos = 0;
+	if (io->fd >= 0) {
+		lseek(io->fd, 0, SEEK_SET);
+		ftruncate(io->fd, 0);
+	}
 }
 
 void io_close(struct io *io)
@@ -48,13 +59,92 @@ void io_close(struct io *io)
 		close(io->fd);
 
 	free(io->tmp);
-	free(io->buf);
+	if (io->own_buf)
+		free(io->buf);
 }
 
 void
 io_free(struct io *io) {
 	io_close(io);
 	free(io);
+}
+
+struct io * io_bufnew(char *buf, size_t len)
+{
+	struct io *io;
+
+	io = calloc(1, sizeof(*io));
+	if (io && io_buf(io, buf, len) == 0) return io;
+	io_free(io);
+	return NULL;
+}
+
+int io_buf(struct io *io, char *buf, size_t len)
+{
+	io->fd  = -1;
+	io->hwm = len;
+	io->buf = buf;
+	io->pos = 0;
+	io->len = len;
+	io->tmp = NULL;
+
+	io->own_buf = 0;
+	return 0;
+}
+
+int io_catfd(struct io *io, int fd)
+{
+	char buf[8192];
+	ssize_t nread, nwrit;
+	size_t off;
+
+	while ((nread = read(fd, buf, 8192)) != 0) {
+		if (nread < 0)
+			return -1;
+
+		off = 0;
+		for (off = 0; off < (size_t)nread; ) {
+			nwrit = io_write(io, ((char *)buf)+off, nread);
+			if (nwrit <= 0)
+				return -1;
+			off += nwrit;
+		}
+	}
+
+	return 0;
+}
+
+int io_copyfd(struct io *io, int fd)
+{
+	io_reinit(io);
+	if (io_catfd(io, fd) != 0)
+		return -1;
+	io_rewind(io);
+	return 0;
+}
+
+int io_catbuf(struct io *io, const void *buf, size_t len)
+{
+	ssize_t nwrit;
+	size_t off;
+
+	for (off = 0; off < len; ) {
+		nwrit = io_write(io, ((char *)buf)+off, len-off);
+		if (nwrit <= 0)
+			return -1;
+		off += nwrit;
+	}
+
+	return 0;
+}
+
+int io_copybuf(struct io *io, const void *buf, size_t len)
+{
+	io_reinit(io);
+	if (io_catbuf(io, buf, len) != 0)
+		return -1;
+	io_rewind(io);
+	return 0;
 }
 
 void
@@ -86,6 +176,9 @@ io_write(struct io *io, const void *buf, size_t len)
 		return _io_write_fd(io, buf, len);
 
 	if (io->len + len > io->hwm) {
+		errno = ENOENT;
+		if (!io->tmp) return -1;
+
 		io->fd = mkostemp(io->tmp, O_CLOEXEC);
 		if (io->fd < 0) return -1;
 
@@ -251,6 +344,119 @@ TESTS {
 		io_free(io);
 	}
 
+	subtest {
+		struct io *io;
+		ssize_t n;
+		char buf[64];
+
+		io = io_new(NULL, 64);
+		if (!io) BAIL_OUT("io_new() returned a NULL pointer!");
+
+		ok(io_copybuf(io, "Hello, World!\n", 14) == 0, "io_copybuf returns 0 on success");
+		n = io_read(io, buf, 64);
+		is_signed(n, 14, "read 14 octets from io struct");
+		buf[n] = '\0';
+		is_string(buf, "Hello, World!\n", "should io_read() everything we io_copied()");
+
+		n = io_read(io, buf, 64);
+		is_signed(n, 0, "read 0 octets from io struct at 'EOF'");
+
+		io_free(io);
+	}
+
+	subtest {
+		struct io *io;
+		ssize_t n;
+		char buf[64];
+
+		io = io_new(NULL, 8);
+		if (!io) BAIL_OUT("io_new() returned a NULL pointer!");
+
+		ok(io_copybuf(io, "Hello, World!\n", 14) == 0, "io_copybuf returns 0 on success");
+		n = io_read(io, buf, 64);
+		is_signed(n, 14, "read 14 octets from io struct");
+		buf[n] = '\0';
+		is_string(buf, "Hello, World!\n", "should io_read() everything we io_copied()");
+
+		n = io_read(io, buf, 64);
+		is_signed(n, 0, "read 0 octets from io struct at 'EOF'");
+
+		io_free(io);
+	}
+
+	subtest {
+		struct io *io;
+		ssize_t n;
+		char buf[64];
+		int fd;
+
+		fd = memfd("io");
+		n = write(fd, "Hello, World!\n", 14);
+		if (n < 0 || n != 14)
+			BAIL_OUT("failed to set up file descriptor to copyfd from...");
+		lseek(fd, 0, SEEK_SET);
+
+		io = io_new(NULL, 64);
+		if (!io) BAIL_OUT("io_new() returned a NULL pointer!");
+
+		ok(io_copyfd(io, fd) == 0, "io_copyfd returns 0 on success");
+		n = io_read(io, buf, 64);
+		is_signed(n, 14, "read 14 octets from io struct");
+		buf[n] = '\0';
+		is_string(buf, "Hello, World!\n", "should io_read() everything we io_copied()");
+
+		n = io_read(io, buf, 64);
+		is_signed(n, 0, "read 0 octets from io struct at 'EOF'");
+
+		io_free(io);
+	}
+
+	subtest {
+		struct io *io;
+		ssize_t n;
+		char buf[64];
+		int fd;
+
+		fd = memfd("io");
+		n = write(fd, "Hello, World!\n", 14);
+		if (n < 0 || n != 14)
+			BAIL_OUT("failed to set up file descriptor to copyfd from...");
+		lseek(fd, 0, SEEK_SET);
+
+		io = io_new(NULL, 8);
+		if (!io) BAIL_OUT("io_new() returned a NULL pointer!");
+
+		ok(io_copyfd(io, fd) == 0, "io_copyfd returns 0 on success");
+		n = io_read(io, buf, 64);
+		is_signed(n, 14, "read 14 octets from io struct");
+		buf[n] = '\0';
+		is_string(buf, "Hello, World!\n", "should io_read() everything we io_copied()");
+
+		n = io_read(io, buf, 64);
+		is_signed(n, 0, "read 0 octets from io struct at 'EOF'");
+
+		io_free(io);
+	}
+
+	subtest {
+		struct io *io;
+		ssize_t n;
+		char in[14] = "Hello, World!\n";
+		char buf[64];
+
+		io = io_bufnew(in, 14);
+		if (!io) BAIL_OUT("io_bufnew() returned a NULL pointer!");
+
+		n = io_read(io, buf, 64);
+		is_signed(n, 14, "read 14 octets from io struct");
+		buf[n] = '\0';
+		is_string(buf, "Hello, World!\n", "should io_read() everything we io_copied()");
+
+		n = io_read(io, buf, 64);
+		is_signed(n, 0, "read 0 octets from io struct at 'EOF'");
+
+		io_free(io);
+	}
 }
 /* LCOV_EXCL_STOP */
 #endif
