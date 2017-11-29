@@ -36,7 +36,7 @@ distclean: clean
 	rm -f bql/grammar.c bql/lexer.c
 
 test: check
-check: util.o log.o page.o btree.o hash.o sha.o tblock.o tslab.o tags.o bql/bql.a
+check: util.o io.o log.o page.o btree.o hash.o sha.o tblock.o tslab.o tags.o bql/bql.a
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o bits  bits.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o util  util.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o io    io.c
@@ -51,7 +51,7 @@ check: util.o log.o page.o btree.o hash.o sha.o tblock.o tslab.o tags.o bql/bql.
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o tags  tags.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o query query.c  hash.o util.o bql/bql.a
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o db    db.c     btree.o page.o util.o hash.o sha.o tblock.o tslab.o log.o tags.o
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o boson boson.c  util.o $(LDLIBS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o json  json.c  util.o io.o $(LDLIBS)
 	prove -v $(addprefix ./,$(TESTS))
 
 memtest: check

@@ -491,6 +491,8 @@ struct json_value {
 	} data;
 };
 
+void json_io(struct json *b, struct io *io);
+/* FIXME: I think we can remove the fd / buf readers */
 void json_init_fd(struct json *b, int fd);
 void json_init_buf(struct json *b, char *buf, size_t len);
 int json_read(struct json *b, struct json_value *v);

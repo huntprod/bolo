@@ -5,6 +5,8 @@
 #define JSON_STACK_DEPTH   128
 
 struct json {
+	struct io *io;
+
 	int    fd;
 	char   buf[8192];
 	size_t len;
@@ -92,7 +94,8 @@ s_readbuf(struct json *b)
 {
 	ssize_t n;
 
-	n = read(b->fd, b->buf, 8192);
+	if (b->io) n = io_read(b->io, b->buf, 8192);
+	else       n = read(b->fd, b->buf, 8192);
 	if (n < 0)
 		bail("error reading. FIXME");
 	b->off = 0;
@@ -148,6 +151,21 @@ s_set(struct json *b, int st)
 }
 
 void
+json_io(struct json *b, struct io *io)
+{
+	memset(b, 0, sizeof(*b));
+	b->io = io;
+	b->strlen = 8192;
+	b->strbuf = malloc(b->strlen);
+	if (!b->strbuf)
+		bail("malloc failed");
+
+	b->top = 1;
+	b->state[1] = S_INIT;
+	s_dumpstack(b,"init()");
+}
+
+void
 json_init_fd(struct json *b, int fd)
 {
 	memset(b, 0, sizeof(*b));
@@ -159,7 +177,7 @@ json_init_fd(struct json *b, int fd)
 
 	b->top = 1;
 	b->state[1] = S_INIT;
-	s_dumpstack(b,"init()");\
+	s_dumpstack(b,"init()");
 }
 
 void
@@ -496,7 +514,8 @@ s_write(struct json *b, const char *buf, size_t len)
 	size_t nwrit, n;
 
 	for (n = 0; n != len; ) {
-		nwrit = write(b->fd, buf + n, len - n);
+		if (b->io) nwrit = io_write(b->io, buf + n, len - n);
+		else       nwrit = write(b->fd, buf + n, len - n);
 		if (nwrit <= 0) return -1;
 		n += nwrit;
 	}
@@ -749,7 +768,8 @@ void
 teardown(struct json *b)
 {
 	free(b->strbuf);
-	close(b->fd);
+	if (!b->io)
+		close(b->fd);
 }
 
 TESTS {
