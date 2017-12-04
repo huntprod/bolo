@@ -481,7 +481,23 @@ ssize_t io_read(struct io *io, void *buf, size_t len);
 #define JSON_ERROR      0xfe
 #define JSON_EOF        0xff
 
-struct json;
+#define JSON_STACK_DEPTH 128
+struct json {
+	struct io *io;
+
+	int    fd;
+	char   buf[8192];
+	size_t len;
+	size_t off;
+
+	char  *strbuf;
+	int    strlen;
+
+	int    state[JSON_STACK_DEPTH];
+	int    top;
+	int    error;
+};
+
 struct json_value {
 	int type;
 	union {

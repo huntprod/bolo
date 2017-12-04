@@ -2,24 +2,6 @@
 #include <ctype.h>
 #include <math.h>
 
-#define JSON_STACK_DEPTH   128
-
-struct json {
-	struct io *io;
-
-	int    fd;
-	char   buf[8192];
-	size_t len;
-	size_t off;
-
-	char  *strbuf;
-	int    strlen;
-
-	int    state[JSON_STACK_DEPTH];
-	int    top;
-	int    error;
-};
-
 /*
    JSON Parser Deterministic Finite Automaton
 
