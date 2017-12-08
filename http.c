@@ -150,6 +150,13 @@ http_conn_read(struct http_conn *c)
 				/* snag the request method */
 				c->req.method = c->req.raw.data + lstart;
 				c->req.raw.data[i-1] = '\0';
+				     if (strcmp(c->req.method, "GET")     == 0) c->req.known_method = HTTP_GET;
+				else if (strcmp(c->req.method, "POST")    == 0) c->req.known_method = HTTP_POST;
+				else if (strcmp(c->req.method, "PUT")     == 0) c->req.known_method = HTTP_PUT;
+				else if (strcmp(c->req.method, "PATCH")   == 0) c->req.known_method = HTTP_PATCH;
+				else if (strcmp(c->req.method, "DELETE")  == 0) c->req.known_method = HTTP_DELETE;
+				else if (strcmp(c->req.method, "HEAD")    == 0) c->req.known_method = HTTP_HEAD;
+				else if (strcmp(c->req.method, "OPTIONS") == 0) c->req.known_method = HTTP_OPTIONS;
 
 				c->req.state = state = S_EXPECT_URI;
 				dot = i;

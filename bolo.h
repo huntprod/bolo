@@ -592,7 +592,13 @@ int query_plan(struct query *q, struct db *db);
 /*******************************************************************  http  ***/
 
 
-/*******************************************************************  http  ***/
+#define HTTP_GET     1
+#define HTTP_POST    2
+#define HTTP_PUT     3
+#define HTTP_PATCH   4
+#define HTTP_DELETE  5
+#define HTTP_HEAD    6
+#define HTTP_OPTIONS 7
 
 struct http_request {
 	char  *method;
