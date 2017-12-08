@@ -4,11 +4,12 @@
 /slow
 
 /bits
-/boson
 /btree
 /cfg
 /db
 /hash
+/io
+/json
 /log
 /page
 /rsv
@@ -25,7 +26,7 @@
 /bql/lexer.c
 /bql/bql.a
 
-/t/fuzz/boson
+/t/fuzz/json
 
 *.db
 /coverage
