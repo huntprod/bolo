@@ -73,6 +73,28 @@ io_free(struct io *io) {
 	free(io);
 }
 
+off_t
+io_seek(struct io *io, off_t offset, int whence)
+{
+	errno = EINVAL;
+	switch (whence) {
+	default: return -1;
+	case IO_SEEK_SET:                            break;
+	case IO_SEEK_CUR: offset = io->pos + offset; break;
+	case IO_SEEK_END: offset = io->len - offset; break;
+	}
+
+	fprintf(stderr, "offset: %li\n", offset);
+	fprintf(stderr, "len:    %li\n", io->len);
+	if (offset < 0 || (size_t)offset > io->len)
+		return -1;
+
+	io->pos = offset;
+	if (io->fd >= 0)
+		return lseek(io->fd, offset, SEEK_SET);
+	return io->pos;
+}
+
 struct io *
 io_bufnew(char *buf, size_t len)
 {
@@ -185,13 +207,14 @@ io_write(struct io *io, const void *buf, size_t len)
 	if (io->fd >= 0)
 		return _io_write_fd(io, buf, len);
 
-	if (io->len + len > io->hwm) {
+	if (io->pos + len > io->hwm) {
 		errno = ENOENT;
 		if (!io->tmp) return -1;
 
 		io->fd = mkostemp(io->tmp, O_CLOEXEC);
 		if (io->fd < 0) return -1;
 
+		io->len = io->pos;
 		io->pos = 0;
 		while (io->pos < io->len) {
 			nwrit = write(io->fd, io->buf + io->pos, io->len - io->pos);
@@ -202,8 +225,10 @@ io_write(struct io *io, const void *buf, size_t len)
 		return _io_write_fd(io, buf, len);
 	}
 
-	memcpy(io->buf + io->len, buf, len);
-	io->len += len;
+	memcpy(io->buf + io->pos, buf, len);
+	io->pos += len;
+	if (io->pos > io->len)
+		io->len = io->pos;
 	return len;
 }
 
@@ -464,6 +489,30 @@ TESTS {
 
 		n = io_read(io, buf, 64);
 		is_signed(n, 0, "read 0 octets from io struct at 'EOF'");
+
+		io_free(io);
+	}
+
+	subtest {
+		struct io *io;
+		ssize_t n;
+		char buf[64];
+
+		io = io_new(NULL, 8);
+		if (!io) BAIL_OUT("io_new() returned a NULL pointer!");
+
+		n = io_write(io, "Hiya!\n", 6);
+		is_signed(n, 6, "wrote 6 octets at offset 0");
+
+		is_signed(io_seek(io, 1, IO_SEEK_SET), 1, "io_seek(1, SET) works");
+		n = io_write(io, "ello, World!\n", 13);
+		is_signed(n, 13, "wrote 13 more octets, at offset 1");
+
+		io_rewind(io);
+		n = io_read(io, buf, 64);
+		is_signed(n, 14, "io stream has 14 octets total");
+		buf[n] = '\0';
+		is_string(buf, "Hello, World!\n", "should io_read() the composite");
 
 		io_free(io);
 	}

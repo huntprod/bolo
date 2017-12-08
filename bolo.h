@@ -449,6 +449,11 @@ void io_reinit(struct io *io);
 void io_close(struct io *io);
 void io_free(struct io *io);
 
+#define IO_SEEK_SET SEEK_SET
+#define IO_SEEK_CUR SEEK_CUR
+#define IO_SEEK_END SEEK_END
+off_t io_seek(struct io *io, off_t offset, int whence);
+
 struct io *io_bufnew(char *buf, size_t len);
 int io_buf(struct io *io, char *buf, size_t len);
 
