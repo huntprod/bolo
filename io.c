@@ -12,7 +12,8 @@ struct io {
 	int     own_buf;
 };
 
-struct io * io_new(const char *tmp, size_t hwm)
+struct io *
+io_new(const char *tmp, size_t hwm)
 {
 	struct io *io;
 
@@ -22,7 +23,8 @@ struct io * io_new(const char *tmp, size_t hwm)
 	return NULL;
 }
 
-int io_init(struct io *io, const char *tmp, size_t hwm)
+int
+io_init(struct io *io, const char *tmp, size_t hwm)
 {
 	io->fd  = -1;
 	io->hwm = hwm;
@@ -44,7 +46,8 @@ fail:
 	return -1;
 }
 
-void io_reinit(struct io *io)
+void
+io_reinit(struct io *io)
 {
 	io->len = io->pos = 0;
 	if (io->fd >= 0) {
@@ -53,7 +56,8 @@ void io_reinit(struct io *io)
 	}
 }
 
-void io_close(struct io *io)
+void
+io_close(struct io *io)
 {
 	if (io->fd >= 0)
 		close(io->fd);
@@ -69,7 +73,8 @@ io_free(struct io *io) {
 	free(io);
 }
 
-struct io * io_bufnew(char *buf, size_t len)
+struct io *
+io_bufnew(char *buf, size_t len)
 {
 	struct io *io;
 
@@ -79,7 +84,8 @@ struct io * io_bufnew(char *buf, size_t len)
 	return NULL;
 }
 
-int io_buf(struct io *io, char *buf, size_t len)
+int
+io_buf(struct io *io, char *buf, size_t len)
 {
 	io->fd  = -1;
 	io->hwm = len;
@@ -92,7 +98,8 @@ int io_buf(struct io *io, char *buf, size_t len)
 	return 0;
 }
 
-int io_catfd(struct io *io, int fd)
+int
+io_catfd(struct io *io, int fd)
 {
 	char buf[8192];
 	ssize_t nread, nwrit;
@@ -114,7 +121,8 @@ int io_catfd(struct io *io, int fd)
 	return 0;
 }
 
-int io_copyfd(struct io *io, int fd)
+int
+io_copyfd(struct io *io, int fd)
 {
 	io_reinit(io);
 	if (io_catfd(io, fd) != 0)
@@ -123,7 +131,8 @@ int io_copyfd(struct io *io, int fd)
 	return 0;
 }
 
-int io_catbuf(struct io *io, const void *buf, size_t len)
+int
+io_catbuf(struct io *io, const void *buf, size_t len)
 {
 	ssize_t nwrit;
 	size_t off;
@@ -138,7 +147,8 @@ int io_catbuf(struct io *io, const void *buf, size_t len)
 	return 0;
 }
 
-int io_copybuf(struct io *io, const void *buf, size_t len)
+int
+io_copybuf(struct io *io, const void *buf, size_t len)
 {
 	io_reinit(io);
 	if (io_catbuf(io, buf, len) != 0)
