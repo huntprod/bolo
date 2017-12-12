@@ -600,12 +600,17 @@ int query_plan(struct query *q, struct db *db);
 #define HTTP_HEAD    6
 #define HTTP_OPTIONS 7
 
+#define HTTP_BODY_SIZE_FD_MIN 8192
 struct http_request {
 	char  *method;
 	char  *uri;
 	int    protocol;
 
+	int known_method;
+	size_t content_length;
+
 	struct hash *headers;
+	struct io   *body;
 
 	int state; /* parser DFA state */
 
@@ -649,7 +654,7 @@ struct http_mux {
 void http_conn_init(struct http_conn *c, int fd);
 
 int http_conn_read(struct http_conn *c);
-int http_conn_atbody(struct http_conn *c);
+int http_conn_ready(struct http_conn *c);
 
 void http_conn_write(struct http_conn *c, const void *buf, int len);
 void http_conn_write0(struct http_conn *c, const char *s);
@@ -659,6 +664,7 @@ void http_conn_flush(struct http_conn *c);
 void http_conn_set_header(struct http_conn *c, const char *header, const char *value);
 const char *http_conn_get_header(struct http_conn *c, const char *header);
 int http_conn_reply(struct http_conn *c, int status);
+int http_conn_replyio(struct http_conn *c, int status, struct io *io);
 
 void http_mux_route(struct http_mux *mux, const char *prefix, http_handler handler);
 int http_dispatch(struct http_mux *mux, struct http_conn *c);

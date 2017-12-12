@@ -21,6 +21,7 @@
 #define S_BODY1            12
 #define S_BAD_REQUEST      13
 #define S_BODY             14
+#define S_READY            15
 
 static int
 is_token(unsigned char c)
@@ -81,6 +82,9 @@ http_conn_init(struct http_conn *c, int fd)
 	hash_free(c->req.headers);
 	c->req.headers = hash_new();
 	c->req.state = S_INIT;
+
+	if (!c->req.body) c->req.body = io_new(NULL, 65535);
+	io_reinit(c->req.body);
 
 	/* carry raw.cap and raw.data over,
 	   to avoid thrashing the mmu */
@@ -341,7 +345,76 @@ http_conn_read(struct http_conn *c)
 			continue;
 		}
 	}
-	c->req.raw.dot = dot;
+	if (state == S_BODY) {
+		/* FIXME: doesn't handle TE yet... */
+		/* read from the fd until we get to Content-Length */
+
+		if (c->req.content_length == 0) {
+			int was_errno;
+			const char *v;
+			char *err;
+
+			fprintf(stderr, "S: detecting content-length of request...\n");
+			if (hash_get(c->req.headers, &v, "Content-Length") != 0) {
+				/* no body */
+				fprintf(stderr, "S: NO content-length found; assuming no body and a READY connection.\n");
+				c->req.state = S_READY;
+				return 0;
+			}
+
+			fprintf(stderr, "S: detected content-length as '%s'; parsing as an integer.\n", v);
+			was_errno = errno; errno = 0;
+			c->req.content_length = strtol(v, &err, 10);
+			if (errno != 0 || *err) {
+				fprintf(stderr, "S: content-length of '%s' is malformed; this is a bad request.\n", v);
+				c->req.state = S_BAD_REQUEST;
+				return 0;
+			}
+			errno = was_errno;
+			fprintf(stderr, "S: parsed content-length as %lu\n", c->req.content_length);
+		}
+
+		if (c->req.content_length > 0) {
+			off_t sofar;
+			size_t len;
+
+			sofar = io_seek(c->req.body, 0, IO_SEEK_CUR);
+			fprintf(stderr, "S: have read %li/%li octets, so far\n", sofar, c->req.content_length);
+			if (sofar == (off_t)c->req.content_length) {
+				c->req.state = S_READY;
+				return 0;
+			}
+			if (sofar < 0) {
+				c->req.state = S_BAD_REQUEST;
+				return 0;
+			}
+
+			/* copy the rest of the buffer into the body io */
+			len = c->req.raw.len - dot;
+			if ((c->req.content_length - sofar) < len)
+				len = c->req.content_length - sofar;
+
+			fprintf(stderr, "S: copying %li octets from raw buffer into req.body\n", len);
+			if (io_catbuf(c->req.body, c->req.raw.data + dot, len) != 0) {
+				c->req.state = S_BAD_REQUEST;
+				return 0;
+			}
+			c->req.raw.dot = c->req.raw.len;
+
+			if (sofar + len == c->req.content_length) {
+				c->req.state = S_READY;
+				return 0;
+			}
+		}
+
+		/* io_read the remainder of content-length into the body io */
+		/* What we need:
+		    - how much have we read?  (io len)
+		    - to differentiate EOF from EINTR
+		 */
+	} else {
+		c->req.raw.dot = dot;
+	}
 
 	fprintf(stderr, "S: HEADERS so far:\n");
 	k = v = NULL;
@@ -359,9 +432,9 @@ error:
 }
 
 int
-http_conn_atbody(struct http_conn *c)
+http_conn_ready(struct http_conn *c)
 {
-	return c->req.state == S_BODY;
+	return c->req.state == S_READY;
 }
 
 void
@@ -467,6 +540,26 @@ http_conn_reply(struct http_conn *c, int status)
 	}
 	http_conn_printf(c, "\r\n");
 	http_conn_flush(c);
+	return 0;
+}
+
+int
+http_conn_replyio(struct http_conn *c, int status, struct io *io)
+{
+	char cl[10], buf[8192];
+	ssize_t len;
+
+	len = io_seek(io, 0, IO_SEEK_END);
+	fprintf(stderr, "io to reply from is %li octets in length; setting content-length...\n", len);
+	if (snprintf(cl, 10, "%lu", len) > 10)
+		return 1;
+	http_conn_set_header(c, "Content-Length", cl);
+	http_conn_reply(c, status);
+
+	/* FIXME: i think this blocks */
+	io_seek(io, 0, IO_SEEK_SET);
+	while ((len = io_read(io, buf, 8192)) > 0)
+		http_conn_write(c, buf, len);
 	return 0;
 }
 

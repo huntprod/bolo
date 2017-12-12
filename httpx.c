@@ -33,6 +33,14 @@ handle_reload(struct http_conn *c)
 	return 0;
 }
 
+static int
+handle_echo(struct http_conn *c)
+{
+	http_conn_set_header(c, "X-Echo", "echo");
+	http_conn_replyio(c, 200, c->req.body);
+	return 0;
+}
+
 #define MAX_EVENTS 100
 #define MAX_CONNECTIONS 1024
 int main(int argc, char **argv)
@@ -51,6 +59,7 @@ int main(int argc, char **argv)
 	http_mux_route(&mux, "/secrets/",    handle_secret);
 	http_mux_route(&mux, "/secret",      handle_secret);
 	http_mux_route(&mux, "/v2/*/reload", handle_reload);
+	http_mux_route(&mux, "/echo",        handle_echo);
 
 	conns = calloc(MAX_CONNECTIONS, sizeof(*conns));
 	if (!conns)
@@ -139,7 +148,7 @@ int main(int argc, char **argv)
 							conns[i].fd = -1;
 							break;
 						}
-						if (http_conn_atbody(&conns[i])) {
+						if (http_conn_ready(&conns[i])) {
 							if (http_dispatch(&mux, conns+i) != 0)
 								printf("S: ERROR\n");
 							printf("S: closing connection.\n");

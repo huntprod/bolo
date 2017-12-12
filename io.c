@@ -84,8 +84,7 @@ io_seek(struct io *io, off_t offset, int whence)
 	case IO_SEEK_END: offset = io->len - offset; break;
 	}
 
-	fprintf(stderr, "offset: %li\n", offset);
-	fprintf(stderr, "len:    %li\n", io->len);
+	//fprintf(stderr, "seek %d, @%li//%li\n", whence, offset, io->len);
 	if (offset < 0 || (size_t)offset > io->len)
 		return -1;
 
