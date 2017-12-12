@@ -61,8 +61,8 @@ memtest: check
 fuzztest: t/fuzz/json
 	./t/afl json
 
-t/fuzz/json: t/fuzz/json.fuzz.o json.fuzz.o util.fuzz.o
-	afl-gcc $(LDFLAGS) -o $@ $+
+t/fuzz/json: t/fuzz/json.fuzz.o json.fuzz.o util.fuzz.o io.fuzz.o
+	afl-gcc $(LDFLAGS) -o $@ $+ $(LDLIBS)
 
 %.fuzz.o: %.c
 	afl-gcc $(CPPFLAGS) $(CFLAGS) -c -o $@ $+
