@@ -594,7 +594,7 @@ s_http_find_route(struct http_mux *mux, const char *uri)
 		bail("calloc failed");
 
 	fprintf(stderr, "S: dispatching uri '%s'\n", uri);
-	for (p = uri; matches > 1 && *p; p++) {
+	for (p = uri; matches > 0 && *p; p++) {
 		for (i = 0; i < mux->nroutes; i++) {
 			if (pos[i] < 0) continue;
 			switch (*p) {
@@ -630,9 +630,12 @@ s_http_find_route(struct http_mux *mux, const char *uri)
 			}
 		}
 	}
-	for (i = mux->nroutes - 1; i >= 0; i--)
-		if (pos[i] >= 0 && mux->routes[i].prefix[pos[i]] == '\0')
+	for (i = mux->nroutes - 1; i >= 0; i--) {
+		if (pos[i] < 0) continue;
+		if (mux->routes[i].prefix[pos[i]] == '*') pos[i]++;
+		if (mux->routes[i].prefix[pos[i]] == '\0')
 			return &(mux->routes[i]);
+	}
 
 	/* 404 */
 	return NULL;
@@ -659,5 +662,6 @@ http_dispatch(struct http_mux *mux, struct http_conn *c)
 	                    "Connection: close\r\n"
 	                    "\r\n"
 	                    "404 not found.\r\n");
+	http_conn_flush(c);
 	return 0;
 }
