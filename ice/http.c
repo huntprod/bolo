@@ -432,6 +432,12 @@ error:
 }
 
 int
+http_conn_bad(struct http_conn *c)
+{
+	return c->req.state == S_BAD_REQUEST;
+}
+
+int
 http_conn_ready(struct http_conn *c)
 {
 	return c->req.state == S_READY;

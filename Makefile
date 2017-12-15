@@ -9,21 +9,18 @@ ifeq ($(PROF),yes)
 	LDFLAGS += -p -pg
 endif
 
-TESTS := bits util io
+TESTS := bits util
 TESTS += rsv log cfg
 TESTS += hash page btree
 TESTS += sha time
 TESTS += tags query db
-TESTS += json
 
 all: bolo
 
-bolo: bolo.o debug.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o btree.o log.o tags.o query.o rsv.o bql/bql.a http.o json.o io.o
+bolo: bolo.o debug.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o btree.o log.o tags.o query.o rsv.o bql/bql.a
 	$(CC) $(LDFLAGS) -o $@ $+ $(LDLIBS)
 
 bqlx: bql/main.o bql/bql.a util.o
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -Wno-error -o $@ $+ $(LDLIBS)
-httpx: httpx.o http.o util.o hash.o io.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -Wno-error -o $@ $+ $(LDLIBS)
 
 clean:
@@ -36,10 +33,9 @@ distclean: clean
 	rm -f bql/grammar.c bql/lexer.c
 
 test: check
-check: util.o io.o log.o page.o btree.o hash.o sha.o tblock.o tslab.o tags.o bql/bql.a
+check: util.o log.o page.o btree.o hash.o sha.o tblock.o tslab.o tags.o bql/bql.a
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o bits  bits.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o util  util.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o io    io.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o rsv   rsv.c    util.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o log   log.c    util.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o cfg   cfg.c    log.o util.o
@@ -51,18 +47,11 @@ check: util.o io.o log.o page.o btree.o hash.o sha.o tblock.o tslab.o tags.o bql
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o tags  tags.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o query query.c  hash.o util.o bql/bql.a
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o db    db.c     btree.o page.o util.o hash.o sha.o tblock.o tslab.o log.o tags.o
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o json  json.c  util.o io.o $(LDLIBS)
 	prove -v $(addprefix ./,$(TESTS))
 
 memtest: check
 	t/vg $(addprefix ./,$(TESTS))
 	@echo "No memory leaks detected"
-
-fuzztest: t/fuzz/json
-	./t/afl json
-
-t/fuzz/json: t/fuzz/json.fuzz.o json.fuzz.o util.fuzz.o io.fuzz.o
-	afl-gcc $(LDFLAGS) -o $@ $+ $(LDLIBS)
 
 %.fuzz.o: %.c
 	afl-gcc $(CPPFLAGS) $(CFLAGS) -c -o $@ $+
@@ -101,9 +90,6 @@ bql/grammar.o: bql/grammar.h bql/grammar.c
 bql/bql.a: bql/grammar.o bql/lexer.o
 	ar cr $@ $+
 
-
-docs/diag/json.png: docs/diag/json.dot
-	dot -Tpng <$< >$@
 
 .PHONY: all clean distclean test check memtest coverage copycov ccov sure fixme
 

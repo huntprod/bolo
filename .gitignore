@@ -27,6 +27,7 @@
 /bql/bql.a
 
 /t/fuzz/json
+/t/fuzz/http
 
 *.db
 /coverage

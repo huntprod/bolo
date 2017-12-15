@@ -1,0 +1,10 @@
+GET / HTTP/1.1
+Host: localhost:8082
+Long-Header: This is a very
+ long header value that wraps
+	multiple lines.
+Medium: A medium-length header
+ that only wraps once.
+User-Agent: none/9.8
+Accept: */*
+
