@@ -182,6 +182,7 @@ hash_read(int from, hash_reader_fn reader, void *udata)
 	if (fd < 0)
 		return NULL;
 
+	h = NULL;
 	in = fdopen(fd, "r");
 	if (!in)
 		goto fail;
@@ -230,7 +231,9 @@ hash_write(struct hash *h, int to, hash_writer_fn writer, void *udata)
 	BUG(h != NULL, "hash_write() given a NULL hash pointer to write");
 	BUG(to >= 0,   "hash_write() given an invalid file descriptor to write to");
 
-	ftruncate(to, 0);
+	if (ftruncate(to, 0) < 0)
+		return -1;
+
 	lseek(to, 0, SEEK_SET);
 
 	fd = dup(to);
