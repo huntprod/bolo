@@ -14,6 +14,7 @@ TESTS += rsv log cfg
 TESTS += hash page btree
 TESTS += sha time
 TESTS += tags query db
+TESTS += bqip
 
 all: bolo
 
@@ -47,6 +48,7 @@ check: util.o log.o page.o btree.o hash.o sha.o tblock.o tslab.o tags.o bql/bql.
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o tags  tags.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o query query.c  hash.o util.o bql/bql.a
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o db    db.c     btree.o page.o util.o hash.o sha.o tblock.o tslab.o log.o tags.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o bqip  bqip.c
 	prove -v $(addprefix ./,$(TESTS))
 
 memtest: check

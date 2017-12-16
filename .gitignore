@@ -4,6 +4,7 @@
 /slow
 
 /bits
+/bqip
 /btree
 /cfg
 /db
@@ -12,12 +13,12 @@
 /json
 /log
 /page
+/query
 /rsv
 /sha
 /tags
 /time
 /util
-/query
 
 /bql/lang.c
 /bql/grammar.c
