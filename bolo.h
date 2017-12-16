@@ -153,6 +153,11 @@ int  hmac_sha512_check(const char *key, size_t klen, const void *buf, size_t len
 #define hmac_check hmac_sha512_check
 
 
+/****************************************************************  network  ***/
+
+int net_bind(const char *addr, int backlog);
+
+
 /****************************************************************  hashing  ***/
 
 struct hash;

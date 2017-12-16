@@ -603,8 +603,7 @@ do_query(int argc, char **argv)
 static int
 do_bqip(int argc, char **argv)
 {
-	int i, v, rc, epfd, n, nfds, listenfd, sockfd, flags;
-	struct sockaddr_in ipv4;
+	int i, rc, epfd, n, nfds, listenfd, sockfd, flags;
 	struct epoll_event ev, events[MAX_EVENTS];
 	int nconns = 0;
 	struct bqip *conns;
@@ -620,28 +619,9 @@ do_bqip(int argc, char **argv)
 	if (epfd < 0)
 		bail("epoll_create failed");
 
-	listenfd = socket(AF_INET, SOCK_STREAM, 0);
+	listenfd = net_bind("[::]:1499", 64);
 	if (listenfd < 0)
-		bail("socket failed");
-
-	printf("S: setting SO_REUSEADDR socket option.\n");
-	v = 1;
-	rc = setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &v, sizeof(v));
-	if (rc < 0)
-		bail("so_reusaddr failed");
-
-	printf("S: binding to *:1499 (IPv4)\n");
-	ipv4.sin_family = AF_INET;
-	ipv4.sin_addr.s_addr = INADDR_ANY;
-	ipv4.sin_port = htons(1499);
-	rc = bind(listenfd, (struct sockaddr *)(&ipv4), sizeof(ipv4));
-	if (rc < 0)
-		bail("bind failed");
-
-	printf("S: listening for inbound connections, backlog 64.\n");
-	rc = listen(listenfd, 64);
-	if (rc < 0)
-		bail("listen failed");
+		bail("net_bind failed");
 
 	ev.events = EPOLLIN;
 	ev.data.fd = listenfd;
