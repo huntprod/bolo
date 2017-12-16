@@ -1,4 +1,5 @@
 #include "bolo.h"
+#include "bqip.h"
 #include <sys/stat.h>
 #include <time.h>
 
@@ -19,6 +20,7 @@
     bolo parse BQL-QUERY
     bolo version
     bolo stdin
+    bolo bqip
 
     (other commands and options added as necessary)
 
@@ -596,6 +598,130 @@ do_query(int argc, char **argv)
 	return 0;
 }
 
+#define MAX_EVENTS 100
+#define MAX_CONNECTIONS 1024
+static int
+do_bqip(int argc, char **argv)
+{
+	int i, v, rc, epfd, n, nfds, listenfd, sockfd, flags;
+	struct sockaddr_in ipv4;
+	struct epoll_event ev, events[MAX_EVENTS];
+	int nconns = 0;
+	struct bqip *conns;
+
+	memset(&ev, 0, sizeof(ev));
+	conns = calloc(MAX_CONNECTIONS, sizeof(*conns));
+	if (!conns)
+		bail("calloc(conns) failed");
+	for (i = 0; i < MAX_CONNECTIONS; i++)
+		conns[i].fd = -1;
+
+	epfd = epoll_create1(0);
+	if (epfd < 0)
+		bail("epoll_create failed");
+
+	listenfd = socket(AF_INET, SOCK_STREAM, 0);
+	if (listenfd < 0)
+		bail("socket failed");
+
+	printf("S: setting SO_REUSEADDR socket option.\n");
+	v = 1;
+	rc = setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &v, sizeof(v));
+	if (rc < 0)
+		bail("so_reusaddr failed");
+
+	printf("S: binding to *:1499 (IPv4)\n");
+	ipv4.sin_family = AF_INET;
+	ipv4.sin_addr.s_addr = INADDR_ANY;
+	ipv4.sin_port = htons(1499);
+	rc = bind(listenfd, (struct sockaddr *)(&ipv4), sizeof(ipv4));
+	if (rc < 0)
+		bail("bind failed");
+
+	printf("S: listening for inbound connections, backlog 64.\n");
+	rc = listen(listenfd, 64);
+	if (rc < 0)
+		bail("listen failed");
+
+	ev.events = EPOLLIN;
+	ev.data.fd = listenfd;
+	if (epoll_ctl(epfd, EPOLL_CTL_ADD, listenfd, &ev) == -1)
+		bail("epoll_ctl failed");
+
+	printf("S: entering main loop.\n");
+	for (;;) {
+		nfds = epoll_wait(epfd, events, MAX_EVENTS, -1);
+		if (nfds == -1)
+			bail("epoll_wait failed");
+
+		for (n = 0; n < nfds; ++n) {
+			if (events[n].data.fd == listenfd) {
+				sockfd = accept(listenfd, NULL, NULL);
+				printf("S: accepted new inbound connection.\n");
+
+				if (nconns > MAX_CONNECTIONS) {
+					close(sockfd);
+					continue;
+				}
+
+				nconns++;
+				for (i = 0; i < MAX_CONNECTIONS; i++) {
+					if (conns[i].fd < 0) {
+						bqip_init(&conns[i], sockfd);
+						break;
+					}
+				}
+
+				flags = fcntl(sockfd, F_GETFL, 0);
+				flags |= O_NONBLOCK;
+				if (fcntl(sockfd, F_SETFL, flags) != 0)
+					bail("F_SETFL failed");
+
+				ev.events = EPOLLIN;
+				ev.data.fd = sockfd;
+				if (epoll_ctl(epfd, EPOLL_CTL_ADD, sockfd, &ev) == -1) {
+					fprintf(stderr, "failed to add socket %d to epoll: %s (error %d)\n",
+							sockfd, strerror(errno), errno);
+					close(sockfd);
+				}
+				printf("S: epolling new inbound connection.\n");
+
+			} else {
+				printf("S: activity detected on file descriptor %d\n", events[n].data.fd);
+				for (i = 0; i < MAX_CONNECTIONS; i++) {
+					if (events[n].data.fd == conns[i].fd) {
+						rc = bqip_read(&conns[i]);
+						if (rc == 1) /* not quite... */
+							break;
+						if (rc < 0) { /* oops */
+							fprintf(stderr, "fatal error reading BQIP data from socket %d; aborting connection.\n",
+									conns[i].fd);
+							close(conns[i].fd);
+							conns[i].fd = -1;
+							/* FIXME: epoll delete */
+							break;
+						}
+
+						fprintf(stderr, "got query '%s' from client...\n", conns[i].request.payload);
+						bqip_send_result(&conns[i], 2);
+						bqip_send_set(&conns[i], 4, "x=1:a,2:b,3:c,4:d");
+						bqip_send_set(&conns[i], 4, "y=5:e,6:f,7:g,8:h");
+
+						break;
+					}
+				}
+				if (i == MAX_CONNECTIONS) {
+					fprintf(stderr, "activity on unrecognized file descriptor %d; ignoring.\n",
+							events[n].data.fd);
+				}
+			}
+		}
+	}
+
+	close(listenfd);
+	return 0;
+}
+
 static int
 do_usage(int argc, char **argv)
 {
@@ -655,6 +781,9 @@ int main(int argc, char **argv)
 
 	if (strcmp(command, "query") == 0)
 		return do_query(argc, argv);
+
+	if (strcmp(command, "bqip") == 0)
+		return do_bqip(argc, argv);
 
 	return do_usage(argc, argv);
 }
