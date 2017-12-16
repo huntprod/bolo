@@ -58,6 +58,12 @@ memtest: check
 %.fuzz.o: %.c
 	afl-gcc $(CPPFLAGS) $(CFLAGS) -c -o $@ $+
 
+fuzz-bqip: t/fuzz/bqip
+	./t/afl bqip
+
+t/fuzz/bqip: t/fuzz/bqip.fuzz.o bqip.fuzz.o
+	afl-gcc $(LDFLAGS) -o $@ $+ $(LDLIBS)
+
 coverage:
 	rm -rf coverage/
 	lcov --capture --directory . --output-file lcov.info

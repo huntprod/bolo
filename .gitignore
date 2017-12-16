@@ -29,6 +29,8 @@
 
 /t/fuzz/json
 /t/fuzz/http
+/t/fuzz/bqip
+/t/fuzz/out
 
 *.db
 /coverage
