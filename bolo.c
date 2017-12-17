@@ -606,7 +606,7 @@ struct daemon {
 };
 
 static int
-daemon_handler(int fd, void *_u)
+query_handler(int fd, void *_u)
 {
 	int rc;
 	struct bqip *bqip;
@@ -629,7 +629,7 @@ fail:
 }
 
 static int
-daemon_listener(int fd, void *_u)
+query_listener(int fd, void *_u)
 {
 	int i, sockfd;
 	struct daemon *daemon;
@@ -641,7 +641,7 @@ daemon_listener(int fd, void *_u)
 	for (i = 0; i < MAX_CONNECTIONS; i++) {
 		if (daemon->conns[i].fd < 0) {
 			bqip_init(&daemon->conns[i], sockfd);
-			if (net_poll_fd(daemon->net_poller, sockfd, daemon_handler, &daemon->conns[i]) == 0)
+			if (net_poll_fd(daemon->net_poller, sockfd, query_handler, &daemon->conns[i]) == 0)
 				return 0;
 
 			fprintf(stderr, "S: failed to register accepted socket; closing...\n");
@@ -680,7 +680,7 @@ do_daemon(int argc, char **argv)
 		bail("net_bind failed");
 	}
 
-	if (net_poll_fd(daemon.net_poller, listenfd, daemon_listener, &daemon) != 0)
+	if (net_poll_fd(daemon.net_poller, listenfd, query_listener, &daemon) != 0)
 		bail("net_poll_fd(listener) failed");
 
 	printf("S: entering main loop.\n");
