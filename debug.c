@@ -22,7 +22,7 @@ debugto(int fd)
 }
 
 void
-debugf(const char *fmt, ...)
+debugf2(const char *file, unsigned long line, const char *fmt, ...)
 {
 	va_list ap;
 
@@ -31,7 +31,11 @@ debugf(const char *fmt, ...)
 
 	BUG(fmt != NULL, "debugf() given a NULL format string to print");
 
+	fprintf(stddbg, "DEBUG %s:%lu> ", file, line);
+
 	va_start(ap, fmt);
 	vfprintf(stddbg, fmt, ap);
 	va_end(ap);
+
+	fprintf(stddbg, "\n");
 }

@@ -93,6 +93,7 @@ void push(struct list *list, struct list *add);
 void startlog(const char *bin, pid_t pid, int level);
 void logto(int fd);
 void errorf(const char *fmt, ...);
+void errnof(const char *fmt, ...);
 void warningf(const char *fmt, ...);
 void infof(const char *fmt, ...);
 
@@ -100,7 +101,8 @@ void infof(const char *fmt, ...);
 /**************************************************************  debugging  ***/
 
 int  debugto(int fd);
-void debugf(const char *fmt, ...);
+#define debugf(...) debugf2(__FILE__, __LINE__, __VA_ARGS__)
+void debugf2(const char *file, unsigned long line, const char *fmt, ...);
 
 
 /*****************************************************************  config  ***/

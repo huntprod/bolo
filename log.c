@@ -39,7 +39,7 @@ void logto(int fd)
 }
 
 static void
-_vlogf(const char *facility, const char *fmt, va_list args)
+_vlogf(const char *facility, const char *fmt, va_list args, int printerr)
 {
 	struct tm tm;
 	time_t t;
@@ -65,6 +65,8 @@ _vlogf(const char *facility, const char *fmt, va_list args)
 print:
 	fprintf(OUT, "%s %s: %s ", date, PRE, facility);
 	vfprintf(OUT, fmt, args);
+	if (printerr)
+		fprintf(OUT, ": %s (error %d)", strerror(errno), errno);
 	fprintf(OUT, "\n");
 	fflush(OUT);
 }
@@ -77,7 +79,19 @@ void errorf(const char *fmt, ...)
 	BUG(OUT != NULL, "errorf() has nowhere to print output");
 
 	va_start(args, fmt);
-	_vlogf("ERROR", fmt, args);
+	_vlogf("ERROR", fmt, args, 0);
+	va_end(args);
+}
+
+void errnof(const char *fmt, ...)
+{
+	va_list args;
+
+	BUG(fmt != NULL, "errnof() given a NULL format string to print");
+	BUG(OUT != NULL, "errnof() has nowhere to print output");
+
+	va_start(args, fmt);
+	_vlogf("ERROR", fmt, args, 1);
 	va_end(args);
 }
 
@@ -92,7 +106,7 @@ void warningf(const char *fmt, ...)
 		return;
 
 	va_start(args, fmt);
-	_vlogf("WARN ", fmt, args);
+	_vlogf("WARN ", fmt, args, 0);
 	va_end(args);
 }
 
@@ -107,7 +121,7 @@ void infof(const char *fmt, ...)
 		return;
 
 	va_start(args, fmt);
-	_vlogf("INFO ", fmt, args);
+	_vlogf("INFO ", fmt, args, 0);
 	va_end(args);
 }
 
