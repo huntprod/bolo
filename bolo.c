@@ -8,7 +8,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/mman.h>
-#include <sys/epoll.h>
 
 /* USAGE:
 
@@ -20,7 +19,7 @@
     bolo parse BQL-QUERY
     bolo version
     bolo stdin
-    bolo bqip
+    bolo daemon
 
     (other commands and options added as necessary)
 
@@ -600,104 +599,92 @@ do_query(int argc, char **argv)
 
 #define MAX_EVENTS 100
 #define MAX_CONNECTIONS 1024
+
+struct daemon {
+	struct bqip       *conns;
+	struct net_poller *net_poller;
+};
+
 static int
-do_bqip(int argc, char **argv)
+daemon_handler(int fd, void *_u)
 {
-	int i, rc, epfd, n, nfds, listenfd, sockfd, flags;
-	struct epoll_event ev, events[MAX_EVENTS];
-	int nconns = 0;
-	struct bqip *conns;
+	int rc;
+	struct bqip *bqip;
 
-	memset(&ev, 0, sizeof(ev));
-	conns = calloc(MAX_CONNECTIONS, sizeof(*conns));
-	if (!conns)
-		bail("calloc(conns) failed");
-	for (i = 0; i < MAX_CONNECTIONS; i++)
-		conns[i].fd = -1;
+	bqip = (struct bqip *)_u;
+	rc = bqip_read(bqip);
+	if (rc < 0) goto fail;
+	if (rc == 1) /* not quite */
+		return 0;
 
-	epfd = epoll_create1(0);
-	if (epfd < 0)
-		bail("epoll_create failed");
+	fprintf(stderr, "got query '%s' from client...\n",bqip->request.payload);
+	bqip_send_result(bqip, 2);
+	bqip_send_set(bqip, 4, "x=1:a,2:b,3:c,4:d");
+	bqip_send_set(bqip, 4, "y=5:e,6:f,7:g,8:h");
+	return 0;
 
-	listenfd = net_bind("[::]:1499", 64);
-	if (listenfd < 0)
-		bail("net_bind failed");
+fail:
+	bqip->fd = -1;
+	return -1;
+}
 
-	ev.events = EPOLLIN;
-	ev.data.fd = listenfd;
-	if (epoll_ctl(epfd, EPOLL_CTL_ADD, listenfd, &ev) == -1)
-		bail("epoll_ctl failed");
+static int
+daemon_listener(int fd, void *_u)
+{
+	int i, sockfd;
+	struct daemon *daemon;
 
-	printf("S: entering main loop.\n");
-	for (;;) {
-		nfds = epoll_wait(epfd, events, MAX_EVENTS, -1);
-		if (nfds == -1)
-			bail("epoll_wait failed");
+	daemon = (struct daemon *)_u;
+	sockfd = accept(fd, NULL, NULL);
+	printf("S: accepted new inbound connection.\n");
 
-		for (n = 0; n < nfds; ++n) {
-			if (events[n].data.fd == listenfd) {
-				sockfd = accept(listenfd, NULL, NULL);
-				printf("S: accepted new inbound connection.\n");
+	for (i = 0; i < MAX_CONNECTIONS; i++) {
+		if (daemon->conns[i].fd < 0) {
+			bqip_init(&daemon->conns[i], sockfd);
+			if (net_poll_fd(daemon->net_poller, sockfd, daemon_handler, &daemon->conns[i]) == 0)
+				return 0;
 
-				if (nconns > MAX_CONNECTIONS) {
-					close(sockfd);
-					continue;
-				}
-
-				nconns++;
-				for (i = 0; i < MAX_CONNECTIONS; i++) {
-					if (conns[i].fd < 0) {
-						bqip_init(&conns[i], sockfd);
-						break;
-					}
-				}
-
-				flags = fcntl(sockfd, F_GETFL, 0);
-				flags |= O_NONBLOCK;
-				if (fcntl(sockfd, F_SETFL, flags) != 0)
-					bail("F_SETFL failed");
-
-				ev.events = EPOLLIN;
-				ev.data.fd = sockfd;
-				if (epoll_ctl(epfd, EPOLL_CTL_ADD, sockfd, &ev) == -1) {
-					fprintf(stderr, "failed to add socket %d to epoll: %s (error %d)\n",
-							sockfd, strerror(errno), errno);
-					close(sockfd);
-				}
-				printf("S: epolling new inbound connection.\n");
-
-			} else {
-				printf("S: activity detected on file descriptor %d\n", events[n].data.fd);
-				for (i = 0; i < MAX_CONNECTIONS; i++) {
-					if (events[n].data.fd == conns[i].fd) {
-						rc = bqip_read(&conns[i]);
-						if (rc == 1) /* not quite... */
-							break;
-						if (rc < 0) { /* oops */
-							fprintf(stderr, "fatal error reading BQIP data from socket %d; aborting connection.\n",
-									conns[i].fd);
-							close(conns[i].fd);
-							conns[i].fd = -1;
-							/* FIXME: epoll delete */
-							break;
-						}
-
-						fprintf(stderr, "got query '%s' from client...\n", conns[i].request.payload);
-						bqip_send_result(&conns[i], 2);
-						bqip_send_set(&conns[i], 4, "x=1:a,2:b,3:c,4:d");
-						bqip_send_set(&conns[i], 4, "y=5:e,6:f,7:g,8:h");
-
-						break;
-					}
-				}
-				if (i == MAX_CONNECTIONS) {
-					fprintf(stderr, "activity on unrecognized file descriptor %d; ignoring.\n",
-							events[n].data.fd);
-				}
-			}
+			fprintf(stderr, "S: failed to register accepted socket; closing...\n");
+			close(sockfd);
+			return 0;
 		}
 	}
 
+	fprintf(stderr, "S: max connections reached; closing socket...\n");
+	close(sockfd);
+	return 0;
+}
+
+static int
+do_daemon(int argc, char **argv)
+{
+	int i, listenfd;
+	struct daemon daemon;
+	char *s;
+
+	daemon.conns = calloc(MAX_CONNECTIONS, sizeof(*daemon.conns));
+	if (!daemon.conns)
+		bail("calloc(conns) failed");
+	for (i = 0; i < MAX_CONNECTIONS; i++)
+		daemon.conns[i].fd = -1;
+
+	daemon.net_poller = net_poller(MAX_CONNECTIONS + 1);
+	if (!daemon.net_poller)
+		bail("net_poller failed");
+
+	s = getenv("BOLO_BIND");
+	if (!s) s = "*:1499";
+	listenfd = net_bind(s, 64);
+	if (listenfd < 0) {
+		errnof("net_bind failed");
+		bail("net_bind failed");
+	}
+
+	if (net_poll_fd(daemon.net_poller, listenfd, daemon_listener, &daemon) != 0)
+		bail("net_poll_fd(listener) failed");
+
+	printf("S: entering main loop.\n");
+	net_poll(daemon.net_poller);
 	close(listenfd);
 	return 0;
 }
@@ -736,6 +723,8 @@ int main(int argc, char **argv)
 		/* silently ignore incorrect values */
 	}
 	startlog(argv[0], getpid(), log_level);
+	if ((s = getenv("BOLO_DEBUG")) != NULL)
+		debugto(2);
 
 	if (strcmp(command, "-v") == 0
 	 || strcmp(command, "--version") == 0)
@@ -762,8 +751,8 @@ int main(int argc, char **argv)
 	if (strcmp(command, "query") == 0)
 		return do_query(argc, argv);
 
-	if (strcmp(command, "bqip") == 0)
-		return do_bqip(argc, argv);
+	if (strcmp(command, "daemon") == 0)
+		return do_daemon(argc, argv);
 
 	return do_usage(argc, argv);
 }
