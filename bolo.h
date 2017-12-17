@@ -159,6 +159,17 @@ int  hmac_sha512_check(const char *key, size_t klen, const void *buf, size_t len
 
 int net_bind(const char *addr, int backlog);
 
+#ifndef NET_POLL_MAX_EVENTS
+#define NET_POLL_MAX_EVENTS 100
+#endif
+struct net_poller;
+typedef int (*net_handler_fn)(int, void *);
+
+struct net_poller * net_poller(int max);
+int net_poll_fd(struct net_poller *np, int fd, net_handler_fn fn, void *udata);
+
+int net_poll(struct net_poller *np);
+
 
 /****************************************************************  hashing  ***/
 

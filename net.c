@@ -1,8 +1,12 @@
 #include "bolo.h"
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
+
+#include <sys/epoll.h>
+
 #include <ctype.h>
 
 int
@@ -100,4 +104,105 @@ invalid:
 failed:
 	free(addr);
 	return -1;
+}
+
+struct npoll {
+	int             fd;
+	net_handler_fn  handler;
+	void           *udata;
+};
+
+struct net_poller {
+	int           epfd;
+	struct npoll *conns;
+	int           maxconns;
+};
+
+struct net_poller *
+net_poller(int max)
+{
+	struct net_poller *np;
+
+	np = calloc(1, sizeof(struct net_poller));
+	if (!np)
+		goto fail;
+
+	np->maxconns = max;
+	np->conns = calloc(max, sizeof(struct npoll));
+	if (!np->conns)
+		goto fail;
+
+	np->epfd = epoll_create1(0);
+	if (np->epfd < 0)
+		goto fail;
+
+	return np;
+
+fail:
+	free(np);
+	return NULL;
+}
+
+int
+net_poll_fd(struct net_poller *np, int fd, net_handler_fn fn, void *udata)
+{
+	int i;
+	struct epoll_event ev;
+
+	for (i = 0; i < np->maxconns; i++) {
+		if (np->conns[i].handler) continue;
+
+		ev.events = EPOLLIN;
+		ev.data.fd = fd;
+		if (epoll_ctl(np->epfd, EPOLL_CTL_ADD, fd, &ev) == -1)
+			return -1;
+
+		/* set non blocking */
+		fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
+
+		np->conns[i].fd      = fd;
+		np->conns[i].handler = fn;
+		np->conns[i].udata   = udata;
+
+		return 0;
+	}
+	return -1;
+}
+
+int
+net_poll(struct net_poller *np)
+{
+	int i, n, rc, nfds, fd;
+	struct epoll_event events[NET_POLL_MAX_EVENTS];
+
+	for (;;) {
+		nfds = epoll_wait(np->epfd, events, NET_POLL_MAX_EVENTS, -1);
+		if (nfds == -1)
+			return -1;
+
+		for (n = 0; n < nfds; n++) {
+			fd = events[n].data.fd;
+			debugf("net: activity on file descriptor %d", fd);
+
+			for (i = 0; i < np->maxconns; i++) {
+				if (!np->conns[i].handler) continue;
+				if (np->conns[i].fd != fd) continue;
+
+				rc = np->conns[i].handler(fd, np->conns[i].udata);
+				if (rc != 0) {
+					debugf("net: removing fd %d from epoll watch list", fd);
+					if (epoll_ctl(np->epfd, EPOLL_CTL_DEL, fd, &events[n]) != 0)
+						errnof("net: unable to remove fd %d from epoll", fd);
+
+					close(fd);
+					memset(&np->conns[i], 0, sizeof(np->conns[i]));
+				}
+				break;
+			}
+
+			if (i == np->maxconns) {
+				errorf("bogus activity detected on file descriptor %d", fd);
+			}
+		}
+	}
 }
