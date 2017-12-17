@@ -15,10 +15,11 @@ TESTS += hash page btree
 TESTS += sha time
 TESTS += tags query db
 TESTS += bqip
+TESTS += ingest
 
 all: bolo
 
-bolo: bolo.o debug.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o btree.o log.o tags.o query.o rsv.o bql/bql.a bqip.o net.o
+bolo: bolo.o debug.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o btree.o log.o tags.o query.o rsv.o bql/bql.a bqip.o net.o ingest.o
 	$(CC) $(LDFLAGS) -o $@ $+ $(LDLIBS)
 
 bqlx: bql/main.o bql/bql.a util.o
@@ -34,7 +35,7 @@ distclean: clean
 	rm -f bql/grammar.c bql/lexer.c
 
 test: check
-check: util.o log.o page.o btree.o hash.o sha.o tblock.o tslab.o tags.o bql/bql.a
+check: util.o debug.o log.o page.o btree.o hash.o sha.o tblock.o tslab.o tags.o bql/bql.a
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o bits  bits.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o util  util.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o rsv   rsv.c    util.o
@@ -49,6 +50,7 @@ check: util.o log.o page.o btree.o hash.o sha.o tblock.o tslab.o tags.o bql/bql.
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o query query.c  hash.o util.o bql/bql.a
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o db    db.c     btree.o page.o util.o hash.o sha.o tblock.o tslab.o log.o tags.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o bqip  bqip.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o ingest ingest.c debug.o tags.o
 	prove -v $(addprefix ./,$(TESTS))
 
 memtest: check

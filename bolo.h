@@ -489,6 +489,29 @@ double rsv_min(struct rsv *rsv);
 double rsv_max(struct rsv *rsv);
 
 
+/*****************************************************  ingestion protocol  ***/
+
+#ifndef INGEST_BUF_SIZE
+#define INGEST_BUF_SIZE 8192
+#endif
+
+struct ingestor {
+	int     fd;
+	int     eof;
+	char    buf[INGEST_BUF_SIZE];
+	size_t  len;
+	char   *last;
+
+	char        *metric;
+	char        *tags;
+	bolo_msec_t  time;
+	bolo_value_t value;
+};
+
+int ingest_eof(struct ingestor *);
+int ingest_read(struct ingestor *);
+int ingest(struct ingestor *);
+
 /*********************************************************  query language  ***/
 
 #define COND_EQ    1

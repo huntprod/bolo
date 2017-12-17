@@ -247,11 +247,11 @@ do_slabinfo(int argc, char **argv)
 static int
 do_stdin(int argc, char **argv)
 {
-	char buf[8192];
-	char *metric, *tags, *time, *value, *end;
+	struct ingestor in;
 	struct db *db;
-	bolo_msec_t when;
-	bolo_value_t what;
+	int n;
+
+	memset(&in, 0, sizeof(in));
 
 	if (argc != 3) {
 		fprintf(stderr, "USAGE: bolo stdin path/to/db\n");
@@ -266,51 +266,30 @@ do_stdin(int argc, char **argv)
 		return 2;
 	}
 
-	while (fgets(buf, 8192, stdin) != NULL) {
-		metric = strtok(buf,  " \n");
-		tags   = strtok(NULL, " \n");
-		time   = strtok(NULL, " \n");
-		value  = strtok(NULL, " \n");
-
-		if (!metric || !tags || !time || !value)
-			continue;
-
-		when = strtoull(time, &end, 10);
-		if (end && *end) {
-			errorf("failed to parse [%s %s] timestamp '%s'",
-			       metric, tags, time);
-			continue;
+	in.fd = 0; /* stdin */
+	while (!ingest_eof(&in)) {
+		n = ingest_read(&in);
+		if (n < 0) {
+			errnof("failed to ingest from stdin");
+			return 1;
 		}
 
-		what = strtod(time, &end);
-		if (end && *end) {
-			errorf("failed to parse [%s %s] measurement value '%s'",
-			       metric, tags, value);
-			continue;
+		while (n-- > 0) {
+			if (ingest(&in) != 0) {
+				errnof("failed to ingest from stdin");
+				return 1;
+			}
+
+			infof("inserting [%s %lu %f]", in.metric, in.time, in.value);
+			if (db_insert(db, in.metric, in.time, in.value) != 0)
+				errnof("failed to insert [%s %lu %f]", in.metric, in.time, in.value);
 		}
-
-		if (tags_valid(tags) != 0
-		 || tags_canonicalize(tags) != 0) {
-			errorf("failed to parse tag set from [%s %s %s]; skipping",
-			       metric, tags, value);
-			continue;
-		}
-
-		/* compose metric|tags */
-		metric[strlen(metric)] = '|';
-		infof("inserting [%s %s %s]",
-			       metric, time, value);
-		if (db_insert(db, metric, when, what) != 0)
-			errorf("failed to insert [%s %s %s]: %s (error %d)",
-			       metric, time, value, error(errno), errno);
-
 		if (db_sync(db) != 0)
-			errorf("failed to sync database to disk: %s (error %d)",
-			       error(errno), errno);
+			errnof("failed to sync database to disk");
 	}
 
 	if (db_unmount(db) != 0)
-		errorf("failed to unmount database: %s", error(errno));
+		errnof("failed to unmount database");
 
 	return 0;
 }

@@ -9,6 +9,7 @@
 /cfg
 /db
 /hash
+/ingest
 /io
 /json
 /log
