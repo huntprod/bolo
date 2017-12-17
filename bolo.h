@@ -109,8 +109,18 @@ void debugf2(const char *file, unsigned long line, const char *fmt, ...);
 
 struct config {
 	int log_level;
-	char *secret_key;
-	unsigned long block_span;
+
+	/* db.* - database settings */
+	char           *secret_key;
+	unsigned long   block_span;
+
+	/* query.* - query listener settings */
+	char *query_listen;
+	int   query_max_connections;
+
+	/* metric.* - metric listener settings */
+	char *metric_listen;
+	int   metric_max_connections;
 };
 
 int configure(struct config *, int fd) RETURNS;

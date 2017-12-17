@@ -97,13 +97,14 @@ configure(struct config *cfg, int fd)
 				return -1;
 			}
 
-		} else if (streq(k, "secret_key")) {
+		} else if (streq(k, "db.secret_key")) {
 			free(cfg->secret_key);
 			cfg->secret_key = strdup(v);
 
-		} else if (streq(k, "block_span")) {
+		} else if (streq(k, "db.block_span")) {
 			cfg->block_span = 0;
 			for (p = v; *p; p++) {
+				if (*p == '_' || *p == ',') continue; /* legibility */
 				if (isdigit(*p)) {
 					cfg->block_span = (cfg->block_span * 10) + (*p - '0');
 				} else {
@@ -121,6 +122,44 @@ configure(struct config *cfg, int fd)
 					}
 					break;
 				}
+			}
+
+		} else if (streq(k, "query.listen")) {
+			free(cfg->query_listen);
+			cfg->query_listen = strdup(v);
+
+		} else if (streq(k, "query.max_connections")) {
+			cfg->query_max_connections = 0;
+			for (p = v; *p; p++) {
+				if (*p == '_' || *p == ',') continue; /* legibility */
+				if (!isdigit(*p)) {
+					errorf("failed to read configuration: query.max_connections value '%s' is not a positive number", v);
+					return -1;
+				}
+				cfg->query_max_connections = (cfg->query_max_connections * 10) + (*p - '0');
+			}
+			if (cfg->query_max_connections < 8) {
+				errorf("failed to read configuration: query.max_connections value '%s' must be at least 8", v);
+				return -1;
+			}
+
+		} else if (streq(k, "metric.listen")) {
+			free(cfg->metric_listen);
+			cfg->metric_listen = strdup(v);
+
+		} else if (streq(k, "metric.max_connections")) {
+			cfg->metric_max_connections = 0;
+			for (p = v; *p; p++) {
+				if (*p == '_' || *p == ',') continue; /* legibility */
+				if (!isdigit(*p)) {
+					errorf("failed to read configuration: metric.max_connections value '%s' is not a positive number", v);
+					return -1;
+				}
+				cfg->metric_max_connections = (cfg->metric_max_connections * 10) + (*p - '0');
+			}
+			if (cfg->metric_max_connections < 8) {
+				errorf("failed to read configuration: metric.max_connections value '%s' must be at least 8", v);
+				return -1;
 			}
 
 		} else {
@@ -142,6 +181,12 @@ void deconfigure(struct config *config)
 {
 	free(config->secret_key);
 	config->secret_key = NULL;
+
+	free(config->query_listen);
+	config->query_listen = NULL;
+
+	free(config->metric_listen);
+	config->metric_listen = NULL;
 }
 
 #ifdef TEST
@@ -214,53 +259,155 @@ TESTS {
 
 		try(cfg, "log_level = error");
 		is_unsigned(cfg.log_level, LOG_ERRORS, "log_level error is parsed properly");
+		deconfigure(&cfg);
 
 		try(cfg, "log_level = warning");
 		is_unsigned(cfg.log_level, LOG_WARNINGS, "log_level warning is parsed properly");
+		deconfigure(&cfg);
 
 		try(cfg, "log_level = info");
 		is_unsigned(cfg.log_level, LOG_INFO, "log_level info is parsed properly");
-
 		deconfigure(&cfg);
 	}
 
 	subtest {
 		struct config cfg;
 
-		try(cfg, "block_span = 1");
+		try(cfg, "db.block_span = 1");
 		ok(cfg.block_span == 1, "without units, block_span is treated as milliseconds");
+		deconfigure(&cfg);
 
-		try(cfg, "block_span = 12345");
+		try(cfg, "db.block_span = 12345");
 		ok(cfg.block_span == 12345, "block_span handles multiple digits");
+		deconfigure(&cfg);
 
-		try(cfg, "block_span = 10ms");
+		try(cfg, "db.block_span = 12_345");
+		ok(cfg.block_span == 12345, "block_span allows underscore for readability");
+		deconfigure(&cfg);
+
+		try(cfg, "db.block_span = 12,345");
+		ok(cfg.block_span == 12345, "block_span allows underscore for readability");
+		deconfigure(&cfg);
+
+		try(cfg, "db.block_span = 10ms");
 		is_unsigned(cfg.block_span, 10, "unit ms == milliseconds (no multiplier)");
 		ok(cfg.block_span == 10, "unit ms == milliseconds (no multiplier)");
+		deconfigure(&cfg);
 
-		try(cfg, "block_span = 15s");
+		try(cfg, "db.block_span = 15s");
 		ok(cfg.block_span == 15 * 1000, "multi-digit, s-unit block_span is good");
+		deconfigure(&cfg);
 
-		try(cfg, "block_span = 3m");
+		try(cfg, "db.block_span = 3m");
 		ok(cfg.block_span == 3 * 60000, "unit m == minutes (x60000 multiplier)");
+		deconfigure(&cfg);
 
-		try(cfg, "block_span = 12h");
+		try(cfg, "db.block_span = 12h");
 		ok(cfg.block_span == 12 * 3600000, "unit h == hours (x3600000 multiplier)");
+		deconfigure(&cfg);
 
-		try(cfg, "block_span = 90d");
+		try(cfg, "db.block_span = 90d");
 		ok(cfg.block_span == 90lu * 86400000, "unit d == days (x86400000 multiplier)");
+		deconfigure(&cfg);
 
-		try(cfg, "block_span = 7 s");
+		try(cfg, "db.block_span = 7 s");
 		ok(cfg.block_span == 7 * 1000, "whitespace between number and digit is ignored");
-
 		deconfigure(&cfg);
 	}
 
 	subtest {
 		struct config cfg;
 
-		try(cfg, "secret_key = /path/to/key # should be chmod 0600");
+		try(cfg, "db.secret_key = /path/to/key # should be chmod 0600");
 		is_string(cfg.secret_key, "/path/to/key", "secret_key parsed properly");
+		deconfigure(&cfg);
+	}
 
+	subtest {
+		struct config cfg;
+
+		try(cfg, "query.listen = *:2199");
+		is_string(cfg.query_listen, "*:2199", "query.listen should allow full wildcards");
+		deconfigure(&cfg);
+
+		try(cfg, "query.listen = 127.0.0.1:2199");
+		is_string(cfg.query_listen, "127.0.0.1:2199", "query.listen should allow IPv4 addresses");
+		deconfigure(&cfg);
+
+		try(cfg, "query.listen = 0.0.0.0:2199");
+		is_string(cfg.query_listen, "0.0.0.0:2199", "query.listen should allow IPv4 wildcard");
+		deconfigure(&cfg);
+
+		try(cfg, "query.listen = [::1]:2199");
+		is_string(cfg.query_listen, "[::1]:2199", "query.listen should allow IPv6 loopback address");
+		deconfigure(&cfg);
+
+		try(cfg, "query.listen = [fe80::a00:27ff:feb2:ad10]:2199");
+		is_string(cfg.query_listen, "[fe80::a00:27ff:feb2:ad10]:2199", "query.listen should allow IPv6 addresses");
+		deconfigure(&cfg);
+
+		try(cfg, "query.listen = [::]:2199");
+		is_string(cfg.query_listen, "[::]:2199", "query.listen should allow IPv6 wildcard");
+		deconfigure(&cfg);
+	}
+
+	subtest {
+		struct config cfg;
+
+		try(cfg, "query.max_connections = 200");
+		is_unsigned(cfg.query_max_connections, 200, "query.max_connections accepts positive, non-zero integer >= 8");
+		deconfigure(&cfg);
+
+		try(cfg, "query.max_connections = 1_024");
+		is_unsigned(cfg.query_max_connections, 1024, "query.max_connections allows embedded underscores for legibility");
+		deconfigure(&cfg);
+
+		try(cfg, "query.max_connections = 2,048");
+		is_unsigned(cfg.query_max_connections, 2048, "query.max_connections allows commas for legibility");
+		deconfigure(&cfg);
+	}
+
+	subtest {
+		struct config cfg;
+
+		try(cfg, "metric.listen = *:2199");
+		is_string(cfg.metric_listen, "*:2199", "metric.listen should allow full wildcards");
+		deconfigure(&cfg);
+
+		try(cfg, "metric.listen = 127.0.0.1:2199");
+		is_string(cfg.metric_listen, "127.0.0.1:2199", "metric.listen should allow IPv4 addresses");
+		deconfigure(&cfg);
+
+		try(cfg, "metric.listen = 0.0.0.0:2199");
+		is_string(cfg.metric_listen, "0.0.0.0:2199", "metric.listen should allow IPv4 wildcard");
+		deconfigure(&cfg);
+
+		try(cfg, "metric.listen = [::1]:2199");
+		is_string(cfg.metric_listen, "[::1]:2199", "metric.listen should allow IPv6 loopback address");
+		deconfigure(&cfg);
+
+		try(cfg, "metric.listen = [fe80::a00:27ff:feb2:ad10]:2199");
+		is_string(cfg.metric_listen, "[fe80::a00:27ff:feb2:ad10]:2199", "metric.listen should allow IPv6 addresses");
+		deconfigure(&cfg);
+
+		try(cfg, "metric.listen = [::]:2199");
+		is_string(cfg.metric_listen, "[::]:2199", "metric.listen should allow IPv6 wildcard");
+		deconfigure(&cfg);
+	}
+
+	subtest {
+		struct config cfg;
+
+		try(cfg, "metric.max_connections = 200");
+		is_unsigned(cfg.metric_max_connections, 200, "metric.max_connections accepts positive, non-zero integer >= 8");
+		deconfigure(&cfg);
+
+		try(cfg, "metric.max_connections = 1_024");
+		is_unsigned(cfg.metric_max_connections, 1024, "metric.max_connections allows embedded underscores for legibility");
+		deconfigure(&cfg);
+
+		try(cfg, "metric.max_connections = 2,048");
+		is_unsigned(cfg.metric_max_connections, 2048, "metric.max_connections allows commas for legibility");
 		deconfigure(&cfg);
 	}
 }
