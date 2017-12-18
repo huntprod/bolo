@@ -105,12 +105,19 @@ TESTS {
 		put(in.fd, "cpu host=localhost,env=dev,os=linux 123456789 34.567\n");
 		lseek(in.fd, 0, SEEK_SET);
 
+		ok(!ingest_eof(&in), "ingestor is not at EOF yet");
 		ok(ingest_read(&in) == 1, "ingest_read() should find exactly one packet.");
+		ok(!ingest_eof(&in), "ingestor is not at EOF yet");
+
 		ok(ingest(&in) == 0, "ingest() should succeed.");
 		is_string(in.metric, "cpu|env=dev,host=localhost,os=linux",
 			"ingest() should set the metric to `name|canon(tags)`.");
 		is_unsigned(in.time, 123456789, "ingest() should parse timestamp.");
 		is_within(in.value, 34.567, 0.000001, "ingest() should parse value.");
+
+		ok(!ingest_eof(&in), "ingestor is not at EOF yet");
+		ok(ingest_read(&in) == 0, "ingest_read() should find no more packets.");
+		ok(ingest_eof(&in), "ingestor is at EOF");
 
 		close(in.fd);
 	}
