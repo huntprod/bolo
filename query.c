@@ -269,7 +269,6 @@ query_exec(struct query *q, struct db *db, struct query_ctx *ctx)
 				rsv_reset(rsv);
 
 				for (set = qx->set; set; set = set->next) {
-					struct tslab  *slab;
 					struct tblock *block;
 					uint64_t blkid;
 
@@ -280,15 +279,7 @@ query_exec(struct query *q, struct db *db, struct query_ctx *ctx)
 						return 1;
 					}
 
-					/* this is s_findblock + s_findslab, from db.o... */
-					block = NULL;
-					for_each(slab, &db->slab, l) {
-						if (slab->number == tslab_number(blkid)) {
-							block = slab->blocks + tblock_number(blkid);
-							break;
-						}
-					}
-
+					block = db_findblock(db, blkid);
 					while (block) {
 						int j;
 						bolo_msec_t ts;
@@ -299,17 +290,7 @@ query_exec(struct query *q, struct db *db, struct query_ctx *ctx)
 								rsv_sample(rsv, tblock_value(block, j));
 						}
 
-						/* this is s_findblock + s_findslab, from db.o... */
-						blkid = block->next;
-						block = NULL;
-						if (blkid) {
-							for_each(slab, &db->slab, l) {
-								if (slab->number == tslab_number(blkid)) {
-									block = slab->blocks + tblock_number(blkid);
-									break;
-								}
-							}
-						}
+						block = db_findblock(db, block->next);
 					}
 
 					rset->results[i].value = rsv_median(rsv);

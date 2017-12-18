@@ -919,6 +919,22 @@ db_insert(struct db *db, char *name, bolo_msec_t when, bolo_value_t what)
 	return 0;
 }
 
+struct tblock *
+db_findblock(struct db *db, uint64_t blkid)
+{
+	struct tslab *slab;
+
+	if (blkid == 0)
+		return NULL;
+
+	for_each(slab, &db->slab, l) {
+		if (slab->number == tslab_number(blkid))
+			return slab->blocks + tblock_number(blkid);
+	}
+
+	return NULL;
+}
+
 #ifdef TEST
 /* LCOV_EXCL_START */
 TESTS {

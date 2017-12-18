@@ -462,6 +462,7 @@ struct db * db_init(const char *path) RETURNS;
 int db_sync(struct db *db) RETURNS;
 int db_unmount(struct db *db) RETURNS;
 int db_insert(struct db *, char *name, bolo_msec_t when, bolo_value_t what) RETURNS;
+struct tblock * db_findblock(struct db *, uint64_t blkid);
 
 
 /****************************************************************  tagging  ***/
