@@ -123,6 +123,7 @@ struct config {
 	int   metric_max_connections;
 };
 
+int configure_defaults(struct config *) RETURNS;
 int configure(struct config *, int fd) RETURNS;
 void deconfigure(struct config *);
 

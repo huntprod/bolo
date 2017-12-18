@@ -1,6 +1,44 @@
 #include "bolo.h"
 #include <ctype.h>
 
+#ifndef DEFAULT_QUERY_LISTEN
+#define DEFAULT_QUERY_LISTEN "*:2001"
+#endif
+
+#ifndef DEFAULT_QUERY_MAX_CONNECTIONS
+#define DEFAULT_QUERY_MAX_CONNECTIONS 256
+#endif
+
+#ifndef DEFAULT_METRIC_LISTEN
+#define DEFAULT_METRIC_LISTEN "*:2002"
+#endif
+
+#ifndef DEFAULT_METRIC_MAX_CONNECTIONS
+#define DEFAULT_METRIC_MAX_CONNECTIONS 8192
+#endif
+
+int
+configure_defaults(struct config *cfg)
+{
+	memset(cfg, 0, sizeof(*cfg));
+
+	cfg->log_level = LOG_ERRORS;
+
+	cfg->block_span = 0; /* FIXME - need better default */
+
+	cfg->query_listen = strdup(DEFAULT_QUERY_LISTEN);
+	if (!cfg->query_listen) return -1;
+
+	cfg->query_max_connections = DEFAULT_QUERY_MAX_CONNECTIONS;
+
+	cfg->metric_listen = strdup(DEFAULT_METRIC_LISTEN);
+	if (!cfg->metric_listen) return -1;
+
+	cfg->metric_max_connections = DEFAULT_METRIC_MAX_CONNECTIONS;
+
+	return 0;
+}
+
 int
 configure(struct config *cfg, int fd)
 {
