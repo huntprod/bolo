@@ -537,6 +537,20 @@ struct qcond {
 #define EXPR_DIV   6
 #define EXPR_FUNC  7
 
+struct result {
+	bolo_msec_t start;
+	bolo_msec_t finish;
+	double      value;
+	int n;
+};
+
+struct resultset {
+	char   *key;             /* identifier for this set */
+	size_t  len;             /* how many (ts,value) tuples are there? */
+
+	struct result results[]; /* list of `len` result (ts,value) tuples */
+};
+
 struct qexpr {
 	int type;
 	void *a;
@@ -544,6 +558,8 @@ struct qexpr {
 
 	struct qexpr   *next;
 	struct multidx *set;
+
+	struct resultset *result;
 };
 
 struct query {
@@ -554,11 +570,17 @@ struct query {
 	int           until;
 };
 
+struct query_ctx {
+	bolo_msec_t now;
+	int         rsv_depth;
+};
+
 struct query * bql_parse(const char *q);
 struct query * query_parse(const char *q);
 void query_free(struct query *q);
 
 int query_plan(struct query *q, struct db *db);
+int query_exec(struct query *q, struct db *db, struct query_ctx *ctx);
 
 
 #endif

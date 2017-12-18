@@ -1,13 +1,13 @@
 #!/bin/bash
 
-if [[ -z "$1" ]]; then
-  echo >&2 "USAGE: $0 N"
-  exit 1;
-fi
-
-./t/randata $1 | while read x; do
-  echo "cpu host=localhost,env=staging $(date +%s)000 $x"
-  echo "cpu host=localhost,env=develop $(date +%s)000 $x"
-  echo "cpu env=develop,host=localhost $(date +%s)000 $x"
-  sleep 0.1
+tags='host=web1,env=staging'
+start=$(date -d '2001-01-01 01:01:01' +%s)000
+while read x; do
+  echo "cpu $tags $start $x"
+  case "$tags" in
+  host=web1,env=staging) tags='host=web1,env=prod'    ;;
+  host=web1,env=prod)    tags='host=web2,env=prod'    ;;
+  host=web2,env=prod)    tags='host=web1,env=staging'
+                         start=$(expr $start + 60000) ;;
+  esac
 done

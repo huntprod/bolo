@@ -36,3 +36,4 @@
 *.db
 /coverage
 /t/tmp
+/t/data/db/
