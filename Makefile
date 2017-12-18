@@ -82,7 +82,7 @@ ccov: clean test copycov
 sure: memtest
 
 fixme:
-	find . -name '*.[ch]' | xargs grep -rin fixme
+	find . -name '*.[ch]' -not -path '*/ice/*' | xargs grep -rin fixme
 
 bql/lexer.c: bql/lexer.l
 	flex -FTvs -o $@ $<
