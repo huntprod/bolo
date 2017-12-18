@@ -13,6 +13,7 @@ tblock_map(struct tblock *b, int fd, off_t offset, size_t len)
 	b->cells  = tblock_read16(b,  6);
 	b->base   = tblock_read64(b,  8);
 	b->number = tblock_read64(b, 16);
+	b->next   = tblock_read64(b, 24);
 
 	insist(b->cells <= TCELLS_PER_TBLOCK, "tblock_map() detected a corrupt block; number of used cells is larger than allowed");
 	return 0;
@@ -34,6 +35,7 @@ void tblock_init(struct tblock *b, uint64_t number, bolo_msec_t base)
 	tblock_write64(b,  6, b->cells);
 	tblock_write64(b,  8, b->base);
 	tblock_write64(b, 16, b->number);
+	tblock_write64(b, 24, b->next);
 
 	if (ENC_KEY)
 		tblock_seal(ENC_KEY, ENC_KEY_LEN, b);
@@ -68,10 +70,19 @@ tblock_insert(struct tblock *b, bolo_msec_t when, double what)
 		return -1;
 
 	BUG(when - b->base < MAX_U32, "tblock_insert() given a timestamp that is beyond the range of this block");
-	tblock_write32 (b, 24 + b->cells * 12,     when - b->base);
-	tblock_write64f(b, 24 + b->cells * 12 + 4, what);
+	tblock_write32 (b, 32 + b->cells * 12,     when - b->base);
+	tblock_write64f(b, 32 + b->cells * 12 + 4, what);
 	tblock_write16 (b, 6, ++b->cells);
 	if (ENC_KEY)
 		tblock_seal(ENC_KEY, ENC_KEY_LEN, b);
 	return 0;
+}
+
+void
+tblock_next(struct tblock *b, struct tblock *next)
+{
+	b->next = next->number;
+	tblock_write64(b, 24, b->next);
+	if (ENC_KEY)
+		tblock_seal(ENC_KEY, ENC_KEY_LEN, b);
 }

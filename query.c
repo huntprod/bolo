@@ -299,8 +299,17 @@ query_exec(struct query *q, struct db *db, struct query_ctx *ctx)
 								rsv_sample(rsv, tblock_value(block, j));
 						}
 
-						/* FIXME: i think we need to thread the blocks */
-						block = NULL; /* FIXME */
+						/* this is s_findblock + s_findslab, from db.o... */
+						blkid = block->next;
+						block = NULL;
+						if (blkid) {
+							for_each(slab, &db->slab, l) {
+								if (slab->number == tslab_number(blkid)) {
+									block = slab->blocks + tblock_number(blkid);
+									break;
+								}
+							}
+						}
 					}
 
 					rset->results[i].value = rsv_median(rsv);

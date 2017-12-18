@@ -889,9 +889,14 @@ db_insert(struct db *db, char *name, bolo_msec_t when, bolo_value_t what)
 		block = s_findblock(db, block_id, when);
 
 		if (block && (tblock_isfull(block) || !tblock_canhold(block, when))) {
-			block = s_newblock(db, when);
-			if (!block)
+			struct tblock *new_block;
+
+			new_block = s_newblock(db, when);
+			if (!new_block)
 				return -1;
+
+			tblock_next(block, new_block);
+			block = new_block;
 
 			if (btree_insert(idx->btree, when, block->number) != 0)
 				return -1;

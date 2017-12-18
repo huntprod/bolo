@@ -140,9 +140,11 @@ The TBLOCK format is:
      +--------+--------+--------+--------+--------+--------+--------+--------+
    8 | BASE TIMESTAMP (ms)                                                   |
      +--------+--------+--------+--------+--------+--------+--------+--------+
-  16 | BLOCK NUMBER                                                          |
+  16 | THIS BLOCK NUMBER                                                     |
      +--------+--------+--------+--------+--------+--------+--------+--------+
-  24 | MEASUREMENT RELTIME (ms)          | MEASUREMENT VALUE (double)        |
+  24 | NEXT BLOCK NUMBER                                                     |
+     +--------+--------+--------+--------+--------+--------+--------+--------+
+  32 | MEASUREMENT RELTIME (ms)          | MEASUREMENT VALUE (double)        |
      +--------+--------+--------+--------+--------+--------+--------+--------+
      | MEASUREMENT VALUE (double)        | ...                               |
      +--------+--------+--------+--------+--------+--------+--------+--------+
@@ -169,14 +171,18 @@ Where the constituent fields are defined thusly:
 - **BASE TIMESTAMP** - offset 8, length 8 - The base timestamp, in
   milliseconds since the UNIX epoch, of the earliest possible
   measurement tuple.
-- **BLOCK NUMBER** - offset 16, length 8 - The 64-bit unsigned
-  TBLOCK ID number.  This is written to the file to allow for
-  filesystem recovery where the names of files may be lost.
-- **MEASUREMENT RELTIME** - offset 24 + 12n, length 4 - The
+- **THIS BLOCK NUMBER** - offset 16, length 8 - The 64-bit
+  unsigned TBLOCK ID number.  This is written to the file to allow
+  for filesystem recovery where the names of files may be lost.
+- **NEXT BLOCK NUMBER** - offset 24, length 8 - The 64-bit
+  unsigned TBLOCK ID number of the block that follows this one,
+  chronologically.  If this is the last (most recent) block, this
+  field must be filled with all zeroes.
+- **MEASUREMENT RELTIME** - offset 32 + 12n, length 4 - The
   nth measurement tuple's `ts` component, in milliseconds since
   the base timestamp, as a 32-bit unsigned integer.  This puts an
   upper limit of 49.7 days on a single TBLOCK's span in time.
-- **MEASUREMENT VALUE** - offset 28 + 12n, length 8 - The nth
+- **MEASUREMENT VALUE** - offset 36 + 12n, length 8 - The nth
   measurement tuple's `value` component.
 - **HMAC-SHA512** - offset 524,224 (2^19 - 64), length 64 - A
   SHA-512 HMAC digest, calculated over the first 4,032 octets of

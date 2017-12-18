@@ -348,10 +348,10 @@ bolo_msec_t btree_last(struct btree *t);
 #define TSLAB_HEADER_SIZE 88
 
 /* a BLOCK in a SLAB is exactly 512k
-   with a 24b header and an HMAC-SHA512
-   footer, leaving 524,176b for data */
+   with a 32b header and an HMAC-SHA512
+   footer, leaving 524,192b for data */
 #define TBLOCK_SIZE         (1 << 19)
-#define TBLOCK_HEADER_SIZE  24
+#define TBLOCK_HEADER_SIZE  32
 #define TBLOCK_DATA_SIZE    (TBLOCK_SIZE - TBLOCK_HEADER_SIZE - SHA512_DIGEST)
 
 /* each CELL has a 4b relative timestamp
@@ -374,6 +374,8 @@ struct tblock {
 	uint64_t number;   /* composite slab / block number,
 	                      where bits 0-53 are the slab number
 	                      and bits 54-63 are the block number */
+	uint64_t next;     /* block number of the next logical block
+	                      in the (chronologically ordered) series */
 
 	struct page page;  /* backing data page */
 };
@@ -395,14 +397,15 @@ void tblock_init(struct tblock *b, uint64_t number, bolo_msec_t base);
 int tblock_isfull(struct tblock *b) RETURNS;
 int tblock_canhold(struct tblock *b, bolo_msec_t when) RETURNS;
 int tblock_insert(struct tblock *b, bolo_msec_t when, bolo_value_t what) RETURNS;
+void tblock_next(struct tblock *b, struct tblock *next);
 #define tblock_unmap(b) page_unmap(&(b)->page)
 #define tblock_sync(b)  page_sync(&(b)->page)
 
 #define tblock_seal( k,l,b) hmac_seal ((k),(l),(b)->page.data,(b)->page.len)
 #define tblock_check(k,l,b) hmac_check((k),(l),(b)->page.data,(b)->page.len)
 
-#define tblock_value(b,n)              tblock_read64f((b), 24 + (n) * 12 + 4)
-#define tblock_ts(b,n)    ((b)->base + tblock_read32 ((b), 24 + (n) * 12))
+#define tblock_value(b,n)              tblock_read64f((b), 32 + (n) * 12 + 4)
+#define tblock_ts(b,n)    ((b)->base + tblock_read32 ((b), 32 + (n) * 12))
 
 /*********************************************************  database slabs  ***/
 
