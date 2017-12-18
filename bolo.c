@@ -1,8 +1,8 @@
 #include "bolo.h"
 
 #define EXT(x) extern int do_ ## x (int argc, char **argv)
-EXT(dbinfo);        /* bolo dbinfo DATADIR */
 EXT(core);          /* bolo core [-c PATH] [-l LEVEL] [-D] */
+EXT(dbinfo);        /* bolo dbinfo DATADIR */
 EXT(help);          /* bolo help */
 EXT(idxinfo);       /* bolo idxinfo DATADIR/idx/INDEXFILE */
 EXT(import);        /* bolo import DATADIR <INPUT */
@@ -35,33 +35,20 @@ int main(int argc, char **argv)
 	if ((s = getenv("BOLO_DEBUG")) != NULL)
 		debugto(2);
 
-	if (strcmp(command, "-v") == 0
-	 || strcmp(command, "--version") == 0)
+	if (streq(command, "-v") == 0
+	 || streq(command, "--version") == 0)
 		command = "version";
 
-	if (strcmp(command, "version") == 0)
-		return do_version(argc, argv);
-
-	if (strcmp(command, "import") == 0)
-		return do_import(argc, argv);
-
-	if (strcmp(command, "dbinfo") == 0)
-		return do_dbinfo(argc, argv);
-
-	if (strcmp(command, "idxinfo") == 0)
-		return do_idxinfo(argc, argv);
-
-	if (strcmp(command, "slabinfo") == 0)
-		return do_slabinfo(argc, argv);
-
-	if (strcmp(command, "parse") == 0)
-		return do_parse(argc, argv);
-
-	if (strcmp(command, "query") == 0)
-		return do_query(argc, argv);
-
-	if (strcmp(command, "core") == 0)
-		return do_core(argc, argv);
+	#define RUN(c) if (streq(command, #c)) return do_ ## c (argc, argv)
+	RUN(core);
+	RUN(dbinfo);
+	RUN(idxinfo);
+	RUN(import);
+	RUN(parse);
+	RUN(query);
+	RUN(slabinfo);
+	RUN(version);
+	#undef RUN
 
 	return do_help(argc, argv);
 }
