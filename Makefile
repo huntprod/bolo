@@ -30,9 +30,11 @@ clean:
 	rm -f bql/*.o bql/*.gcno bql/*.gcda
 	rm -f $(TESTS)
 	rm -f lcov.info
+
+realclean: clean
 	rm -rf t/data/db
 
-distclean: clean
+distclean: realclean
 	rm -f bql/grammar.c bql/lexer.c
 
 test: check
