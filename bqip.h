@@ -37,6 +37,8 @@ int bqip_read(struct bqip *c);
 
 int bqip_send_error(struct bqip *c, const char *e);
 int bqip_send_result(struct bqip *c, int nsets);
-int bqip_send_set(struct bqip *c, int ntuples, const char *encoded);
+int bqip_send_set(struct bqip *c, int ntuples, const char *key);
+int bqip_send_tuple(struct bqip *c, struct result *r, int first);
+int bqip_flush(struct bqip *c);
 
 #endif
