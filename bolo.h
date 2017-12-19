@@ -113,6 +113,7 @@ struct config {
 	/* db.* - database settings */
 	char           *secret_key;
 	unsigned long   block_span;
+	char           *db_data_root;
 
 	/* query.* - query listener settings */
 	char *query_listen;

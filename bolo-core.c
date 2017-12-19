@@ -3,22 +3,43 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <getopt.h>
+#include <pthread.h>
 
 #ifndef DEFAULT_CONFIG_FILE
 #define DEFAULT_CONFIG_FILE "/etc/bolo.conf"
 #endif
 
-struct daemon {
-	int                qmax;
-	struct bqip       *qconn;
-	struct net_poller *qpoll;
-};
+static struct config    cfg;
+static struct db       *db;
+static pthread_mutex_t  db_lock;
+
+static struct qlsnr {
+	int                fd;
+	pthread_t          tid;
+	int                nconn;
+	struct bqip       *conn;
+	struct net_poller *poll;
+} qlsnr;
+
+static void *
+qlsnr_thread(void *_u)
+{
+	struct qlsnr *ql;
+	ql = (struct qlsnr *)_u;
+
+	net_poll(ql->poll);
+	close(ql->fd);
+	return NULL;
+}
 
 static int
 query_handler(int fd, void *_u)
 {
-	int rc;
+	int rc, n;
+	size_t i;
 	struct bqip *bqip;
+	struct query *q;
+	struct qexpr *qx;
 
 	bqip = (struct bqip *)_u;
 	rc = bqip_read(bqip);
@@ -27,36 +48,151 @@ query_handler(int fd, void *_u)
 		return 0;
 
 	fprintf(stderr, "got query '%s' from client...\n", bqip->request.payload);
-	bqip_send_result(bqip, 2);
-	bqip_send_set(bqip, 4, "x=1:a,2:b,3:c,4:d");
-	bqip_send_set(bqip, 4, "y=5:e,6:f,7:g,8:h");
+	q = query_parse(bqip->request.payload);
+	if (!q)
+		goto fail;
+
+	pthread_mutex_lock(&db_lock);
+		rc = query_plan(q, db);
+		if (rc != 0)
+			goto fail;
+
+		rc = query_exec(q, db, NULL);
+		if (rc != 0)
+			goto fail;
+	pthread_mutex_unlock(&db_lock);
+
+	n = 0;
+	for (qx = q->select; qx; qx = qx->next)
+		n++;
+	bqip_send_result(bqip, n);
+
+	for (qx = q->select; qx; qx = qx->next) {
+		bqip_send_set(bqip, qx->result->len, qx->result->key);
+		for (i = 0; i < qx->result->len; i++)
+			bqip_send_tuple(bqip, &qx->result->results[i], i == 0);
+		bqip_flush(bqip);
+	}
 	return 0;
 
 fail:
+	pthread_mutex_unlock(&db_lock);
 	bqip->fd = -1;
 	return -1;
 }
 
 static int
-query_listener(int fd, void *_u)
+query_listener(int _, void *_u)
 {
 	int i, sockfd;
-	struct daemon *d;
+	struct qlsnr *ql;
 
-	d = (struct daemon *)_u;
-	sockfd = accept(fd, NULL, NULL);
+	ql = (struct qlsnr *)_u;
+	sockfd = accept(ql->fd, NULL, NULL);
 	printf("S: accepted new inbound connection.\n");
 
-	for (i = 0; i < d->qmax; i++) {
-		if (d->qconn[i].fd < 0) {
-			bqip_init(&d->qconn[i], sockfd);
-			if (net_poll_fd(d->qpoll, sockfd, query_handler, &d->qconn[i]) == 0)
-				return 0;
+	for (i = 0; i < ql->nconn; i++) {
+		if (ql->conn[i].fd >= 0) continue;
 
-			fprintf(stderr, "S: failed to register accepted socket; closing...\n");
-			close(sockfd);
+		bqip_init(&ql->conn[i], sockfd);
+		if (net_poll_fd(ql->poll, sockfd, query_handler, &ql->conn[i]) == 0)
 			return 0;
-		}
+
+		fprintf(stderr, "S: failed to register accepted socket; closing...\n");
+		close(sockfd);
+		return 0;
+	}
+
+	fprintf(stderr, "S: max connections reached; closing socket...\n");
+	close(sockfd);
+	return 0;
+}
+
+
+
+static struct mlsnr {
+	int                fd;
+	pthread_t          tid;
+	int                nconn;
+	struct ingestor   *conn;
+	struct net_poller *poll;
+} mlsnr;
+
+static void *
+mlsnr_thread(void *_u)
+{
+	struct mlsnr *ml;
+	ml = (struct mlsnr *)_u;
+
+	net_poll(ml->poll);
+	close(ml->fd);
+	return NULL;
+}
+
+static int
+metric_handler(int fd, void *_u)
+{
+	struct ingestor *in;
+	int n;
+
+	in = (struct ingestor *)_u;
+	n = ingest_read(in);
+	if (n < 0)
+		goto fail;
+	if (n == 0)
+		goto done;
+
+	pthread_mutex_lock(&db_lock);
+	while (n-- > 0) {
+		debugf("ingesting metric submission from fd %d", in->fd);
+		if (ingest(in) != 0)
+			goto lockfail;
+
+		debugf("inserting new measurement from fd %d", in->fd);
+		if (db_insert(db, in->metric, in->time, in->value) != 0)
+			goto lockfail;
+	}
+
+	debugf("syncing database...");
+	if (db_sync(db) != 0)
+		goto lockfail;
+	pthread_mutex_unlock(&db_lock);
+
+done:
+	if (ingest_eof(in)) {
+		in->fd = -1;
+		return -1;
+	}
+	return 0;
+
+lockfail:
+	pthread_mutex_unlock(&db_lock);
+	errorf("failed to deal with stuff; bailing out (fd %d)", in->fd);
+fail:
+	in->fd = -1;
+	return -1;
+}
+
+static int
+metric_listener(int fd, void *_u)
+{
+	int i, sockfd;
+	struct mlsnr *ml;
+
+	ml = (struct mlsnr *)_u;
+	sockfd = accept(ml->fd, NULL, NULL);
+	printf("S: accepted new inbound connection.\n");
+
+	for (i = 0; i < ml->nconn; i++) {
+		if (ml->conn[i].fd >= 0) continue;
+
+		ml->conn[i].fd = sockfd;
+		if (net_poll_fd(ml->poll, sockfd, metric_handler, &ml->conn[i]) == 0)
+			return 0;
+
+		fprintf(stderr, "S: failed to register accepted socket; closing...\n");
+		close(sockfd);
+		return 0;
 	}
 
 	fprintf(stderr, "S: max connections reached; closing socket...\n");
@@ -67,10 +203,7 @@ query_listener(int fd, void *_u)
 int
 do_core(int argc, char **argv)
 {
-	int i, listenfd;
-	struct daemon d;
-	struct config cfg;
-
+	int i;
 	{
 		int fd, override_log_level = -1;
 		char *config_file = strdup(DEFAULT_CONFIG_FILE);
@@ -102,6 +235,7 @@ do_core(int argc, char **argv)
 
 			case 'D':
 				debugto(fileno(stderr));
+				override_log_level = LOG_INFO;
 				break;
 
 			case 'c':
@@ -118,41 +252,76 @@ do_core(int argc, char **argv)
 			}
 		}
 
+		debugf("reading configuration from %s", config_file);
 		fd = open(config_file, O_RDONLY);
 		if (fd < 0) {
 			errnof("unable to open configuration file %s", config_file);
 			return 1;
 		}
 		if (configure_defaults(&cfg) != 0
-		 && configure(&cfg, fd) != 0)
+		 || configure(&cfg, fd) != 0)
 			return 1;
 
 		if (override_log_level != -1)
 			cfg.log_level = override_log_level;
 	}
 
-	d.qmax = cfg.query_max_connections;
-	d.qconn = calloc(d.qmax, sizeof(*d.qconn));
-	if (!d.qconn)
-		bail("calloc(conns) failed");
-	for (i = 0; i < d.qmax; i++)
-		d.qconn[i].fd = -1;
+	startlog(argv[0], getpid(), cfg.log_level);
+	debugf("dumping configuration....");
+	debugf("db.data_root = '%s'\n", cfg.db_data_root);
 
-	d.qpoll = net_poller(d.qmax + 1);
-	if (!d.qpoll)
-		bail("net_poller failed");
+	db = db_mount(cfg.db_data_root);
+	if (!db && (errno == BOLO_ENODBROOT || errno == BOLO_ENOMAINDB))
+		db = db_init(cfg.db_data_root);
+	if (!db)
+		bail("db_mount failed");
 
-	listenfd = net_bind(cfg.query_listen, 64);
-	if (listenfd < 0) {
-		errnof("net_bind failed");
-		bail("net_bind failed");
-	}
+	/* configure query listener */
+	qlsnr.nconn = cfg.query_max_connections;
+	qlsnr.conn  = calloc(qlsnr.nconn, sizeof(*qlsnr.conn));
+	if (!qlsnr.conn)
+		bail("memory allocation failed.");
 
-	if (net_poll_fd(d.qpoll, listenfd, query_listener, &d) != 0)
-		bail("net_poll_fd(listener) failed");
+	for (i = 0; i < qlsnr.nconn; i++)
+		qlsnr.conn[i].fd = -1;
 
-	printf("S: entering main loop.\n");
-	net_poll(d.qpoll);
-	close(listenfd);
+	qlsnr.poll = net_poller(qlsnr.nconn + 1);
+	if (!qlsnr.poll)
+		bail("network setup failed.");
+
+	qlsnr.fd = net_bind(cfg.query_listen, 64);
+	if (qlsnr.fd < 0)
+		bail("network bind failed.");
+
+	if (net_poll_fd(qlsnr.poll, qlsnr.fd, query_listener, &qlsnr) != 0)
+		bail("network poll failed.");
+
+	/* configure metric listener */
+	mlsnr.nconn = cfg.metric_max_connections;
+	mlsnr.conn  = calloc(mlsnr.nconn, sizeof(*mlsnr.conn));
+	if (!mlsnr.conn)
+		bail("memory allocation failed.");
+
+	for (i = 0; i < mlsnr.nconn; i++)
+		mlsnr.conn[i].fd = -1;
+
+	mlsnr.poll = net_poller(mlsnr.nconn + 1);
+	if (!mlsnr.poll)
+		bail("network setup failed.");
+
+	mlsnr.fd = net_bind(cfg.metric_listen, 64);
+	if (mlsnr.fd < 0)
+		bail("network bind failed.");
+
+	if (net_poll_fd(mlsnr.poll, mlsnr.fd, metric_listener, &mlsnr) != 0)
+		bail("network poll failed.");
+
+	/* initialize mutices */
+	pthread_mutex_init(&db_lock, NULL);
+
+	/* spin both threads */
+	pthread_create(&qlsnr.tid, NULL, qlsnr_thread, &qlsnr);
+	pthread_create(&mlsnr.tid, NULL, mlsnr_thread, &mlsnr);
+	pthread_join(qlsnr.tid, NULL);
 	return 0;
 }

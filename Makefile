@@ -1,6 +1,6 @@
 CFLAGS += -Wall -Wextra -Wpedantic -Wunused -Wunused-result -Wno-unused-parameter
 TEST_CFLAGS := -g -DTEST -fprofile-arcs -ftest-coverage -It
-LDLIBS += -lm
+LDLIBS += -lm -lpthread
 
 ifeq ($(PROF),yes)
 	# BOTH -p and -pg seem to be necessary, if you want

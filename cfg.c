@@ -17,6 +17,10 @@
 #define DEFAULT_METRIC_MAX_CONNECTIONS 8192
 #endif
 
+#ifndef DEFAULT_DB_DATA_ROOT
+#define DEFAULT_DB_DATA_ROOT "/var/lib/bolo/db"
+#endif
+
 int
 configure_defaults(struct config *cfg)
 {
@@ -25,6 +29,9 @@ configure_defaults(struct config *cfg)
 	cfg->log_level = LOG_ERRORS;
 
 	cfg->block_span = 0; /* FIXME - need better default */
+
+	cfg->db_data_root = strdup(DEFAULT_DB_DATA_ROOT);
+	if (!cfg->db_data_root) return -1;
 
 	cfg->query_listen = strdup(DEFAULT_QUERY_LISTEN);
 	if (!cfg->query_listen) return -1;
@@ -161,6 +168,10 @@ configure(struct config *cfg, int fd)
 					break;
 				}
 			}
+
+		} else if (streq(k, "db.data_root")) {
+			free(cfg->db_data_root);
+			cfg->db_data_root = strdup(v);
 
 		} else if (streq(k, "query.listen")) {
 			free(cfg->query_listen);
@@ -358,6 +369,14 @@ TESTS {
 
 		try(cfg, "db.secret_key = /path/to/key # should be chmod 0600");
 		is_string(cfg.secret_key, "/path/to/key", "secret_key parsed properly");
+		deconfigure(&cfg);
+	}
+
+	subtest {
+		struct config cfg;
+
+		try(cfg, "db.data_root = /path/to/db");
+		is_string(cfg.db_data_root, "/path/to/db", "db.data_root recognized");
 		deconfigure(&cfg);
 	}
 

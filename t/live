@@ -1,0 +1,8 @@
+#!/bin/bash
+
+while true; do
+	./t/randata 1000 | while read x; do
+		echo "cpu host=localhost $(date +%s)000 $x"
+		sleep 1
+	done
+done

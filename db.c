@@ -877,11 +877,12 @@ db_insert(struct db *db, char *name, bolo_msec_t when, bolo_value_t what)
 
 	/* find the tblock ID, if we have one */
 	if (btree_find(idx->btree, &block_id, when) != 0) {
-		infof("allocating a new tblock for '%s'", name);
+		infof("allocating a new tblock for '%s' @%lu", name, when);
 		block = s_newblock(db, when);
 		if (!block)
 			return -1;
 
+		infof("inserting block [%08lu] into btree index...", block->number);
 		if (btree_insert(idx->btree, when, block->number) != 0)
 			return -1;
 
