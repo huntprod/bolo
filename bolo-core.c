@@ -35,7 +35,7 @@ qlsnr_thread(void *_u)
 static int
 query_handler(int fd, void *_u)
 {
-	int rc, n;
+	int rc;
 	size_t i;
 	struct bqip *bqip;
 	struct query *q;
@@ -47,33 +47,57 @@ query_handler(int fd, void *_u)
 	if (rc == 1) /* not quite */
 		return 0;
 
-	fprintf(stderr, "got query '%s' from client...\n", bqip->request.payload);
-	q = query_parse(bqip->request.payload);
-	if (!q)
-		goto fail;
+	switch (bqip->request.type) {
+	default:
+		bqip_send_error(bqip, "unrecognized packet type");
+		break;
 
-	pthread_mutex_lock(&db_lock);
-		rc = query_plan(q, db);
-		if (rc != 0)
+	case 'Q':
+		q = query_parse(bqip->request.payload);
+		if (!q)
 			goto fail;
 
-		rc = query_exec(q, db, NULL);
-		if (rc != 0)
+		pthread_mutex_lock(&db_lock);
+			rc = query_plan(q, db);
+			if (rc != 0)
+				goto fail;
+
+			rc = query_exec(q, db, NULL);
+			if (rc != 0)
+				goto fail;
+		pthread_mutex_unlock(&db_lock);
+
+		bqip_send0(bqip, "R");
+		for (qx = q->select; qx; qx = qx->next) {
+			bqip_send0(bqip, "|");
+			bqip_send0(bqip, qx->result->key);
+			bqip_send0(bqip, "=");
+			for (i = 0; i < qx->result->len; i++)
+				bqip_send_tuple(bqip, &qx->result->results[i]);
+		}
+		break;
+
+	case 'P':
+		q = query_parse(bqip->request.payload);
+		if (!q)
 			goto fail;
-	pthread_mutex_unlock(&db_lock);
 
-	n = 0;
-	for (qx = q->select; qx; qx = qx->next)
-		n++;
-	bqip_send_result(bqip, n);
+		pthread_mutex_lock(&db_lock);
+			rc = query_plan(q, db);
+			if (rc != 0)
+				goto fail;
+		pthread_mutex_unlock(&db_lock);
 
-	for (qx = q->select; qx; qx = qx->next) {
-		bqip_send_set(bqip, qx->result->len, qx->result->key);
-		for (i = 0; i < qx->result->len; i++)
-			bqip_send_tuple(bqip, &qx->result->results[i], i == 0);
-		bqip_flush(bqip);
+		bqip_send0(bqip, "R");
+		for (qx = q->select; qx; qx = qx->next) {
+			bqip_send0(bqip, "|");
+			bqip_send0(bqip, qx->a); /* FIXME: this ONLY works for refs */
+		}
+		break;
 	}
-	return 0;
+
+	bqip->fd = -1;
+	return -1; /* force-close after every query */
 
 fail:
 	pthread_mutex_unlock(&db_lock);

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>bolo</title>
+<link href="/bolo.css" rel="stylesheet">
+</head>
+<body class="app preauth" page="board">
+
+<div class="grid">
+	<div class="w12 header">
+		<div class="app">
+			<a class="logo" href="/">bolo</a>
+			<nav>
+				<li class="action"><a rel="browse" href="#browse">Browse</a></li>
+				<li class="action"><a rel="explore" href="#explore">Explore</a></li>
+				<li class="action"><a rel="logout" href="#logout">logout</a></li>
+			</nav>
+		</div>
+		<div class="boards">
+			<nav id="top-nav">
+				<li class="action"><a rel="add" href="#new">+</a></li>
+			</nav>
+		</div>
+	</div>
+</div>
+
+<form id="login">
+	<div class="grid">
+		<div class="w3 h4"></div>
+		<div class="w6 h4 chrome">
+			<div class="login">
+				<div class="ctl">
+					<div class="error"></div>
+					<label for="login-username">Username</label>
+					<input autocomplete="off" type="text" name="username" id="login-username">
+				</div>
+				<div class="ctl">
+					<label for="login-password">Password</label>
+					<input type="password" name="password" id="login-password">
+				</div>
+				<div class="ctl">
+					<button>Sign in</button>
+				</div>
+			</div>
+		</div>
+		<div class="w3 h4"></div>
+	</div>
+</form>
+
+
+<form id="explore">
+	<div class="grid explore">
+		<div class="w1 h1"></div>
+		<div class="w10 h1 chrome">
+			<input autocomplete="off" placeholder="Enter your search query..." type="text" name="q">
+		</div>
+		<div class="w1 h1 chrome">
+			<button>»</button>
+		</div>
+	</div>
+
+	<div class="grid board"></div>
+</form>
+
+
+<form id="browse">
+	<div class="grid browse">
+		<div class="w1 h1"></div>
+		<div class="w10 h1 chrome">
+			<input autocomplete="off" placeholder="Filter these data points..." type="text" name="q">
+		</div>
+		<div class="w1 h1"></div>
+
+		<div class="w1 h1"></div>
+		<div class="w10 results"></div>
+		<div class="w1 h1"></div>
+	</div>
+</form>
+
+
+<div class="grid" id="oops"></div>
+<form id="editor">
+	<div class="form grid">
+		<div class="w9">
+			<p>
+				<label>name</label>
+				<input type="text" name="name" autocomplete="off">
+				<input type="text" name="link" autocomplete="off" data-changed="no">
+			</p>
+		</div>
+		<div class="w3">
+			<p>Every board deserves some quality link text, don't you think?</p>
+		</div>
+		<div class="w9">
+			<p>
+				<label>code</label>
+				<textarea name="code"></textarea>
+			</p>
+			<p class="fail"></p>
+			<p>
+				<button type="preview"><span></span>Preview</button>
+				<button type="submit"><span></span>Save</button>
+			</p>
+		</div>
+		<div class="w3">
+			<p>Bolo boards are written in a little language called
+			<a href="/docs" target="_blank">BoardCode</a>.  It can be a bit
+			daunting at first, but once you get the hang of it, it sure
+			makes board-writing easier.</p>
+
+			<p>You may want to read the docs;
+			<a href="/docs" target="_blank">BoardCode : A Primer</a>.</p>
+
+			<h3>Block Types</h3>
+			<p><a href="/docs#metric" target="_blank">Metric</a>
+			&ndash; A single number, with [optional] coloring thresholds.</p>
+
+			<p><a href="/docs#sparkline" target="_blank">Sparkline</a>
+			&ndash; A small plot with a label, no units and no axes.</p>
+
+			<p><a href="/docs#graph" target="_blank">Graph</a>
+			&ndash; One or more lines or [stacked] areas, color-coded.  This
+			is what most people thing of when they hear "monitoring".</p>
+		</div>
+	</div>
+
+	<div class="preview grid board"></div>
+</form>
+<div class="grid board" id="board"></div>
+
+<div class="grid">
+	<div class="w12 mgmt">
+		<div class="r">
+			<nav>
+				<li><a rel="edit" href="#">edit</a></li>
+				<li><a rel="delete" href="#">delete</a></li>
+			</nav>
+		</div>
+	</div>
+	<div class="w12 footer">
+		Copyright &copy; 2017 The Bolo Authors · <a href="https://github.com/bolo/ui" rel="code">code</a> · <a href="/docs" target="_blank">docs</a>
+	</div>
+</div>
+<script type="text/javascript" src="js/jq.js"></script>
+<script type="text/javascript" src="js/d3.js"></script>
+<script type="text/javascript" src="js/color.js"></script>
+<script type="text/javascript" src="js/parser.js"></script>
+<script type="text/javascript" src="js/bolo.js"></script>
+</body>
+</html>

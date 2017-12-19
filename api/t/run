@@ -1,0 +1,55 @@
+#!/bin/bash
+set -e
+URL=http://localhost:8080
+
+rm -rf t/tmp
+mkdir -p t/tmp
+
+curl() {
+	command curl -Lvv -c t/tmp/cookies -b t/tmp/cookies $* | tee t/tmp/out
+}
+space() {
+	echo ; echo ; echo ; echo
+}
+
+echo ">> logging in as jhunt:bolo to $URL..."
+(set -x ; curl ${URL}/v1/auth -HContent-Type:application/json --data-binary '{"username":"jhunt","password":"bolo"}')
+space
+
+echo ">> retrieving my information..."
+(set -x ; curl ${URL}/v1/auth)
+space
+
+echo ">> retrieving list of ALL boards..."
+(set -x ; curl ${URL}/v1/boards)
+space
+
+echo ">> creating a new board..."
+cat > t/tmp/in <<EOF
+{
+  "name"  : "A New Board",
+  "link"  : "a-new-board",
+  "notes" : "this is my new board...",
+  "code"  : "#dashcode"
+}
+EOF
+(set -x ; curl ${URL}/v1/boards -HContent-Type:application/json --data-binary "@t/tmp/in")
+space
+
+echo ">> retrieving list of ALL boards..."
+(set -x ; curl ${URL}/v1/boards)
+space
+
+echo ">> setting up nav for jhunt..."
+(set -x ; curl ${URL}/v1/nav -XPUT -HContent-Type:application/json --data-binary '["home","a-new-board"]')
+space
+
+echo ">> retrieving nav for jhunt..."
+(set -x ; curl ${URL}/v1/nav)
+space
+
+echo ">> retrieving the home board..."
+(set -x ; curl ${URL}/v1/boards/home)
+space
+
+echo "DONE"

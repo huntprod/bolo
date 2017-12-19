@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>bolo :: documentation</title>
+<link href="/bolo.css" rel="stylesheet">
+</head>
+<body class="docs">
+
+<div class="grid">
+	<div class="w12 header">
+		<div class="app">
+			<a class="logo" href="/">bolo</a>
+			<nav>
+				<li class="action"><a rel="browse" href="#browse">Browse</a></li>
+				<li class="action"><a rel="explore" href="#explore">Explore</a></li>
+			</nav>
+		</div>
+		<div class="boards">
+			<nav id="top-nav">
+				&nbsp;
+			</nav>
+		</div>
+	</div>
+
+	<div class="w8">
+		<h1>BoardCode : A Primer</h1>
+
+		<p>Bolo boards are written in a custom language, called
+		<em>BoardCode</em>. This document serves as both the official
+		language specification, and a helpful tutorial. So let's get
+		started!</p>
+
+
+
+		<a id="lang"></a>
+		<h2 toc="*">Language Basics</h2>
+
+		<p>BoardCode is a declarative layout language.  That means you don't
+		really <i>program</i> boards so much as <i>describe</i> them.  Bolo
+		figures out how to take your specification and turn it into a
+		hodgepodge of HTML, CSS and Javascript that makes the pretty
+		pictures.</p>
+
+		<pre><code>% an example board
+metric {
+  size  3x3
+  label "average latency"
+  query [SELECT field FROM series ...]
+}</code></pre>
+
+		<p>Comments start with <tt>%</tt> and continue to the end of the
+		line.  Bolo completely ignores what's in the comments &mdash; they
+		exist to help out other board authors (including future versions of
+		yourself) figure out why you wrote what you did.</p>
+
+		<p><tt>metric</tt> is an example of a <i>keyword</i>, a bunch of
+		alphanumeric characters that means something to Bolo.  The
+		<tt>metric</tt> keyword in particular serves to introduce a
+		<em>Metric Block</em> &mdash; a thing that gets displayed on the
+		board.</p>
+
+		<p>Everything inside of the <tt>{</tt> and <tt>}</tt> (the "curly
+		braces") pertains to this particular metric block.  <tt>size</tt> is
+		another keyword; it tells Bolo how big you want this block to be.
+		We've chosen a respectably square <tt>3x3</tt>.  You can combine any
+		two numbers between 1 and 12, separate them with 'x', and you have
+		youself a size.  The first number is the width; the second is the
+		height.</p>
+
+		<p>Text with spaces in it needs to be quoted (with double quotes), or the
+		Bolo UI will misinterpret each word as a keyword.  Nine times out of
+		ten that won't work (and that tenth time is a doozy!).  Here, we've
+		set the label of our metric block to the phrase "average
+		latency".</p>
+
+		<p class="note"><strong>Note:</strong> Bolo doesn't understand
+		"normal" escape sequences like <tt>\n</tt> or <tt>\t</tt>.  This
+		also means that it is impossible to embed double quotes in the text
+		you want displayed.  This may be fixed in the near future, if enough
+		people ask for it over on
+		<a href="https://github.com/bolo/ui/issues">Github</a>.</p>
+
+		<p>The last odd-looking bit is that <tt>query</tt> value,
+		<tt>[SELECT ....]</tt>.  This is just another quoted string, albeit
+		a strange and exotic one.  The <tt>[</tt> and <tt>]</tt> characters
+		(they're called "square brackets") provide a kind of <i>super
+		quoting</i> that normal double-quote characters just aren't up to:
+		<strong>(a)</strong> line breaks are allowed, and,
+		<strong>(b)</strong> long runs of white-space are shortened to a
+		single space.</p>
+
+		<p>That means that these two strings are equivalent:</p>
+
+		<pre><code>% double-quoted:
+"SELECT MEAN(field) FROM series BETWEEN 8d AGO AND NOW AGGREGATE HOURLY"
+
+% the more readable, bracket-quoted:
+[SELECT MEAN(fields)
+   FROM series
+     BETWEEN 8d AGO
+         AND NOW
+     AGGREGATE HOURLY]</code></pre>
+
+		<p>We personally prefer the bracket-quoting style for queries, and
+		the double-quoted style for text strings.  We think you will too.</p>
+
+
+		<a id="grid"></a>
+		<h2 toc="*">Life On The Grid</h2>
+
+		<p>Boards are made up of blocks, and those blocks are laid out
+		on a 12-wide grid.  Each block can span multiple rows and columns,
+		giving you immense flexibility in building out your monitoring
+		views.</p>
+
+		<img src="/docs/grid.png" alt="bolo grid system"
+		     class="block">
+
+		<p>Blocks come in a few flavors: <em>metric</em>, <em>sparkline</em>,
+		<em>graph</em>, and <em>scatterplot</em> blocks.  There's also a
+		<tt>break</tt> keyword that will force the grid to continue on the
+		next available left-most slot.</p>
+
+		<p>So, without further ado, let's build a board!</p>
+
+		<pre><code>;
+% My First Bolo Board
+% (thanks to the tutorial)
+%
+metric {
+    size 3x3
+    query [SELECT running
+             FROM cluster/1:prod:containers
+               BETWEEN 10m ago and now]
+}</code></pre>
+
+		<p>We define a <tt>metric</tt> block that is 3 columns wide by 3
+		rows tall (about 200px square), and have it pull the number of
+		running application containers from our production cluster/1
+		instance.</p>
+
+		<p>(Mind you, this example will ony work if you <i>actually have</i>
+		a data series named <var>cluster/1:prod:containers</var>, so if you
+		don't, you'll need to find something suitable in your data set)</p>
+
+
+
+		<a id="metric"></a>
+		<h2 toc="*">Metric Blocks</h2>
+
+		<span class="example">
+			threshold "ms" {
+				default: white/navy
+			}
+			metric {
+				unit "ms"
+				label "average latency"
+				color @ms
+				query [SELECT metric FROM series]
+				graph on
+			}
+		</span>
+
+		<p>Metric blocks are handy when you can distill part of a system down
+		to a single number, like "how many application containers are we
+		currently running globally?", or "what's the stock price at right
+		now?"</p>
+
+		<p>Each metric consists of the value, displayed nice and large so
+		you can see it across the room, and a user-defined unit.  A helpful
+		label can be placed in the bottom right corner.</p>
+
+		<p>The color scheme is determined by a
+		<a href="#thresholds">threshold rule</a>
+		&mdash; the current value will be compared against a set of ranges
+		to determine the right foreground and background colors to use.
+		This can be useful for flipping a metric from green (everything's
+		cool) to red (uh-oh) when it rises too high or drops too low.</p>
+
+		<p>Here's an example metric:</p>
+
+		<pre><code>metric {
+  size  3x3
+  unit  "ms"
+  label "average latency"
+  color @ms
+  graph yes
+  query [SELECT MEDIAN(latency) FROM web-requests:stats]
+}</code></pre>
+
+		<h3>query (required)</h3>
+		<p><tt>query</tt> defines the data query that will feed data into
+		the metric.  Only the last (most recent) value of the resulting data
+		set will be used.</p>
+
+		<h3>size</h3>
+		<p><tt>size</tt> specifies the size (ROWSxCOLS) of the block
+		in the grid.  Defaults to "3x3" &mdash; you probably ought to keep
+		these square, since that's how they display best.</p>
+
+		<h3>unit</h3>
+		<p><tt>unit</tt> sets the unit of measurement, which will be
+		displayed alongside the metric value.  This parameter is optional
+		&mdash; if you omit it, no unit will be displayed.</p>
+
+		<h3>label</h3>
+		<p><tt>label</tt> sets the text to print in the lower right-hand
+		corner of the metric block.  This parameter is optional &mdash; if
+		you omit it, no label will be displayed.</p>
+
+		<h3>color</h3>
+		<p><tt>color</tt> references the <em>threshold rules</em> to use for
+		controlling the foreground and background colors.  This parameter is
+		optional &mdash; you can skip it if you like the default colors
+		(white foreground on a navy blue background).</p>
+
+		<h3>graph</h3>
+		<p><tt>graph</tt> festoons the metric block with a tiny spark line,
+		using the foregounrd color (per threshold) that shows the entire
+		span of the data.</p>
+
+
+
+		<a id="threshold"></a>
+		<h2 toc="*">Threshold Rules</h2>
+		<p>To take full advantage of the <tt>metric</tt> block type, you're
+		going to want to define and use <em>threshold rules</em>.  These
+		define what color scheme to use, based on the value displayed in the
+		metric block.</p>
+
+		<p>Here's an example threshold ruleset:</p>
+
+		<pre><code>threshold "ms" {
+  when < 40:  white/green
+  when < 200: white/orange
+  default:    white/red
+}</code></pre>
+
+		<p>Each rule consists of the a conditional and a
+		foreground/background color pair to use when the condition is
+		met.  Rules are evaluated in-order.  Evaluation stops on the first
+		match.</p>
+
+		<p>The <tt>default</tt> rule fires if none of the other
+		rules do.  You only get one <tt>default</tt> rule, and it has to go at
+		the end.</p>
+
+		<p>Other rules are specified using the <tt>when</tt> keyword, a
+		<em>comparison operator</em> and a literal value.  Comparison
+		operators are (we think) pretty straightforward, but here's an
+		exhaustive reference if you're into that sort of thing:</p>
+
+		<ul>
+			<li><tt>when &lt; x</tt> - triggers if the metric value is
+			strictly less than <b>x</b>.</li>
+			<li><tt>when &lt;= x</tt> - triggers if the metric value is
+			less than or equal to <b>x</b>.</li>
+			<li><tt>when &gt; x</tt> - triggers if the metric value is
+			strictly greater than <b>x</b>.</li>
+			<li><tt>when &gt;= x</tt> - triggers if the metric value is
+			greater than or equal to <b>x</b>.</li>
+			<li><tt>when = x</tt> - triggers if the metric value is
+			strictly equal to <b>x</b>.</li>
+			<li><tt>when != x</tt> - triggers if the metric value is
+			strictly not equal to <b>x</b>.</li>
+		</ul>
+
+		<p>Colors are specified as either <tt>bg</tt>, or <tt>fg/bg</tt>.
+		You can use color names like <span class="swatch
+		orange">orange</span> or <span class="swatch navy">navy</span>,
+		or hex values like <span class="swatch x1b2">#1b2</span> or <span
+		class="swatch xf0f7">#ff00ff77 (rgba!)</span></p>
+
+
+
+		<a id="sparkline"></a>
+		<h2 toc="*">Sparkline Blocks</h2>
+
+		<span class="example">
+			sparkline {
+				size 8x1
+				query [SELECT metric FROM series]
+				label "Average Request Latency"
+				color forestgreen
+			}
+		</span>
+
+		<p>Sparklines are low-profile, unit-less graphs that let you show
+		overall trends of a single series, over time.  They look pretty
+		great in 12x1 and 6x1 sizes, and can pack a lot of information into
+		a surprising amount of space.</p>
+
+		<p>Here's an example sparkline:</p>
+
+		<pre><code>sparkline {
+  size    12x1
+  label  "Average Request Latency"
+  color   forestgreen
+  query [SELECT mean(used) FROM web/0:prod
+           BETWEEN 1h AGO AND NOW]
+}</code></pre>
+
+		<h3>query (required)</h3>
+		<p><tt>query</tt> defines the data query that will feed data into
+		the sparkline.  To avoid taxing the Bolo server, and to avoid artifacts
+		of data series scaling, you should generaly use aggregated
+		queries.</p>
+
+		<h3>label (required)</h3>
+		<p><tt>label</tt> provides the text to the left of the sparkline
+		itself.  The space for the label is statically fixed (scaled
+		according to <tt>size</tt>), so you may need to experiment to find
+		the most visually appealing wording.</p>
+
+		<h3>plot</h3>
+		<p><tt>plot</tt> is useful when you have a query that is returning
+		multiple metrics from the data series and you need to tell Bolo
+		which one you want to plot as your sparkline.  Sharing queries
+		across blocks can greatly increase the performance of your board.</p>
+
+		<h3>size</h3>
+		<p><tt>size</tt> specifies the size (ROWSxCOLS) of the block
+		in the grid.  Defaults to '12x1'.  Sparklines work best with x1
+		sizes that are wider than 3x.  Anything narrower and the label gets
+		crowded out; anything taller and you're just wasting vertical space
+		(and probably wanted a <em>graph</em> anyway).</p>
+
+		<h3>color</h3>
+		<p><tt>color</tt> sets the color used to draw the sparkline itself.
+		This parameter is optional &mdash; if you omit it, the sparkline
+		will be drawn in boring old black.</p>
+
+
+
+		<a id="graph"></a>
+		<h2 toc="*">Graph Blocks</h2>
+		<span class="example">
+			graph {
+				size 8x3
+				query [SELECT metric FROM series]
+				plot "metric" {
+					as line
+					color skyblue
+				}
+			}
+		</span>
+
+		<p>Graphs are the workhorse of most monitoring shops.  You can use
+		them to compare information side-by-side, stack data into stream- or
+		flow-based analytics, and more.</p>
+
+		<p>Here is a sample graph:</p>
+
+		<pre><code>graph {
+  size 4x3
+  query [SELECT num.containers
+           FROM diego:runtime:cf-prod/1
+             AFTER 30m AGO]
+
+  plot "num.containers" {
+    as area
+    color darkblue 
+  }
+}</code></pre>
+
+		<h3>query (required)</h3>
+		<p><tt>query</tt> defines the data query that will feed data into
+		the graph.  To avoid taxing the Bolo server, and to avoid artifacts
+		of data series scaling, you should generaly use aggregated
+		queries.</p>
+
+		<h3>size</h3>
+		<p><tt>size</tt> specifies the size (ROWSxCOLS) of the block
+		in the grid.  Defaults to '4x3'.  Graphs usually work out best if they
+		are wider than they are tall, but you know your data better than we do.</p>
+
+		<h3>plot</h3>
+		<p>A graph is nothing without its plots.  Each <tt>plot { ... }</tt>
+		subsection of the graph defines another line or area on the final
+		graph.</p>
+
+		<p class="note"><strong>Note:</strong> Currently, the UI backend
+		only supports a single data series result per query.  This prohibits
+		the front-end from supporting multiple <tt>plot</tt> subsections.
+		This limitation will be removed soon, so stay tuned.</p>
+
+		<p>Plots have the following parameters:</p>
+
+		<h3>as (plot)</h3>
+		<p>Whether the data should be plotted as a <tt>line</tt>, or as an
+		<tt>area</tt>.  Currently, only <tt>area</tt> (the default) is
+		supported, but that will change in the future.  Other values will
+		cause the board to throw an error.</p>
+
+		<h3>color (plot)</h3>
+		<p>The color of the line (for <tt>as line</tt>) or the filled region
+		(for <tt>as area</tt>).  Area plots will get a programmatically
+		darkened "cap" line, so feel free to use light pastel colors without
+		fear of legibility problems.</p>
+
+		<p>Colors can be specified using either W3C Named Colors like
+		<span class="swatch orange">orange</span> or <span class="swatch
+			navy">navy</span>, or hex RGB(A) values like
+		<span class="swatch x1b2">#1b2</span> or
+		<span class="swatch xf0f7">#ff00ff77 (rgba!)</span></p>
+
+		<h3>width (plot)</h3>
+		<p>How wide to draw the plot line in a <tt>line</tt> plot.  Has
+		absolutely no effect on the <tt>area</tt> plots.  Defaults to 2.</p>
+
+
+
+		<a id="scatterplot"></a>
+		<h2 toc="*">Scatter Plot Blocks</h2>
+		<span class="example">
+			scatterplot {
+				size 4x4
+				query [SELECT metric, other FROM series]
+				x metric
+				y other
+			}
+		</span>
+
+		<p>Scatter plots (or <i>scatter diagrams</i>) are a powerful twist
+		on time series data whereby you can compare to different time
+		series, one against the other, looking for correlation or causality.
+		The value range of one series is taken as the x-axis, the other as
+		the y-axis, and the data points (x,y) are plotted.</p>
+
+		<p>With completely independent data, a scatter plot will show
+		uniform distribution throughout the cartesian field.  It will just
+		look like a bunch of dots, probably clustered around the center, but
+		otherwise non-uniform.</p>
+
+		<p>If there is a correlation between the data, you should be able to
+		trace a line (the <i>trendline</i>) that shows the mathematical
+		kernel of the correlation / causality.</p>
+
+		<p>Here is a sample scatter plot:</p>
+
+		<pre><code>scatterplot {
+  size 4x3
+  query [SELECT used, total
+           FROM memory
+             AFTER 30m AGO]
+
+  x used
+  y total
+}</code></pre>
+
+		<h3>query (required)</h3>
+		<p><tt>query</tt> defines the data query that will feed data into
+		the graph.  To avoid taxing the Bolo server, and to avoid artifacts
+		of data series scaling, you should generaly use aggregated
+		queries.</p>
+
+		<h3>x (required)</h3>
+		<p><tt>x</tt> identifies the field in the <tt>query</tt> that will
+		be used for the x-axis of the scatter plot.  In a data set with only
+		one <i>independent</i> variable, that variable is usually plotted on
+		the x-axis.</p>
+
+		<h3>y (required)</h3>
+		<p><tt>y</tt> identifies the field in the <tt>query</tt> that will
+		be used for the y-axis of the scatter plot.  In a data set with a
+		<i>dependent</i> variable, that variable is usually plotted on the
+		y-axis.</p>
+
+		<h3>size</h3>
+		<p><tt>size</tt> specifies the size (ROWSxCOLS) of the block
+		in the grid.  Defaults to '4x3'.  Scatter plots usually work out
+		best if they are roughly square, giving equal screen real estate to
+		both data series, but you know your data better than we do.</p>
+
+
+
+		<a id="placeholder"></a>
+		<h2 toc="*">Placeholder Blocks</h2>
+
+		<span class="example">
+			placeholder { }
+		</span>
+
+		<p>There is another type of block, the <tt>placeholder</tt> that
+		doesn't query any data from Bolo &mdash; it just sits there on your
+		board, taking up space.</p>
+
+		<p>Sounds useless, but bear with me for just a minute.</p>
+
+		<p>If you're trying to mock up a board, placeholder blocks can be
+		quite useful.  You can put whatever text in them you want (within
+		reason), and they can be any size.  Once you're happy with the
+		overal layout, you can start replacing your placeholders with real
+		blocks.  For bonus points, change out the <tt>text</tt> parameter to
+		show people what's going to go where!</p>
+
+		<p>Placeholders can quite literally "sub in" for any other block, as
+		long as you know the dimensions.  Having trouble with a particular
+		<tt>graph</tt> and just want to temporarily disable it?  Comment out
+		the graph definition and put a small <tt>placeholder</tt> right
+		beside it!</p>
+
+		<pre><code>placeholder {
+  size 3x3
+  text "CPU (TBD)"
+}</code></pre>
+
+		<h3>size</h3>
+		<p><tt>size</tt> specifies the size (ROWSxCOLS) of the block
+		in the grid.  Defaults to '3x3'.  Placeholders look great at any
+		size (depending on your text), so have fun!</p>
+
+		<h3>text</h3>
+		<p><tt>text</tt> is what you want show up in the placeholder.
+		Defaults to "placeholder", which, admittedly, is not terribly
+		exciting.</p>
+
+		<h3>color</h3>
+		<p><tt>color</tt> sets the color of the placeholder background and
+		foreground text.</p>
+
+		<p>Colors are specified as either <tt>bg</tt>, or <tt>fg/bg</tt>.
+		Foreground color defaults to black.
+		You can use color names like <span class="swatch
+		orange">orange</span> or <span class="swatch navy">navy</span>,
+		or hex values like <span class="swatch x1b2">#1b2</span> or <span
+		class="swatch xf0f7">#ff00ff77 (rgba!)</span></p>
+
+
+
+		<a id="helllllp"></a>
+		<h2 toc="*">Getting Help</h2>
+		<p>No document can stand against the collective knowledge of the
+		team that wrote the software, and while we have high hopes that you
+		got something useful out of this document, we're not going to hold
+		our breath.</p>
+
+		<p>If you've still got questions, head over to our
+		<a href="https://github.com/bolo/ui/issues">Github Issue Tracker</a>
+		and open up a new issue.  We'll try to help out as best we can.</p>
+
+		<p>Alternatively, if you're a big hotshot <em>BoardCoder</em>, and you
+		want to show off your monitoring-y visualizing prowess, head over to
+		our <a href="https://github.com/bolo/ui/issues">Github Issue Tracker</a>
+		and see if you can't help out other fellow Bolo-ers?  It's good
+		karma...</p>
+
+
+		<!-- hope the semantic web people don't find out about this... -->
+		<br><br><br><br><br><br><br><br>
+		<br><br><br><br><br><br><br><br>
+		<br><br><br><br><br><br><br><br>
+		<h2 id="end">The End</h2>
+		<p>Look at you.  You made it all the way to the end of the docs!</p>
+		<p>Here, have a cupcake.</p>
+		<img src="/docs/cupcake.jpg">
+
+
+
+	</div>
+	<div class="w3">
+		<ol id="toc"></ol>
+	</div>
+	<div class="w12 footer">
+		Copyright &copy; 2017 The Bolo Authors · <a href="https://github.com/bolo/ui" rel="code">code</a> · <a href="/">home</a>
+	</div>
+</div>
+<script type="text/javascript" src="/js/jq.js"></script>
+<script type="text/javascript" src="/js/d3.js"></script>
+<script type="text/javascript" src="/js/color.js"></script>
+<script type="text/javascript" src="/js/parser.js"></script>
+<script type="text/javascript" src="/js/bolo.js"></script>
+</body>
+</html>

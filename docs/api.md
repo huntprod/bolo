@@ -159,6 +159,8 @@ Accept: application/json
 
 wih the same response format as above.
 
+(FIXME: above not yet implemented)
+
 ### POST /v1/boards
 
 **Request**:
@@ -269,6 +271,8 @@ HTTP/1.1 204 No Content
 
 ### GET /v1/query?q=...
 
+Run a single query, and returns its results.
+
 **Request**:
 
 ```
@@ -288,6 +292,9 @@ Content-Length: ...
 
 ### POST /v1/query
 
+Run multiple queries, and returns the results of each, indexed in
+such a way that the caller can tell one resultset from another.
+
 **Request**:
 
 ```
@@ -296,7 +303,10 @@ Content-Type: application/x-www-form-urlencoded
 Accept: application/json
 Content-Length: ...
 
-q=...
+{
+  "cpu-usage": "SELECT cpu WHERE env = prod",
+  "mem-usage": "SELECT mem WHERE env = prod"
+}
 ```
 
 **Response**:
@@ -306,6 +316,23 @@ HTTP/1.1 200 OK
 Content-Type: application/json
 Content-Length: ...
 
-{ ... }
+{
+  "cpu-usage": {
+    "cpu" : [
+       {"t":1513785194,"v":1.2345},
+       {"t":1513785195,"v":1.2301},
+       {"t":1513785196,"v":1.2317},
+       ...
+    }
+  },
+  "mem-usage": {
+    "mem" : [
+      {"t":1513785194,"v":67.34},
+      {"t":1513785195,"v":67.32},
+      {"t":1513785196,"v":67.34},
+       ...
+    }
+  }
+}
 ```
 

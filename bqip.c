@@ -101,8 +101,14 @@ bqip_read(struct bqip *c)
 			return 1; /* WAIT */
 
 		i = 0;
-		if (c->rcvbuf.data[i] != 'Q')
+		switch (c->rcvbuf.data[i]) {
+		case 'Q':
+		case 'P':
+		case 'M': break;
+		default:
 			return -1; /* ERR */
+		}
+		c->request.type = c->rcvbuf.data[i];
 
 		i++;
 		if (c->rcvbuf.data[i] != '|')
@@ -154,76 +160,35 @@ bqip_read(struct bqip *c)
 }
 
 int
-bqip_send_error(struct bqip *c, const char *e)
+bqip_sendn(struct bqip *c, const void *buf, size_t len)
 {
-	char pre[32];
-	int len, n;
-
-	len = strlen(e);
-
-	errno = EINVAL;
-	n = snprintf(pre, 32, "E|%d|", len);
-	if (n < 4 || n > 32) return -1; /* ERR */
-
-	if (bqip_buf_streamout(&c->sndbuf, c->fd, pre,  n)   != 0) return -1;
-	if (bqip_buf_streamout(&c->sndbuf, c->fd, e,    len) != 0) return -1;
-	if (bqip_buf_streamout(&c->sndbuf, c->fd, "\n", 1)   != 0) return -1;
+	if (bqip_buf_streamout(&c->sndbuf, c->fd, buf, len) != 0) return -1;
 	return 0;
+}
+
+int bqip_send0(struct bqip *c, const char *buf)
+{
+	return bqip_sendn(c, buf, strlen(buf));
 }
 
 int
-bqip_send_result(struct bqip *c, int nsets)
+bqip_send_error(struct bqip *c, const char *e)
 {
-	char reply[32];
-	int n;
-
-	errno = EINVAL;
-	n = snprintf(reply, 32, "R|%d\n", nsets);
-	if (n < 4 || n > 32) return -1; /* ERR */
-
-	if (bqip_buf_streamout(&c->sndbuf, c->fd, reply, n) != 0) return -1;
+	if (bqip_sendn(c, "E|", 2) != 0) return -1;
+	if (bqip_send0(c, e)       != 0) return -1;
 	return 0;
 }
 
-#define TUPLE_LEN (13 + 1 + 10 + 1)
-#define TUPLE_FMT "%013lu:%010e"
-int bqip_send_set(struct bqip *c, int ntuples, const char *key)
+int bqip_send_tuple(struct bqip *c, struct result *r)
 {
-	char pre[64];
-	int n, len;
+	ssize_t n;
+	char buf[64];
 
-	errno = EINVAL;
-	len = strlen(key) + 1 + ntuples * (TUPLE_LEN + 1) - 1;
-	n = snprintf(pre, 64, "S|%d|%d|", ntuples, len);
-	if (n < 6 || n > 64) return -1; /* ERR */
-
-	len = strlen(key);
-	if (bqip_buf_streamout(&c->sndbuf, c->fd, pre, n)   != 0) return -1;
-	if (bqip_buf_streamout(&c->sndbuf, c->fd, key, len) != 0) return -1;
-	if (bqip_buf_streamout(&c->sndbuf, c->fd, "=", 1)   != 0) return -1;
-	return 0;
-}
-
-int bqip_send_tuple(struct bqip *c, struct result *r, int first)
-{
-	char buf[TUPLE_LEN+2], *p;
-
-	p = buf;
-	if (!first) *p++ = ',';
-
-	if (snprintf(p, TUPLE_LEN+1, TUPLE_FMT, r->start, r->value) != TUPLE_LEN+1)
-		/*return -1;*/fprintf(stderr, "got wrong bytes count for [%s]\n", buf);
-
-	fprintf(stderr, "buf[%s]\n", buf);
-	if (bqip_buf_streamout(&c->sndbuf, c->fd, buf, (p-buf)+TUPLE_LEN) != 0)
+	n = snprintf(buf, 64, "%lu:%e,", r->start, r->value);
+	if (n > 64 || n < 0)
 		return -1;
-	return 0;
-}
 
-int bqip_flush(struct bqip *c)
-{
-	if (bqip_buf_streamout(&c->sndbuf, c->fd, "\n", 1) != 0)
-		return -1;
+	if (bqip_sendn(c, buf, n) != 0) return -1;
 	return 0;
 }
 
@@ -264,21 +229,7 @@ TESTS {
 
 		lseek(fd, 0, SEEK_SET);
 		get(buf, 8192, fd);
-		is_string(buf, "E|4|oops\n", "bqip_send_error() encodes properly");
-
-		close(fd);
-		bqip_deinit(&b);
-	}
-
-	subtest {
-		reset();
-
-		rc = bqip_send_result(&b, 14);
-		is_signed(rc, 0, "bqip_send_result() succeeds");
-
-		lseek(fd, 0, SEEK_SET);
-		get(buf, 8192, fd);
-		is_string(buf, "R|14\n", "bqip_send_result() encodes properly");
+		is_string(buf, "E|oops", "bqip_send_error() encodes properly");
 
 		close(fd);
 		bqip_deinit(&b);
@@ -288,23 +239,23 @@ TESTS {
 		struct result r;
 		reset();
 
-		ok(bqip_send_set(&b, 3, "host") == 0, "bqip_send_set() succeeds");
+		ok(bqip_send0(&b, "R|")   == 0, "bqip_sendn() sends result packet identifier");
+		ok(bqip_send0(&b, "cpu=") == 0, "bqip_sendn() sends resultset identifier");
 
 		r.start = 1; r.value = 1.0;
-		ok(bqip_send_tuple(&b, &r, 1) == 0, "bqip_send_tuple() succeeds");
+		ok(bqip_send_tuple(&b, &r) == 0, "bqip_send_tuple() succeeds");
 
 		r.start = 2; r.value = 2.0;
-		ok(bqip_send_tuple(&b, &r, 0) == 0, "bqip_send_tuple() succeeds");
+		ok(bqip_send_tuple(&b, &r) == 0, "bqip_send_tuple() succeeds");
 
 		r.start = 3; r.value = 3.0;
-		ok(bqip_send_tuple(&b, &r, 0) == 0, "bqip_send_tuple() succeeds");
-		ok(bqip_flush(&b) == 0, "bqip_flush() succeeds");
+		ok(bqip_send_tuple(&b, &r) == 0, "bqip_send_tuple() succeeds");
 
 		lseek(fd, 0, SEEK_SET);
 		get(buf, 8192, fd);
 		is_string(buf,
-			"S|3|73|host=0000000001:1.000000e+0,0000000002:2.000000e+0,0000000003:3.000000e+0\n",
-			"bqip_send_set() encodes properly");
+			"R|cpu=1:1.000000e+00,2:2.000000e+00,3:3.000000e+00,",
+			"bqip is encoded properly");
 
 		close(fd);
 		bqip_deinit(&b);

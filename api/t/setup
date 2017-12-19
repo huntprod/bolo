@@ -1,0 +1,7 @@
+#!/bin/bash
+set -e
+
+rm -f main.db
+sqlite3 main.db < db.sql
+sqlite3 main.db < t/setup.sql
+./api --db main.db

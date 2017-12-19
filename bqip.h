@@ -5,6 +5,21 @@
 
 #define BQIP_BUFSIZ 8192
 
+/* BQIP packets:
+
+                               Run <query>, which is <n> octets long
+   C> Q|<n>|<query>\n
+   S> R|field1=t:v,t:v,t:v|field2=t:v,t:v,t:v|...<EOF>
+
+                               Plan <query>, which is <n> octets long
+   C> P|<n>|<plan>\n
+   S> R|field1|field2|...<EOF>
+
+                               List metrics matching the given filter
+   C> M|<n>|<filter>\n
+   S> R|cpu:tag=value|mem:tag=value|...<EOF>
+ */
+
 struct bqip_buf {
 	char   data[BQIP_BUFSIZ];
 	size_t len;
@@ -24,6 +39,7 @@ struct bqip {
 	struct bqip_buf sndbuf;
 
 	struct {
+		char    type;
 		size_t  len;
 		size_t  dot;
 		char   *payload;
@@ -35,10 +51,9 @@ void bqip_deinit(struct bqip *c);
 
 int bqip_read(struct bqip *c);
 
+int bqip_sendn(struct bqip *c, const void *buf, size_t len);
+int bqip_send0(struct bqip *c, const char *s);
 int bqip_send_error(struct bqip *c, const char *e);
-int bqip_send_result(struct bqip *c, int nsets);
-int bqip_send_set(struct bqip *c, int ntuples, const char *key);
-int bqip_send_tuple(struct bqip *c, struct result *r, int first);
-int bqip_flush(struct bqip *c);
+int bqip_send_tuple(struct bqip *c, struct result *r);
 
 #endif
