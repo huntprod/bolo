@@ -36,8 +36,8 @@ int main(int argc, char **argv)
 	if ((s = getenv("BOLO_DEBUG")) != NULL)
 		debugto(2);
 
-	if (streq(command, "-v") == 0
-	 || streq(command, "--version") == 0)
+	if (streq(command, "-v")
+	 || streq(command, "--version"))
 		command = "version";
 
 	#define RUN(c) if (streq(command, #c)) return do_ ## c (argc, argv)
