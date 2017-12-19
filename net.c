@@ -148,6 +148,7 @@ net_poll_fd(struct net_poller *np, int fd, net_handler_fn fn, void *udata)
 {
 	int i;
 	struct epoll_event ev;
+	memset(&ev, 0, sizeof(ev));
 
 	for (i = 0; i < np->maxconns; i++) {
 		if (np->conns[i].handler) continue;
