@@ -101,6 +101,11 @@ s_configure_core(struct core_config *cfg, int fd)
 		BUG(eol != NULL,  "configure() ended up with a NULL eol marker somehow (this is curious)");
 		BUG(*eol == '\n', "configure() ended up with a non-newline eol marker somehow (this is curious)");
 
+		/* ignore trailing whitespace by shifting eol */
+		for (eol--; eol >= buf && isspace(*eol); eol--)
+			;
+		eol++;
+
 		/* find start of the key */
 		k = &buf[0];
 		while (k != eol && isspace(*k))
@@ -260,6 +265,11 @@ s_configure_agent(struct agent_config *cfg, int fd)
 
 		BUG(eol != NULL,  "configure() ended up with a NULL eol marker somehow (this is curious)");
 		BUG(*eol == '\n', "configure() ended up with a non-newline eol marker somehow (this is curious)");
+
+		/* ignore trailing whitespace by shifting eol */
+		for (eol--; eol >= buf && isspace(*eol); eol--)
+			;
+		eol++;
 
 		/* find start of the key */
 		k = &buf[0];
