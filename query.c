@@ -180,7 +180,8 @@ qcond_free(struct qcond *qcond)
 static void
 qexpr_free(struct qexpr *qexpr)
 {
-	struct qexpr *next;
+	struct qexpr *next_qexpr;
+	struct multidx *set, *next_set;
 
 	while (qexpr) {
 		switch (qexpr->type) {
@@ -208,10 +209,17 @@ qexpr_free(struct qexpr *qexpr)
 		}
 
 		free_resultset(qexpr->result);
+		set = qexpr->set;
+		while (set) {
+			next_set = set->next;
+			free(set);
+			set = next_set;
+		}
+		qexpr->set = NULL;
 
-		next = qexpr->next;
+		next_qexpr = qexpr->next;
 		free(qexpr);
-		qexpr = next;
+		qexpr = next_qexpr;
 	}
 }
 
@@ -299,6 +307,7 @@ query_exec(struct query *q, struct db *db, struct query_ctx *ctx)
 			}
 
 			qx->result = rset;
+			rsv_free(rsv);
 		}
 	}
 	return 0;
@@ -542,6 +551,7 @@ TESTS {
 
 	subtest { /* live database querying */
 		struct db *db;
+		struct dbkey *key;
 		struct query *q;
 		struct query_ctx ctx;
 		const char *query;
@@ -550,7 +560,7 @@ TESTS {
 		memset(&ctx, 0, sizeof(ctx));
 		ctx.now = 983552821000; /* Fri, 02 Mar 2001 17:07:01+0000 */
 
-		if (!(db = db_mount("t/data/db/1", read_key("decafbad"))))
+		if (!(db = db_mount("t/data/db/1", key = read_key("decafbad"))))
 			BAIL_OUT("failed to mount database at t/data/db/1 successfully");
 
 		/* i.e. `BOLO_NOW='2001-03-02 17:07:01' ./bolo query t/data/db/1/ 'select cpu where env=staging after 6h ago aggregate 1h'` */
@@ -736,6 +746,11 @@ TESTS {
 				"data point #1 (median) value is correct");
 
 		query_free(q);
+
+		ok(db_unmount(db) == 0,
+			"db_unmount() should succeed");
+		free(key->key);
+		free(key);
 	}
 }
 /* LCOV_EXCL_STOP */

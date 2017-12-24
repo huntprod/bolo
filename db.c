@@ -1040,6 +1040,9 @@ TESTS {
 		is_unsigned(k->key[5] & 0xff, 0xab, "k[5] is 0xab");
 		is_unsigned(k->key[6] & 0xff, 0xcd, "k[6] is 0xcd");
 		is_unsigned(k->key[7] & 0xff, 0xef, "k[7] is 0xef");
+
+		free(k->key);
+		free(k);
 	}
 
 	subtest {
@@ -1149,6 +1152,9 @@ TESTS {
 		ok(db_unmount(db) == 0,
 			"db_unmount() should succeed");
 	}
+
+	free(key1->key); free(key1);
+	free(key2->key); free(key2);
 }
 /* LCOV_EXCL_STOP */
 #endif

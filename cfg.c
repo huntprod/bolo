@@ -365,13 +365,19 @@ s_deconfigure_core(struct core_config *config)
 	config->metric_listen = NULL;
 }
 
+static void
+s_deconfigure_agent(struct agent_config *config)
+{
+	free(config->base_dir);
+	config->base_dir = NULL;
+}
+
 void
 deconfigure(int type, void *cfg)
 {
 	switch (type) {
-	case CORE_CONFIG:
-		s_deconfigure_core((struct core_config *)cfg);
-		break;
+	case CORE_CONFIG:  s_deconfigure_core((struct core_config *)cfg); break;
+	case AGENT_CONFIG: s_deconfigure_agent((struct agent_config *)cfg); break;
 	}
 }
 
@@ -586,6 +592,7 @@ TESTS {
 
 		try(AGENT_CONFIG, cfg, "base.dir = /path/to/somewhere");
 		is_string(cfg.base_dir, "/path/to/somewhere", "base.dir parsed properly");
+		deconfigure(AGENT_CONFIG, &cfg);
 	}
 
 	subtest {
