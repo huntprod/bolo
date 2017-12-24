@@ -550,7 +550,7 @@ TESTS {
 		memset(&ctx, 0, sizeof(ctx));
 		ctx.now = 983552821000; /* Fri, 02 Mar 2001 17:07:01+0000 */
 
-		if (!(db = db_mount("t/data/db/1")))
+		if (!(db = db_mount("t/data/db/1", read_key("decafbad"))))
 			BAIL_OUT("failed to mount database at t/data/db/1 successfully");
 
 		/* i.e. `BOLO_NOW='2001-03-02 17:07:01' ./bolo query t/data/db/1/ 'select cpu where env=staging after 6h ago aggregate 1h'` */

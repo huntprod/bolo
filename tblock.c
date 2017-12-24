@@ -37,8 +37,8 @@ void tblock_init(struct tblock *b, uint64_t number, bolo_msec_t base)
 	tblock_write64(b, 16, b->number);
 	tblock_write64(b, 24, b->next);
 
-	if (ENC_KEY)
-		tblock_seal(ENC_KEY, ENC_KEY_LEN, b);
+	if (b->key)
+		tblock_seal(b, b->key);
 }
 
 int tblock_isfull(struct tblock *b)
@@ -73,8 +73,8 @@ tblock_insert(struct tblock *b, bolo_msec_t when, double what)
 	tblock_write32 (b, 32 + b->cells * 12,     when - b->base);
 	tblock_write64f(b, 32 + b->cells * 12 + 4, what);
 	tblock_write16 (b, 6, ++b->cells);
-	if (ENC_KEY)
-		tblock_seal(ENC_KEY, ENC_KEY_LEN, b);
+	if (b->key)
+		tblock_seal(b, b->key);
 	return 0;
 }
 
@@ -83,6 +83,6 @@ tblock_next(struct tblock *b, struct tblock *next)
 {
 	b->next = next->number;
 	tblock_write64(b, 24, b->next);
-	if (ENC_KEY)
-		tblock_seal(ENC_KEY, ENC_KEY_LEN, b);
+	if (b->key)
+		tblock_seal(b, b->key);
 }

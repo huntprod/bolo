@@ -1,4 +1,5 @@
 #include "bolo.h"
+#include <getopt.h>
 #include <time.h>
 
 static void
@@ -45,8 +46,54 @@ int
 do_query(int argc, char **argv)
 {
 	struct db *db;
+	struct dbkey *key;
 	struct query *query;
 	struct query_ctx ctx;
+
+	{
+		char *key_str;
+		int idx = 0;
+		char c, *shorts = "hDk:";
+		struct option longs[] = {
+			{"help",      no_argument,       0, 'h'},
+			{"debug",     no_argument,       0, 'D'},
+			{"key",       required_argument, 0, 'k'},
+			{0, 0, 0, 0},
+		};
+
+		while ((c = getopt_long(argc, argv, shorts, longs, &idx)) >= 0) {
+			switch (c) {
+			case 'h':
+				printf("USAGE: %s query [--key \"key-in-hex\"] [--debug] /path/to/db/\n\n", argv[0]);
+				printf("OPTIONS\n\n");
+				printf("  -h, --help              Show this help screen.\n\n");
+				printf("  -k, --key KEY-IN-HEX    The literal, hex-encoded database encryption key.\n");
+				printf("  -D, --debug             Enable debugging mode.\n"
+					   "                          (mostly useful only to bolo devs).\n\n");
+				return 0;
+
+			case 'D':
+				debugto(fileno(stderr));
+				break;
+
+			case 'k':
+				free(key_str);
+				key_str = strdup(optarg);
+				break;
+			}
+		}
+
+		if (key_str) {
+			key = read_key(key_str);
+			if (!key) {
+				fprintf(stderr, "invalid database encryption key given\n");
+				return 1;
+			}
+		} else {
+			printf("USAGE: %s query [--key \"key-in-hex\"] [--debug] /path/to/db/\n\n", argv[0]);
+			return 1;
+		}
+	}
 
 	char *envnow;
 	ctx.now = time(NULL) * 1000;
@@ -67,7 +114,7 @@ do_query(int argc, char **argv)
 		return 1;
 	}
 
-	db = db_mount(argv[2]);
+	db = db_mount(argv[2], key);
 	if (!db) {
 		fprintf(stderr, "%s: %s\n", argv[2], error(errno));
 		return 2;

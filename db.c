@@ -12,20 +12,87 @@
    and the customization is provided by the fs_handler. */
 typedef int(*fs_handler)(struct db *, uint64_t, int);
 
-const char *ENC_KEY = NULL;
-size_t      ENC_KEY_LEN = 0;
-
-void
-encryptdb(const char *key, size_t len)
+struct dbkey *
+rand_key(size_t len)
 {
-	BUG(key != NULL, "enryptdb() given a NULL key to encrypt with");
+	struct dbkey *k;
 
-	if (len == 0)
-		len = strlen(key);
+	BUG(len != 0, "rand_key() asked to generate a random zero-length key");
+	BUG(len <= 4096, "rand_key() asked to generate an impossible large (>4096) key");
 
-	free((char *)ENC_KEY);
-	ENC_KEY     = strdup(key);
-	ENC_KEY_LEN = len;
+	k = calloc(1, sizeof(*k));
+	if (!k)
+		goto fail;
+
+	k->len = len;
+	k->key = calloc(len, sizeof(char));
+	if (!k->key)
+		goto fail;
+
+	if (urand(k->key, k->len) != 0)
+		goto fail;
+
+	return k;
+
+fail:
+	if (k) free(k->key);
+	free(k);
+	return NULL;
+}
+
+struct dbkey *
+read_key(const char *s)
+{
+	size_t i, len;
+	struct dbkey *k;
+
+	BUG(s != NULL, "read_key() given a NULL string to decode into a key");
+
+	k = calloc(1, sizeof(*k));
+	if (!k)
+		goto fail;
+
+	len = strlen(s);
+	if (len % 2)
+		goto fail;
+
+	k->len = len/2;
+	k->key = calloc(len, sizeof(char));
+	if (!k->key)
+		goto fail;
+
+	for (i = 0; i < k->len; i++) {
+		switch (s[i*2]) {
+			case '0': case '1': case '2': case '3': case '4':
+			case '5': case '6': case '7': case '8': case '9':
+				k->key[i] = ((s[i*2] - '0') & 0x0f) << 4;
+				break;
+			case 'a': case 'b': case 'c':
+			case 'd': case 'e': case 'f':
+				k->key[i] = ((s[i*2] - 'a' + 10) & 0x0f) << 4;
+				break;
+			default:
+				goto fail;
+		}
+		switch (s[i*2+1]) {
+			case '0': case '1': case '2': case '3': case '4':
+			case '5': case '6': case '7': case '8': case '9':
+				k->key[i] |= (s[i*2+1] - '0') & 0x0f;
+				break;
+			case 'a': case 'b': case 'c':
+			case 'd': case 'e': case 'f':
+				k->key[i] |= (s[i*2+1] - 'a' + 10) & 0x0f;
+				break;
+			default:
+				goto fail;
+		}
+	}
+	return k;
+
+fail:
+	if (k) free(k->key);
+	free(k);
+	return NULL;
 }
 
 static int
@@ -64,6 +131,7 @@ s_handle_slab(struct db *db, uint64_t id, int fd)
 	slab = malloc(sizeof(*slab));
 	if (!slab)
 		goto fail;
+	slab->key = db->key;
 
 	slab->number = id;
 	if (tslab_map(slab, fd) != 0)
@@ -413,7 +481,7 @@ s_maindb_reader(const char *key, uint64_t id, void *udata)
 }
 
 struct db *
-db_mount(const char *path)
+db_mount(const char *path, struct dbkey *key)
 {
 	struct db *db;
 	int fd, cwd;
@@ -439,6 +507,9 @@ db_mount(const char *path)
 		goto fail;
 
 	db->rootfd = fd;
+	db->key = key;
+	if (!db->key)
+		goto fail;
 
 	infof("checking for main.db index file at %s/%s", path, PATH_TO_MAINDB);
 	fd = openat(db->rootfd, PATH_TO_MAINDB, O_RDONLY);
@@ -494,7 +565,7 @@ fail:
 }
 
 struct db *
-db_init(const char *path)
+db_init(const char *path, struct dbkey *key)
 {
 	struct db *db;
 	int cwd, fd;
@@ -522,6 +593,12 @@ db_init(const char *path)
 	db = calloc(1, sizeof(*db));
 	if (!db)
 		goto fail;
+
+	if (!key)
+		key = rand_key(DEFAULT_KEY_SIZE);
+	if (!key)
+		goto fail;
+	db->key = key;
 
 	db->rootfd = fd;
 	fd = -1;
@@ -770,6 +847,7 @@ s_newslab(struct db *db, uint64_t id)
 	slab = malloc(sizeof(*slab));
 	if (!slab)
 		return NULL;
+	slab->key = db->key;
 
 	/* formulate a path, relative to db root, for this slab */
 	snprintf(path, sizeof(path), "slabs/%04lx.%04lx/%04lx.%04lx.%04lx.%04lx.slab",
@@ -939,7 +1017,30 @@ db_findblock(struct db *db, uint64_t blkid)
 #ifdef TEST
 /* LCOV_EXCL_START */
 TESTS {
+	struct dbkey *key1, *key2;
+
 	startlog("test:db", 0, LOG_ERRORS);
+	key1 = rand_key(DEFAULT_KEY_SIZE);
+	key2 = rand_key(DEFAULT_KEY_SIZE+1);
+	if (!key1 || !key2)
+		BAIL_OUT("failed to generate random testing keys");
+
+	subtest {
+		struct dbkey *k;
+
+		k = read_key("0123456789abcdef");
+		isnt_null(k, "shoud read_key() properly");
+
+		is_unsigned(k->len, 8, "k[] should by 8 octets long");
+		is_unsigned(k->key[0] & 0xff, 0x01, "k[0] is 0x01");
+		is_unsigned(k->key[1] & 0xff, 0x23, "k[1] is 0x23");
+		is_unsigned(k->key[2] & 0xff, 0x45, "k[2] is 0x45");
+		is_unsigned(k->key[3] & 0xff, 0x67, "k[3] is 0x67");
+		is_unsigned(k->key[4] & 0xff, 0x89, "k[4] is 0x89");
+		is_unsigned(k->key[5] & 0xff, 0xab, "k[5] is 0xab");
+		is_unsigned(k->key[6] & 0xff, 0xcd, "k[6] is 0xcd");
+		is_unsigned(k->key[7] & 0xff, 0xef, "k[7] is 0xef");
+	}
 
 	subtest {
 		char *copy;
@@ -963,16 +1064,17 @@ TESTS {
 		struct db *db;
 		char metric[256];
 
+
 		if (system("./t/setup/db-init") != 0)
 			BAIL_OUT("t/setup/db-init failed!");
 
-		db = db_mount("t/tmp/new");
+		db = db_mount("t/tmp/new", key1);
 		is_null(db, "db_mount() should fail with new (empty) new directories");
 
-		db = db_init("t/tmp/old");
+		db = db_init("t/tmp/old", key1);
 		is_null(db, "db_init() should fail with old (existing) data directories");
 
-		db = db_init("t/tmp/new");
+		db = db_init("t/tmp/new", key1);
 		isnt_null(db, "db_init() should succeed with new (empty) new directories");
 		isnt_null(db->main, "db->main hash table should exist for a new database");
 		ok(isempty(&db->idx), "db->idx list should be empty on a new database");
@@ -1000,7 +1102,7 @@ TESTS {
 			"db_unmount() should succeed");
 
 
-		db = db_mount("t/tmp/new");
+		db = db_mount("t/tmp/new", key1);
 		isnt_null(db, "db_mount() should succeed with newly-init'd data directories");
 
 		ok(db_unmount(db) == 0,
@@ -1015,7 +1117,7 @@ TESTS {
 		if (system("./t/setup/db-init") != 0)
 			BAIL_OUT("t/setup/db-init failed!");
 
-		db = db_init("t/tmp/new");
+		db = db_init("t/tmp/new", key2);
 		for (ts = 0; ts < TCELLS_PER_TBLOCK * 2 + 1; ts++) {
 			strcpy(metric, "metric|host=localhost,env=test");
 			if (db_insert(db, metric, 10001 + ts, 4567.89) != 0)
@@ -1034,7 +1136,7 @@ TESTS {
 		ok(db_unmount(db) == 0,
 			"db_unmount() should succeed");
 
-		db = db_mount("t/tmp/new");
+		db = db_mount("t/tmp/new", key2);
 		isnt_null(db, "mounted t/tmp/new a second time");
 
 		ok(hash_isset(db->metrics, "metric"),      "the 'metric' metric should be set in the metric index (post-read)");

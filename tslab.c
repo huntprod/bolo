@@ -30,7 +30,7 @@ int tslab_map(struct tslab *s, int fd)
 
 	/* check the HMAC */
 	errno = BOLO_EBADHMAC;
-	if (ENC_KEY && hmac_check(ENC_KEY, ENC_KEY_LEN, header, TSLAB_HEADER_SIZE) != 0)
+	if (s->key && hmac_check(s->key->key, s->key->len, header, TSLAB_HEADER_SIZE) != 0)
 		return -1;
 
 	/* check host endianness vs file endianness */
@@ -51,6 +51,7 @@ int tslab_map(struct tslab *s, int fd)
 	memset(s->blocks, 0, sizeof(s->blocks));
 	lseek(s->fd, 4096, SEEK_SET);
 	for (i = 0; i < TBLOCKS_PER_TSLAB && n > 0; i++, n -= s->block_size) {
+		s->blocks[i].key = s->key;
 		rc = tblock_map(&s->blocks[i], s->fd,
 		                4096 + i * s->block_size, /* grab the i'th block */
 		                s->block_size);
@@ -114,8 +115,8 @@ int tslab_init(struct tslab *s, int fd, uint64_t number, uint32_t block_size)
 	write8(header,   6, 19); /* from block_size, ostensibly */
 	write32(header,  8, ENDIAN_MAGIC);
 	write64(header, 16, tslab_number(number));
-	if (ENC_KEY)
-		hmac_seal(ENC_KEY, ENC_KEY_LEN, header, sizeof(header));
+	if (s->key)
+		hmac_seal(s->key->key, s->key->len, header, sizeof(header));
 
 	lseek(fd, 0, SEEK_SET);
 	nwrit = write(fd, header, sizeof(header));
@@ -168,6 +169,9 @@ int tslab_extend(struct tslab *s, bolo_msec_t base)
 		len   = s->block_size;
 		start = sysconf(_SC_PAGESIZE) + i * len;
 		BUG(len == (1 << 19), "tslab_extend() was told to extend a tslab with a non-standard block size");
+
+		/* track the encryption key */
+		s->blocks[i].key = s->key;
 
 		/* extend the file descriptor one TBLOCK's worth */
 		if (lseek(s->fd, start + len - 1, SEEK_SET) < 0)

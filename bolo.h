@@ -60,6 +60,7 @@ const char * error(int num) RETURNS;
 uint32_t urandn(uint32_t n);
 uint32_t urand32();
 uint64_t urand64();
+int urand(void *buf, size_t len);
 
 int mktree(int dirfd, const char *path, mode_t mode) RETURNS;
 
@@ -380,6 +381,19 @@ bolo_msec_t btree_last(struct btree *t);
 #define tslab_number(x)  ((x) & ~0x7ff)
 #define tblock_number(x) ((x) &  0x7ff)
 
+#ifndef DEFAULT_KEY_SIZE
+#define DEFAULT_KEY_SIZE 128
+#endif
+
+struct dbkey {
+	char   *key;
+	size_t  len;
+};
+
+/* these are part of db.o */
+struct dbkey * rand_key(size_t len) RETURNS;
+struct dbkey * read_key(const char *s) RETURNS;
+
 /********************************************************  database blocks  ***/
 
 struct tblock {
@@ -393,6 +407,7 @@ struct tblock {
 	uint64_t next;     /* block number of the next logical block
 	                      in the (chronologically ordered) series */
 
+	struct dbkey *key; /* encryption key to use */
 	struct page page;  /* backing data page */
 };
 
@@ -417,8 +432,8 @@ void tblock_next(struct tblock *b, struct tblock *next);
 #define tblock_unmap(b) page_unmap(&(b)->page)
 #define tblock_sync(b)  page_sync(&(b)->page)
 
-#define tblock_seal( k,l,b) hmac_seal ((k),(l),(b)->page.data,(b)->page.len)
-#define tblock_check(k,l,b) hmac_check((k),(l),(b)->page.data,(b)->page.len)
+#define tblock_seal( b,k) hmac_seal ((k)->key,(k)->len,(b)->page.data,(b)->page.len)
+#define tblock_check(b,k) hmac_check((k)->key,(k)->len,(b)->page.data,(b)->page.len)
 
 #define tblock_value(b,n)              tblock_read64f((b), 32 + (n) * 12 + 4)
 #define tblock_ts(b,n)    ((b)->base + tblock_read32 ((b), 32 + (n) * 12))
@@ -432,6 +447,8 @@ struct tslab {
 	uint32_t block_size;     /* how big is each data block page? */
 	uint64_t number;         /* slab number, with the least significant
 	                            11-bits cleared. */
+
+	struct dbkey *key;       /* encryption key to use */
 
 	struct tblock                 /* list of all blocks in this slab.    */
 	  blocks[TBLOCKS_PER_TSLAB];  /* present blocks will have .valid = 1 */
@@ -469,12 +486,13 @@ struct db {
 	struct list   slab;     /* unsorted list of tslab structures */
 	struct list   multidx;  /* list of allocated multidx's, for freeing later */
 
+	struct dbkey *key;      /* database integrity signing key */
+
 	uint64_t next_tblock;   /* ID of the next tblock to hand out */
 };
 
-void db_encrypt(const char *key, size_t len);
-struct db * db_mount(const char *path) RETURNS;
-struct db * db_init(const char *path) RETURNS;
+struct db * db_mount(const char *path, struct dbkey *k) RETURNS;
+struct db * db_init(const char *path, struct dbkey *k) RETURNS;
 int db_sync(struct db *db) RETURNS;
 int db_unmount(struct db *db) RETURNS;
 int db_insert(struct db *, char *name, bolo_msec_t when, bolo_value_t what) RETURNS;

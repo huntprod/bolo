@@ -89,6 +89,23 @@ urand64()
 	return v;
 }
 
+int
+urand(void *buf, size_t len)
+{
+	size_t n;
+	ssize_t nread;
+
+	_urand_init();
+	for (n = 0; n != len; ) {
+		nread = read(_urand_fd, (char *)buf + n, len - n);
+		if (nread <= 0)
+			return -1;
+		n += nread;
+	}
+
+	return 0;
+}
+
 uint32_t
 urandn(uint32_t n)
 {

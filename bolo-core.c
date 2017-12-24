@@ -228,7 +228,10 @@ int
 do_core(int argc, char **argv)
 {
 	int i;
+	struct dbkey *key;
+
 	{
+		char *key_str;
 		int fd, override_log_level = -1;
 		char *config_file = strdup(DEFAULT_CONFIG_FILE);
 
@@ -242,10 +245,11 @@ do_core(int argc, char **argv)
 			{0, 0, 0, 0},
 		};
 
+		key_str = NULL;
 		while ((c = getopt_long(argc, argv, shorts, longs, &idx)) >= 0) {
 			switch (c) {
 			case 'h':
-				printf("USAGE: %s daemon [--config /etc/bolo.conf] [--debug] [--log-level error]\n\n", argv[0]);
+				printf("USAGE: %s core [--config /etc/bolo.conf] [--debug] [--log-level error]\n\n", argv[0]);
 				printf("OPTIONS\n\n");
 				printf("  -h, --help              Show this help screen.\n\n");
 				printf("  -c, --config FILE       Path to a configuration file.\n"
@@ -287,15 +291,23 @@ do_core(int argc, char **argv)
 
 		if (override_log_level != -1)
 			cfg.log_level = override_log_level;
+
+		if (!key_str)
+			key_str = cfg.db_secret_key;
+		key = read_key(key_str);
+		if (!key) {
+			fprintf(stderr, "invalid database encryption key given\n");
+			return 1;
+		}
 	}
 
 	startlog(argv[0], getpid(), cfg.log_level);
 	debugf("dumping configuration....");
 	debugf("db.data_root = '%s'\n", cfg.db_data_root);
 
-	db = db_mount(cfg.db_data_root);
+	db = db_mount(cfg.db_data_root, key);
 	if (!db && (errno == BOLO_ENODBROOT || errno == BOLO_ENOMAINDB))
-		db = db_init(cfg.db_data_root);
+		db = db_init(cfg.db_data_root, key);
 	if (!db)
 		bail("db_mount failed");
 

@@ -62,7 +62,7 @@ check: testdata util.o debug.o log.o page.o btree.o hash.o rsv.o sha.o tblock.o 
 testdata: bolo t/data/db/1/main.db
 t/data/db/1/main.db: t/data/db1.dat
 	mkdir -p t/data/db
-	./t/stream < $< | ./bolo import t/data/db/1
+	./t/stream < $< | ./bolo import t/data/db/1 --key decafbad
 
 memtest: check
 	t/vg $(addprefix ./,$(TESTS))
