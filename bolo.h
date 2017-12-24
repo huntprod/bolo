@@ -107,13 +107,29 @@ void debugf2(const char *file, unsigned long line, const char *fmt, ...);
 
 /*****************************************************************  config  ***/
 
-struct config {
+#define AGENT_CONFIG 1
+#define CORE_CONFIG  2
+struct agent_check {
+	unsigned int  interval;
+	char         *cmdline;
+};
+
+struct agent_config {
+	int log_level;
+
+	char         *base_dir;
+	unsigned int  schedule_splay;
+
+	size_t              nchecks;
+	struct agent_check *checks;
+};
+
+struct core_config {
 	int log_level;
 
 	/* db.* - database settings */
-	char           *secret_key;
-	unsigned long   block_span;
-	char           *db_data_root;
+	char *db_secret_key;
+	char *db_data_root;
 
 	/* query.* - query listener settings */
 	char *query_listen;
@@ -124,9 +140,8 @@ struct config {
 	int   metric_max_connections;
 };
 
-int configure_defaults(struct config *) RETURNS;
-int configure(struct config *, int fd) RETURNS;
-void deconfigure(struct config *);
+int configure(int type, void *, int fd) RETURNS;
+void deconfigure(int type, void *);
 
 
 /****************************************************************  SHA-512  ***/

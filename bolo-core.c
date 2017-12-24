@@ -9,9 +9,9 @@
 #define DEFAULT_CONFIG_FILE "/etc/bolo.conf"
 #endif
 
-static struct config    cfg;
-static struct db       *db;
-static pthread_mutex_t  db_lock;
+static struct core_config cfg;
+static struct db         *db;
+static pthread_mutex_t    db_lock;
 
 static struct qlsnr {
 	int                fd;
@@ -282,8 +282,7 @@ do_core(int argc, char **argv)
 			errnof("unable to open configuration file %s", config_file);
 			return 1;
 		}
-		if (configure_defaults(&cfg) != 0
-		 || configure(&cfg, fd) != 0)
+		if (configure(CORE_CONFIG, &cfg, fd) != 0)
 			return 1;
 
 		if (override_log_level != -1)
