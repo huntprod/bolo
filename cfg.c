@@ -33,6 +33,10 @@
 #define DEFAULT_AGENT_SCHEDULE_SPLAY 30
 #endif
 
+#ifndef DEFAULT_AGENT_MAX_RUNNERS
+#define DEFAULT_AGENT_MAX_RUNNERS 0
+#endif
+
 static int
 s_configure_core(struct core_config *cfg, int fd)
 {
@@ -217,10 +221,13 @@ s_configure_agent(struct agent_config *cfg, int fd)
 {
 	char buf[8192], *p;
 	char *k, *v, *next, *eol;
+	char *env;
 	ssize_t n, used;
 
 	memset(cfg, 0, sizeof(*cfg));
 	cfg->schedule_splay = DEFAULT_AGENT_SCHEDULE_SPLAY;
+	cfg->max_runners = DEFAULT_AGENT_MAX_RUNNERS;
+	cfg->env = hash_new();
 
 	used = 0;
 	memset(buf, 0, 8192);
@@ -274,68 +281,134 @@ s_configure_agent(struct agent_config *cfg, int fd)
 		/* find start of the key */
 		k = &buf[0];
 		while (k != eol && isspace(*k))
-			k++;
+			;
 
 		if (k == eol)
 			goto next;
 
-		/* find the end of the key */
-		v = k;
-		while (v != eol && !isspace(*v) && *v != '=')
-			v++;
+		/* might be an "@<time> <command with args>" line... */
+		if (k[0] == '@') {
+			unsigned int often = 0;
+			struct agent_check *checks;
 
-		if (*v == '=') { /* handle 'key=value' specifically */
-			*v++ = '\0';
-		} else {
-			*v++ = '\0';
-			/* find the '=' */
-			while (v != eol && *v != '=')
-				v++;
-			if (*v != '=') {
-				errorf("failed to read configuration: missing '=' for '%s' directive", k);
-				return -1;
-			}
-			v++;
-		}
-
-		/* find the start of the value */
-		while (v != eol && isspace(*v))
-			v++;
-
-		/* trim trailing line whitespace */
-		while (eol != v && isspace(*eol))
-			*eol-- = '\0';
-
-		/* check the key against known keys */
-		if (streq(k, "base.dir")) {
-			free(cfg->base_dir);
-			cfg->base_dir = strdup(v);
-
-		} else if (streq(k, "schedule.splay")) {
-			cfg->schedule_splay = 0;
-			for (p = v; *p; p++) {
+			k++;
+			if (k == eol)
+				goto next;
+			for (p = v = k; *p; p++) {
 				if (*p == '_' || *p == ',') continue; /* legibility */
 				if (isdigit(*p)) {
-					cfg->schedule_splay = (cfg->schedule_splay * 10) + (*p - '0');
+					often = (often * 10) + (*p - '0');
 				} else {
-					while (*p && isspace(*p))
+					k = p;
+					while (*p && !isspace(*p))
 						p++;
-
-					     if (streq(p, "ms")) cfg->schedule_splay *= 1;
-					else if (streq(p,  "s")) cfg->schedule_splay *= 1000;
-					else if (streq(p,  "m")) cfg->schedule_splay *= 1000 * 60;
-					else if (streq(p,  "h")) cfg->schedule_splay *= 1000 * 60 * 60;
+					*p++ = '\0';
+					     if (streq(k, "ms")) often *= 1;
+					else if (streq(k,  "s")) often *= 1000;
+					else if (streq(k,  "m")) often *= 1000 * 60;
+					else if (streq(k,  "h")) often *= 1000 * 60 * 60;
 					else {
-						errorf("failed to read configuration: invalid unit in schedule.splay value '%s'", v);
+						errorf("failed to read configuration: invalid unit in command frequency '%s'", v);
 						return -1;
 					}
 					break;
 				}
 			}
+			while (*p && isspace(*p))
+				;
+			if (!*p) {
+				errorf("failed to read configuration: syntax error in command scheduling");
+				return -1;
+			}
+
+			checks = realloc(cfg->checks, (cfg->nchecks + 1) * sizeof(struct agent_check));
+			if (!checks) {
+				errorf("failed to read configuration: could not allocate memory");
+				return -1;
+			}
+			*eol = '\0';
+			checks[cfg->nchecks].interval = often;
+			checks[cfg->nchecks].cmdline  = strdup(p);
+			checks[cfg->nchecks].env      = cfg->env;
+			cfg->checks = checks;
+			cfg->nchecks++;
 
 		} else {
-			errorf("failed to read configuration: unrecognized configuration directive '%s'", k);
-			return -1;
+			/* find the end of the key */
+			v = k;
+			while (v != eol && !isspace(*v) && *v != '=')
+				v++;
+
+			if (*v == '=') { /* handle 'key=value' specifically */
+				*v++ = '\0';
+			} else {
+				*v++ = '\0';
+				/* find the '=' */
+				while (v != eol && *v != '=')
+					v++;
+				if (*v != '=') {
+					errorf("failed to read configuration: missing '=' for '%s' directive", k);
+					return -1;
+				}
+				v++;
+			}
+
+			/* find the start of the value */
+			while (v != eol && isspace(*v))
+				v++;
+
+			/* trim trailing line whitespace */
+			while (eol != v && isspace(*eol))
+				*eol-- = '\0';
+
+			/* check the key against known keys */
+			if (strncmp(k, "env.", 4) == 0) {
+				if (hash_get(cfg->env, &env, k+4)  == 0) free(env);
+				if (asprintf(&env, "%s=%s", k+4, v) < 0) return -1;
+				if (hash_set(cfg->env, k+4, env)   != 0) return -1;
+
+			} else if (streq(k, "bolo.endpoint")) {
+				free(cfg->bolo_endpoint);
+				cfg->bolo_endpoint = strdup(v);
+
+			} else if (streq(k, "schedule.splay")) {
+				cfg->schedule_splay = 0;
+				for (p = v; *p; p++) {
+					if (*p == '_' || *p == ',') continue; /* legibility */
+					if (isdigit(*p)) {
+						cfg->schedule_splay = (cfg->schedule_splay * 10) + (*p - '0');
+					} else {
+						while (*p && isspace(*p))
+							p++;
+
+						     if (streq(p, "ms")) cfg->schedule_splay *= 1;
+						else if (streq(p,  "s")) cfg->schedule_splay *= 1000;
+						else if (streq(p,  "m")) cfg->schedule_splay *= 1000 * 60;
+						else if (streq(p,  "h")) cfg->schedule_splay *= 1000 * 60 * 60;
+						else {
+							errorf("failed to read configuration: invalid unit in schedule.splay value '%s'", v);
+							return -1;
+						}
+						break;
+					}
+				}
+
+			} else if (streq(k, "max.runners")) {
+				cfg->max_runners = 0;
+				for (p = v; *p; p++) {
+					if (*p == '_' || *p == ',') continue; /* legibility */
+					if (isdigit(*p)) {
+						cfg->max_runners = (cfg->max_runners * 10) + (*p - '0');
+					} else {
+						errorf("failed to read configuration: invalid max.runners value '%s'", v);
+						return -1;
+					}
+				}
+
+			} else {
+				errorf("failed to read configuration: unrecognized configuration directive '%s'", k);
+				return -1;
+			}
 		}
 
 next:
@@ -378,8 +451,14 @@ s_deconfigure_core(struct core_config *config)
 static void
 s_deconfigure_agent(struct agent_config *config)
 {
-	free(config->base_dir);
-	config->base_dir = NULL;
+	char *k, *v;
+
+	if (config->env) {
+		hash_each(config->env, &k, &v)
+			free(v);
+		hash_free(config->env);
+		config->env = NULL;
+	}
 }
 
 void
@@ -600,14 +679,6 @@ TESTS {
 	subtest {
 		struct agent_config cfg;
 
-		try(AGENT_CONFIG, cfg, "base.dir = /path/to/somewhere");
-		is_string(cfg.base_dir, "/path/to/somewhere", "base.dir parsed properly");
-		deconfigure(AGENT_CONFIG, &cfg);
-	}
-
-	subtest {
-		struct agent_config cfg;
-
 		try(AGENT_CONFIG, cfg, "schedule.splay = 1");
 		ok(cfg.schedule_splay == 1, "without units, schedule_splay is treated as milliseconds");
 		deconfigure(AGENT_CONFIG, &cfg);
@@ -643,6 +714,55 @@ TESTS {
 
 		try(AGENT_CONFIG, cfg, "schedule.splay = 7 s");
 		ok(cfg.schedule_splay == 7 * 1000, "whitespace between number and digit is ignored");
+		deconfigure(AGENT_CONFIG, &cfg);
+	}
+
+
+
+	subtest {
+		struct agent_config cfg;
+
+		try(AGENT_CONFIG, cfg, "@15s linux nonet");
+		is_unsigned(cfg.nchecks, 1, "agent should have parsed one check");
+
+		is_unsigned(cfg.checks[0].interval, 15 * 1000, "first check should be every 15s");
+		is_string(cfg.checks[0].cmdline, "linux nonet", "first check command line should be verbatim");
+		deconfigure(AGENT_CONFIG, &cfg);
+	}
+
+	subtest {
+		struct agent_config cfg;
+
+		try(AGENT_CONFIG, cfg, "@15s linux '1q' \"2q\" /slashes/ \\back\\");
+		is_unsigned(cfg.nchecks, 1, "agent should have parsed one check");
+
+		is_string(cfg.checks[0].cmdline, "linux '1q' \"2q\" /slashes/ \\back\\", "no shell interpretation occurs");
+		deconfigure(AGENT_CONFIG, &cfg);
+	}
+
+	subtest {
+		struct agent_config cfg;
+
+		try(AGENT_CONFIG, cfg, "@15s linux nonet # interesting\n@25s linux net");
+		is_unsigned(cfg.nchecks, 2, "agent should have parsed two checks");
+
+		is_unsigned(cfg.checks[0].interval, 15 * 1000, "first check should be every 15s");
+		is_string(cfg.checks[0].cmdline, "linux nonet", "first check command line should be verbatim");
+		is_unsigned(cfg.checks[1].interval, 25 * 1000, "second check should be every 25s");
+		is_string(cfg.checks[1].cmdline, "linux net", "second check command line should be verbatim");
+		deconfigure(AGENT_CONFIG, &cfg);
+	}
+
+	subtest {
+		struct agent_config cfg;
+
+		try(AGENT_CONFIG, cfg, "@22ms x\n@22s x\n@22m x\n@22h x");
+		is_unsigned(cfg.nchecks, 4, "agent should have parsed four checks");
+
+		is_unsigned(cfg.checks[0].interval, 22,                  "first check should be every 22ms");
+		is_unsigned(cfg.checks[1].interval, 22 * 1000,           "second check should be every 22s");
+		is_unsigned(cfg.checks[2].interval, 22 * 1000 * 60,      "third check should be every 22m");
+		is_unsigned(cfg.checks[3].interval, 22 * 1000 * 60 * 60, "fourth check should be every 22h");
 		deconfigure(AGENT_CONFIG, &cfg);
 	}
 }

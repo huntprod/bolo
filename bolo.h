@@ -128,18 +128,26 @@ bolo_msec_t bolo_s (const struct timeval *tv) RETURNS;
 #define AGENT_CONFIG 1
 #define CORE_CONFIG  2
 struct agent_check {
-	unsigned int  interval;
-	char         *cmdline;
+	unsigned int  interval;   /* how often (in ms) to run this check */
+	char         *cmdline;    /* command to execute via `/bin/sh -c ...` */
+	struct hash  *env;        /* shared environment for execution;
+	                             (points back to agent_config.env) */
+
+	bolo_msec_t next_run;     /* timestamp (ms) of earliest subsequent run */
+	struct list q;            /* current scheduling queue */
 };
 
 struct agent_config {
 	int log_level;
 
-	char         *base_dir;
+	char         *bolo_endpoint;
 	unsigned int  schedule_splay;
+	unsigned int  max_runners;
 
 	size_t              nchecks;
 	struct agent_check *checks;
+
+	struct hash *env;
 };
 
 struct core_config {
