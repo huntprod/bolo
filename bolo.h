@@ -52,6 +52,17 @@ extern size_t      ENC_KEY_LEN;
 
 /*******************************************************  common utilities  ***/
 
+#define xmalloc(len)   xalloc(1,   (len))
+#define xcalloc(n,len) xalloc((n), (len))
+static inline void *
+xalloc(size_t n, size_t len)
+{
+	void *p = calloc(n, len);
+	if (p) return p;
+	fprintf(stderr, "***** MEMORY ALLOCATION FAILED *****\n");
+	exit(5);
+}
+
 #define streq(a,b) (strcmp((a),(b)) == 0)
 void bail(const char *msg);
 const char * error(int num) RETURNS;

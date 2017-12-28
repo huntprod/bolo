@@ -34,13 +34,7 @@ struct hash {
 struct hash *
 hash_new()
 {
-	struct hash *h;
-
-	h = calloc(1, sizeof(*h));
-	if (!h)
-		return NULL;
-
-	return h;
+	return xalloc(1, sizeof(struct hash));
 }
 
 void
@@ -126,10 +120,7 @@ hash_set(struct hash *h, const char *key, void *val)
 	}
 
 	/* not in existing data, prepend a new bucket */
-	b = calloc(1, sizeof(struct bucket));
-	if (!b)
-		return -1;
-
+	b = xalloc(1, sizeof(struct bucket));
 	b->key = strdup(key);
 	b->ptr = val;
 	b->next = h->buckets[k];
@@ -188,9 +179,6 @@ hash_read(int from, hash_reader_fn reader, void *udata)
 		goto fail;
 
 	h = hash_new();
-	if (!h)
-		goto fail;
-
 	while (fgets(buf, 8192, in) != NULL) {
 		a = strchr(buf, '\t');
 		b = strchr(buf, '\n');
@@ -257,12 +245,6 @@ hash_write(struct hash *h, int to, hash_writer_fn writer, void *udata)
 
 #ifdef TEST
 /* LCOV_EXCL_START */
-#define new_hash(h) do {\
-	h = hash_new(); \
-	if (!h) \
-		BAIL_OUT("hash_new() returned a NULL pointer"); \
-} while (0)
-
 struct data {
 	uint64_t id;
 	/* don't need any other fields... */
@@ -307,8 +289,7 @@ TESTS {
 		struct hash *h;
 		const char *v;
 
-		new_hash(h);
-
+		h = hash_new();
 		is_unsigned(hash_nset(h), 0, "hash initially has 0 keys");
 		ok(!hash_isset(h, "one"), "h[one] should not be set");
 
@@ -336,13 +317,10 @@ TESTS {
 		int fd;
 		struct data *data, *lst[2], *result;
 
-		new_hash(h);
+		h = hash_new();
 		fd = memfd("hash");
 
-		data = malloc(sizeof(struct data));
-		if (!data)
-			BAIL_OUT("memory allocation failed");
-
+		data = xmalloc(sizeof(struct data));
 		data->id = 0xdecafbad;
 		lst[0] = data;
 		lst[1] = NULL;
@@ -376,7 +354,7 @@ TESTS {
 		int i;
 		struct data d;
 
-		new_hash(h);
+		h = hash_new();
 		is_unsigned(hash_nset(h), 0, "hash initially has 0 keys");
 		for (i = 0; i < HASH_STRIDE + 1; i++) {
 			if (asprintf(&key, "key%d", i) <= 0)
@@ -395,7 +373,7 @@ TESTS {
 		struct hash *h;
 		struct data d1, d2, *v;
 
-		new_hash(h);
+		h = hash_new();
 		ok(hash_set(h, "x", &d1) == 0, "should set x => d1");
 		ok(hash_get(h, &v, "x") == 0, "should be able to retrieve 'x'");
 		is_ptr(v, &d1, "'x' should be mapped to d1");

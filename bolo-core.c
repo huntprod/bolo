@@ -313,9 +313,7 @@ do_core(int argc, char **argv)
 
 	/* configure query listener */
 	qlsnr.nconn = cfg.query_max_connections;
-	qlsnr.conn  = calloc(qlsnr.nconn, sizeof(*qlsnr.conn));
-	if (!qlsnr.conn)
-		bail("memory allocation failed.");
+	qlsnr.conn  = xalloc(qlsnr.nconn, sizeof(*qlsnr.conn));
 
 	for (i = 0; i < qlsnr.nconn; i++)
 		qlsnr.conn[i].fd = -1;
@@ -333,9 +331,7 @@ do_core(int argc, char **argv)
 
 	/* configure metric listener */
 	mlsnr.nconn = cfg.metric_max_connections;
-	mlsnr.conn  = calloc(mlsnr.nconn, sizeof(*mlsnr.conn));
-	if (!mlsnr.conn)
-		bail("memory allocation failed.");
+	mlsnr.conn  = xalloc(mlsnr.nconn, sizeof(*mlsnr.conn));
 
 	for (i = 0; i < mlsnr.nconn; i++)
 		mlsnr.conn[i].fd = -1;

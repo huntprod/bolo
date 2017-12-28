@@ -68,11 +68,7 @@ s_mapat1(int fd, off_t offset)
 {
 	struct btree *t;
 
-	t = malloc(sizeof(*t));
-	if (!t)
-		goto fail;
-
-	memset(t, 0, sizeof(*t));
+	t = xmalloc(sizeof(*t));
 	t->id = (uint64_t)offset;
 
 	if (page_map(&t->page, fd, offset, BTREE_PAGE_SIZE) != 0)

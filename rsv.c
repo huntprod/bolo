@@ -5,10 +5,7 @@ rsv_new(size_t cap)
 {
 	struct rsv *rsv;
 
-	rsv = calloc(1, sizeof(*rsv) + cap * sizeof(double));
-	if (!rsv)
-		bail("malloc failed");
-
+	rsv = xalloc(1, sizeof(*rsv) + cap * sizeof(double));
 	rsv->cap = cap;
 	rsv_reset(rsv);
 	return rsv;

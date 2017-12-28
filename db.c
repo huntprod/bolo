@@ -20,15 +20,9 @@ rand_key(size_t len)
 	BUG(len != 0, "rand_key() asked to generate a random zero-length key");
 	BUG(len <= 4096, "rand_key() asked to generate an impossible large (>4096) key");
 
-	k = calloc(1, sizeof(*k));
-	if (!k)
-		goto fail;
-
+	k = xalloc(1, sizeof(*k));
 	k->len = len;
-	k->key = calloc(len, sizeof(char));
-	if (!k->key)
-		goto fail;
-
+	k->key = xalloc(len, sizeof(char));
 	if (urand(k->key, k->len) != 0)
 		goto fail;
 
@@ -48,19 +42,13 @@ read_key(const char *s)
 
 	BUG(s != NULL, "read_key() given a NULL string to decode into a key");
 
-	k = calloc(1, sizeof(*k));
-	if (!k)
-		goto fail;
-
 	len = strlen(s);
 	if (len % 2)
 		goto fail;
 
+	k = xalloc(1, sizeof(*k));
 	k->len = len/2;
-	k->key = calloc(len, sizeof(char));
-	if (!k->key)
-		goto fail;
-
+	k->key = xalloc(len, sizeof(char));
 	for (i = 0; i < k->len; i++) {
 		switch (s[i*2]) {
 			case '0': case '1': case '2': case '3': case '4':
@@ -101,10 +89,7 @@ s_handle_idx(struct db *db, uint64_t id, int fd)
 	int esave;
 	struct idx *idx;
 
-	idx = malloc(sizeof(*idx));
-	if (!idx)
-		goto fail;
-
+	idx = xmalloc(sizeof(*idx));
 	idx->number = id;
 	idx->btree = btree_read(fd);
 	if (!idx->btree)
@@ -128,9 +113,7 @@ s_handle_slab(struct db *db, uint64_t id, int fd)
 	struct tslab *slab;
 	uint64_t max_tblock;
 
-	slab = malloc(sizeof(*slab));
-	if (!slab)
-		goto fail;
+	slab = xmalloc(sizeof(*slab));
 	slab->key = db->key;
 
 	slab->number = id;
@@ -401,9 +384,7 @@ s_setmetric(struct db *db, char *name, struct idx *idx)
 				return;
 	}
 
-	this = malloc(sizeof(*this));
-	if (!this) bail("malloc failed");
-
+	this = xmalloc(sizeof(*this));
 	push(&db->multidx, &this->l);
 	this->idx  = idx;
 	this->next = set;
@@ -430,9 +411,7 @@ again:
 					goto next;
 		}
 
-		this = malloc(sizeof(*this));
-		if (!this) bail("malloc failed");
-
+		this = xmalloc(sizeof(*this));
 		push(&db->multidx, &this->l);
 		this->idx  = idx;
 		this->next = set;
@@ -502,10 +481,7 @@ db_mount(const char *path, struct dbkey *key)
 		goto fail;
 	}
 
-	db = calloc(1, sizeof(struct db));
-	if (!db)
-		goto fail;
-
+	db = xalloc(1, sizeof(struct db));
 	db->rootfd = fd;
 	db->key = key;
 	if (!db->key)
@@ -530,12 +506,7 @@ db_mount(const char *path, struct dbkey *key)
 	empty(&db->multidx);
 
 	db->tags = hash_new(0);
-	if (!db->tags)
-		goto fail;
 	db->metrics = hash_new(0);
-	if (!db->metrics)
-		goto fail;
-
 	db->main = hash_read(fd, s_maindb_reader, db);
 	if (!db->main)
 		goto fail;
@@ -590,9 +561,7 @@ db_init(const char *path, struct dbkey *key)
 	if (!s_dirempty(fd))
 		goto fail;
 
-	db = calloc(1, sizeof(*db));
-	if (!db)
-		goto fail;
+	db = xalloc(1, sizeof(*db));
 
 	if (!key)
 		key = rand_key(DEFAULT_KEY_SIZE);
@@ -602,15 +571,9 @@ db_init(const char *path, struct dbkey *key)
 
 	db->rootfd = fd;
 	fd = -1;
-	db->main = hash_new(0);
-	if (!db->main)
-		goto fail;
-	db->tags = hash_new(0);
-	if (!db->tags)
-		goto fail;
+	db->main    = hash_new(0);
+	db->tags    = hash_new(0);
 	db->metrics = hash_new(0);
-	if (!db->metrics)
-		goto fail;
 
 	/* create the main.db index */
 	fd = openat(db->rootfd, PATH_TO_MAINDB, O_WRONLY|O_CREAT, 0666);
@@ -800,9 +763,7 @@ s_newidx(struct db *db, struct idx **idx, uint64_t *id)
 	if (fd < 0)
 		goto fail;
 
-	*idx = malloc(sizeof(**idx));
-	if (!*idx)
-		goto fail;
+	*idx = xmalloc(sizeof(**idx));
 	(*idx)->number = *id;
 
 	if (!((*idx)->btree = btree_create(fd)))
@@ -844,9 +805,7 @@ s_newslab(struct db *db, uint64_t id)
 
 	BUG(db != NULL, "s_newslab() given a NULL db pointer to work with");
 
-	slab = malloc(sizeof(*slab));
-	if (!slab)
-		return NULL;
+	slab = xmalloc(sizeof(*slab));
 	slab->key = db->key;
 
 	/* formulate a path, relative to db root, for this slab */

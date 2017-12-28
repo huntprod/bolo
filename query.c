@@ -20,10 +20,7 @@ new_resultset(int aggr, int from, int until)
 	size_t n;
 
 	n = (until - from + aggr - 1) / aggr;
-	rset = calloc(1, sizeof(*rset) + sizeof(struct result) * n);
-	if (!rset)
-		bail("malloc failed");
-
+	rset = xalloc(1, sizeof(*rset) + sizeof(struct result) * n);
 	rset->len = n;
 	for (n = 0; n < rset->len; n++) {
 		rset->results[n].start  = 1000 * (from + n * aggr);
@@ -143,8 +140,7 @@ query_plan(struct query *q, struct db *db)
 		expr->set = NULL;
 		for (tmp = full; tmp; tmp = tmp->next) {
 			if (qcond_check(q->where, tmp->idx) == 0) {
-				if (!(set = malloc(sizeof(*set))))
-					bail("malloc failed");
+				set = xmalloc(sizeof(*set));
 				set->next = expr->set;
 				set->idx  = tmp->idx;
 				expr->set = set;

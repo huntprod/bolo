@@ -131,9 +131,7 @@ bqip_read(struct bqip *c)
 
 		c->request.dot = 0;
 		c->request.len = len;
-		c->request.payload = malloc(len + 1);
-		if (!c->request.payload)
-			return -1; /* ERR */
+		c->request.payload = xmalloc(len + 1);
 
 		if (bqip_buf_skip(&c->rcvbuf, i) != 0)
 			return -1; /* ERR */
