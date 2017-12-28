@@ -56,18 +56,18 @@ do_dbinfo(int argc, char **argv)
 		}
 	}
 
-	if (argc != optind+1) {
+	if (argc != optind+2) {
 		fprintf(stderr, "USAGE: %s dbinfo [--key \"key-in-hex\"] [--debug] /path/to/db/\n\n", argv[0]);
 		return 1;
 	}
 
-	db = db_mount(argv[2], key);
+	db = db_mount(argv[optind+1], key);
 	if (!db) {
-		fprintf(stderr, "%s: %s\n", argv[2], error(errno));
+		fprintf(stderr, "%s: %s\n", argv[optind+1], error(errno));
 		return 2;
 	}
 
-	fprintf(stdout, "%s:\n", argv[2]);
+	fprintf(stdout, "%s:\n", argv[optind+1]);
 	fprintf(stdout, "next tblock #: [%#06lx]\n", db->next_tblock);
 
 	if (isempty(&db->slab)) {
@@ -136,7 +136,7 @@ do_dbinfo(int argc, char **argv)
 
 	if (db_unmount(db) != 0) {
 		fprintf(stderr, "warning: had trouble unmounting database at %s: %s\n",
-		                argv[2], error(errno));
+		                argv[optind+1], error(errno));
 	}
 	return 0;
 }

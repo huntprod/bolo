@@ -64,7 +64,7 @@ do_import(int argc, char **argv)
 	if (!db && (errno == BOLO_ENODBROOT || errno == BOLO_ENOMAINDB))
 		db = db_init(argv[optind+1], key);
 	if (!db) {
-		errorf("%s: %s", argv[2], error(errno));
+		errorf("%s: %s", argv[optind+1], error(errno));
 		return 2;
 	}
 

@@ -56,20 +56,20 @@ do_init(int argc, char **argv)
 		}
 	}
 
-	if (argc != optind+1) {
+	if (argc != optind+2) {
 		printf("USAGE: %s init [--key \"key-in-hex\"] [--debug] /path/to/db/\n\n", argv[0]);
 		return 1;
 	}
 
-	db = db_init(argv[optind], key);
+	db = db_init(argv[optind+1], key);
 	if (!db) {
-		fprintf(stderr, "%s: %s\n", argv[optind], error(errno));
+		fprintf(stderr, "%s: %s\n", argv[optind+1], error(errno));
 		return 2;
 	}
 
 	if (db_unmount(db) != 0) {
 		fprintf(stderr, "warning: had trouble unmounting database at %s: %s\n",
-		                argv[2], error(errno));
+		                argv[optind+1], error(errno));
 	}
 	return 0;
 }

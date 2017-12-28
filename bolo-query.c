@@ -109,18 +109,18 @@ do_query(int argc, char **argv)
 		}
 	}
 
-	if (argc != 4) {
+	if (argc != optind+3) {
 		fprintf(stderr, "USAGE: bolo query DATABASE 'QUERY...'\n");
 		return 1;
 	}
 
-	db = db_mount(argv[2], key);
+	db = db_mount(argv[optind+1], key);
 	if (!db) {
-		fprintf(stderr, "%s: %s\n", argv[2], error(errno));
+		fprintf(stderr, "%s: %s\n", argv[optind+1], error(errno));
 		return 2;
 	}
 
-	query = query_parse(argv[3]);
+	query = query_parse(argv[optind+2]);
 	if (!query) {
 		fprintf(stderr, "invalid query.\n");
 
@@ -169,7 +169,7 @@ do_query(int argc, char **argv)
 
 	if (db_unmount(db) != 0) {
 		fprintf(stderr, "warning: had trouble unmounting database at %s: %s\n",
-		                argv[2], error(errno));
+		                argv[optind+1], error(errno));
 	}
 	return 0;
 }
