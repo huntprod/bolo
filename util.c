@@ -140,7 +140,7 @@ mktree(int dirfd, const char *path, mode_t mode)
 
 	for (p = strchr(buf, '/'); p && *p; p = strchr(p+1, '/')) {
 		c = *p; *p = '\0';
-		if (mkdirat(dirfd, buf, mode) != 0 && errno != EEXIST)
+		if (*buf && mkdirat(dirfd, buf, mode) != 0 && errno != EEXIST)
 			return -1;
 		*p = c;
 	}
