@@ -357,6 +357,7 @@ metric {
 
 		<pre><code>graph {
   size 4x3
+  label "Diego Containers"
   query [SELECT diego.running.containers
           WHERE cf = "prod/1"
           AFTER 30m ago]
@@ -372,6 +373,12 @@ metric {
 		the graph.  To avoid taxing the Bolo server, and to avoid artifacts
 		of data series scaling, you should generaly use aggregated
 		queries.</p>
+
+		<h3>label</h3>
+		<p><tt>label</tt> optionally provides a title for the graph, which
+		which will be placed somewhere on the graph, hopefully out of the way
+		of the actual plotline.  You will probably want to keep your graph
+		labels short and to the point.</p>
 
 		<h3>size</h3>
 		<p><tt>size</tt> specifies the size (ROWSxCOLS) of the block
