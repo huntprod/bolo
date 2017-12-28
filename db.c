@@ -123,7 +123,7 @@ s_handle_slab(struct db *db, uint64_t id, int fd)
 	push(&db->slab, &slab->l);
 
 	max_tblock = slab->number;
-	for (i = 0; i < TBLOCKS_PER_TSLAB; i++) {
+	for (i = 1; i < TBLOCKS_PER_TSLAB; i++) {
 		if (!slab->blocks[i].valid)
 			break;
 		max_tblock++;

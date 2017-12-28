@@ -47,6 +47,10 @@ int tslab_map(struct tslab *s, int fd)
 		return -1;
 	n -= 4096;
 
+	errno = BOLO_EBADSLAB;
+	if (n == 0) /* orphaned header */
+		return -1;
+
 	/* scan blocks! */
 	memset(s->blocks, 0, sizeof(s->blocks));
 	lseek(s->fd, 4096, SEEK_SET);
