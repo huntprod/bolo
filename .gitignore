@@ -1,8 +1,10 @@
+# binaries
 /bolo
 /bqlx
 /httpx
 /slow
 
+# tests
 /bits
 /bqip
 /btree
@@ -21,6 +23,7 @@
 /time
 /util
 
+# generated files
 /bql/lang.c
 /bql/grammar.c
 /bql/grammar.h
@@ -28,11 +31,13 @@
 /bql/lexer.c
 /bql/bql.a
 
+# fuzzing tests
 /t/fuzz/json
 /t/fuzz/http
 /t/fuzz/bqip
 /t/fuzz/out
 
+# miscellaneous
 *.db
 /coverage
 /t/tmp
