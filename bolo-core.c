@@ -18,7 +18,7 @@ static struct qlsnr {
 	pthread_t          tid;
 	int                nconn;
 	struct bqip       *conn;
-	struct net_poller *poll;
+	struct fdpoll     *poll;
 } qlsnr;
 
 static void *
@@ -27,7 +27,7 @@ qlsnr_thread(void *_u)
 	struct qlsnr *ql;
 	ql = (struct qlsnr *)_u;
 
-	net_poll(ql->poll);
+	fdpoll(ql->poll);
 	close(ql->fd);
 	return NULL;
 }
@@ -119,7 +119,7 @@ query_listener(int _, void *_u)
 		if (ql->conn[i].fd >= 0) continue;
 
 		bqip_init(&ql->conn[i], sockfd);
-		if (net_poll_fd(ql->poll, sockfd, query_handler, &ql->conn[i]) == 0)
+		if (fdpoll_watch(ql->poll, sockfd, FDPOLL_READ, query_handler, &ql->conn[i]) == 0)
 			return 0;
 
 		fprintf(stderr, "S: failed to register accepted socket; closing...\n");
@@ -135,11 +135,11 @@ query_listener(int _, void *_u)
 
 
 static struct mlsnr {
-	int                fd;
-	pthread_t          tid;
-	int                nconn;
-	struct ingestor   *conn;
-	struct net_poller *poll;
+	int              fd;
+	pthread_t        tid;
+	int              nconn;
+	struct ingestor *conn;
+	struct fdpoll   *poll;
 } mlsnr;
 
 static void *
@@ -148,7 +148,7 @@ mlsnr_thread(void *_u)
 	struct mlsnr *ml;
 	ml = (struct mlsnr *)_u;
 
-	net_poll(ml->poll);
+	fdpoll(ml->poll);
 	close(ml->fd);
 	return NULL;
 }
@@ -219,7 +219,7 @@ metric_listener(int fd, void *_u)
 		if (ml->conn[i].fd >= 0) continue;
 
 		ml->conn[i].fd = sockfd;
-		if (net_poll_fd(ml->poll, sockfd, metric_handler, &ml->conn[i]) == 0)
+		if (fdpoll_watch(ml->poll, sockfd, FDPOLL_READ, metric_handler, &ml->conn[i]) == 0)
 			return 0;
 
 		fprintf(stderr, "S: failed to register accepted socket; closing...\n");
@@ -326,7 +326,7 @@ do_core(int argc, char **argv)
 	for (i = 0; i < qlsnr.nconn; i++)
 		qlsnr.conn[i].fd = -1;
 
-	qlsnr.poll = net_poller(qlsnr.nconn + 1);
+	qlsnr.poll = fdpoller(qlsnr.nconn + 1);
 	if (!qlsnr.poll)
 		bail("network setup failed.");
 
@@ -334,7 +334,7 @@ do_core(int argc, char **argv)
 	if (qlsnr.fd < 0)
 		bail("network bind failed.");
 
-	if (net_poll_fd(qlsnr.poll, qlsnr.fd, query_listener, &qlsnr) != 0)
+	if (fdpoll_watch(qlsnr.poll, qlsnr.fd, FDPOLL_READ, query_listener, &qlsnr) != 0)
 		bail("network poll failed.");
 
 	/* configure metric listener */
@@ -344,7 +344,7 @@ do_core(int argc, char **argv)
 	for (i = 0; i < mlsnr.nconn; i++)
 		mlsnr.conn[i].fd = -1;
 
-	mlsnr.poll = net_poller(mlsnr.nconn + 1);
+	mlsnr.poll = fdpoller(mlsnr.nconn + 1);
 	if (!mlsnr.poll)
 		bail("network setup failed.");
 
@@ -352,7 +352,7 @@ do_core(int argc, char **argv)
 	if (mlsnr.fd < 0)
 		bail("network bind failed.");
 
-	if (net_poll_fd(mlsnr.poll, mlsnr.fd, metric_listener, &mlsnr) != 0)
+	if (fdpoll_watch(mlsnr.poll, mlsnr.fd, FDPOLL_READ, metric_listener, &mlsnr) != 0)
 		bail("network poll failed.");
 
 	/* initialize mutices */

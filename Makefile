@@ -19,7 +19,7 @@ TESTS += ingest
 
 all: bolo
 bolo: bolo.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o \
-      btree.o tags.o query.o rsv.o bql/bql.a bqip.o net.o ingest.o cfg.o \
+      btree.o tags.o query.o rsv.o bql/bql.a bqip.o net.o fdpoll.o ingest.o cfg.o \
       \
       bolo-help.o bolo-version.o bolo-core.o bolo-dbinfo.o bolo-idxinfo.o bolo-slabinfo.o \
       bolo-import.o bolo-parse.o bolo-query.o bolo-init.o

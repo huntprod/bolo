@@ -188,20 +188,28 @@ int  hmac_sha512_check(const char *key, size_t klen, const void *buf, size_t len
 #define hmac_check hmac_sha512_check
 
 
+/*****************************************************************  fdpoll  ***/
+
+#ifndef FDPOLL_MAX_EVENTS
+#define FDPOLL_MAX_EVENTS 100
+#endif
+
+#define FDPOLL_READ  1
+#define FDPOLL_WRITE 2
+
+struct fdpoll;
+typedef int (*fdpoll_fn)(int, void *);
+struct fdpoll * fdpoller(int max);
+int fdpoll_watch(struct fdpoll *fdp, int fd, int flags, fdpoll_fn fn, void *udata);
+int fdpoll_unwatch(struct fdpoll *fdp, int fd);
+void fdpoll_timeout(struct fdpoll *fdp, int timeout_ms, fdpoll_fn fn, void *udata);
+void fdpoll_every(struct fdpoll *fdp, fdpoll_fn fn, void *udata);
+int fdpoll(struct fdpoll *fdp);
+
+
 /****************************************************************  network  ***/
 
 int net_bind(const char *addr, int backlog);
-
-#ifndef NET_POLL_MAX_EVENTS
-#define NET_POLL_MAX_EVENTS 100
-#endif
-struct net_poller;
-typedef int (*net_handler_fn)(int, void *);
-
-struct net_poller * net_poller(int max);
-int net_poll_fd(struct net_poller *np, int fd, net_handler_fn fn, void *udata);
-
-int net_poll(struct net_poller *np);
 
 
 /****************************************************************  hashing  ***/
