@@ -390,11 +390,11 @@ TESTS {
 		struct data d1, d2, *v;
 		char *key;
 
-		new_hash(before);
+		before = hash_new();
 		ok(hash_set(before, "d1", &d1) == 0, "should set before[d1] => d1");
 		ok(hash_set(before, "d2", &d2) == 0, "should set before[d2] => d2");
 
-		new_hash(after);
+		after = hash_new();
 		ok(hash_get(after, &v, "d1") != 0, "after[d1] is not set pre-traversal");
 		ok(hash_get(after, &v, "d2") != 0, "after[d2] is not set pre-traversal");
 
