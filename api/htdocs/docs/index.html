@@ -46,7 +46,7 @@
 metric {
   size  3x3
   label "average latency"
-  query [SELECT field FROM series ...]
+  query [SELECT metric WHERE some-tag=value ...]
 }</code></pre>
 
 		<p>Comments start with <tt>%</tt> and continue to the end of the
@@ -93,11 +93,11 @@ metric {
 		<p>That means that these two strings are equivalent:</p>
 
 		<pre><code>% double-quoted:
-"SELECT MEAN(field) FROM series BETWEEN 8d AGO AND NOW AGGREGATE HOURLY"
+"SELECT MEAN(metric) WHERE some-tag = value BETWEEN 8d AGO AND NOW AGGREGATE HOURLY"
 
 % the more readable, bracket-quoted:
-[SELECT MEAN(fields)
-   FROM series
+[SELECT MEAN(metric)
+   WHERE some-tag = value
      BETWEEN 8d AGO
          AND NOW
      AGGREGATE HOURLY]</code></pre>
@@ -130,9 +130,10 @@ metric {
 %
 metric {
     size 3x3
-    query [SELECT running
-             FROM cluster/1:prod:containers
-               BETWEEN 10m ago and now]
+    query [SELECT containers.running
+            WHERE env     = prod
+              AND cluster = app7
+          BETWEEN 10m ago and now]
 }</code></pre>
 
 		<p>We define a <tt>metric</tt> block that is 3 columns wide by 3
@@ -157,7 +158,7 @@ metric {
 				unit "ms"
 				label "average latency"
 				color @ms
-				query [SELECT metric FROM series]
+				query [SELECT metric WHERE some-tag = value]
 				graph on
 			}
 		</span>
@@ -186,7 +187,7 @@ metric {
   label "average latency"
   color @ms
   graph yes
-  query [SELECT MEDIAN(latency) FROM web-requests:stats]
+  query [SELECT MEDIAN(get.latency) WHERE site = "bolo.cloud"]
 }</code></pre>
 
 		<h3>query (required)</h3>
@@ -280,7 +281,7 @@ metric {
 		<span class="example">
 			sparkline {
 				size 8x1
-				query [SELECT metric FROM series]
+				query [SELECT metric WHERE some-tag = value]
 				label "Average Request Latency"
 				color forestgreen
 			}
@@ -297,8 +298,10 @@ metric {
   size    12x1
   label  "Average Request Latency"
   color   forestgreen
-  query [SELECT mean(used) FROM web/0:prod
-           BETWEEN 1h AGO AND NOW]
+  query [SELECT mean(get.latency)
+          WHERE host = web1
+            AND env  = prod
+        BETWEEN 1h ago and now]
 }</code></pre>
 
 		<h3>query (required)</h3>
@@ -338,7 +341,7 @@ metric {
 		<span class="example">
 			graph {
 				size 8x3
-				query [SELECT metric FROM series]
+				query [SELECT metric WHERE some-tag = value]
 				plot "metric" {
 					as line
 					color skyblue
@@ -354,9 +357,9 @@ metric {
 
 		<pre><code>graph {
   size 4x3
-  query [SELECT num.containers
-           FROM diego:runtime:cf-prod/1
-             AFTER 30m AGO]
+  query [SELECT diego.running.containers
+          WHERE cf = "prod/1"
+          AFTER 30m ago]
 
   plot "num.containers" {
     as area
@@ -416,7 +419,7 @@ metric {
 		<span class="example">
 			scatterplot {
 				size 4x4
-				query [SELECT metric, other FROM series]
+				query [SELECT metric, other WHERE some-tag = value]
 				x metric
 				y other
 			}
@@ -441,8 +444,9 @@ metric {
 
 		<pre><code>scatterplot {
   size 4x3
-  query [SELECT used, total
-           FROM memory
+  query [SELECT mem.used, mem.total
+          WHERE env     = prod
+            AND cluster = web1
              AFTER 30m AGO]
 
   x used
