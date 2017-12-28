@@ -94,6 +94,7 @@ struct list {
 
 size_t len(const struct list *l) RETURNS;
 void push(struct list *list, struct list *add);
+void delist(struct list *node);
 
 #define LOG_ERRORS   0
 #define LOG_WARNINGS 1
