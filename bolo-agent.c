@@ -118,47 +118,17 @@ runner_handler(int fd, void *_u)
 			if ((sizeof(r->ctx->bolo.sndbuf) - r->ctx->bolo.outstanding) < (unsigned)(eol - r->buf))
 				goto tryagain;
 
-			*eol = '\0';
-			if (r->buf[1] != ' ') {
-				errorf("malformed collector output [%s]\n", r->buf);
-				goto consume;
+			*eol++ = '\n';
+			memcpy(r->ctx->bolo.sndbuf + r->ctx->bolo.outstanding,
+				r->buf + 2, eol - r->buf - 2);
+			r->ctx->bolo.outstanding += eol - r->buf - 2;
+			if (!r->ctx->bolo.watched) {
+				debugf("watching upstream relay fd (we have data to send!)");
+				if (fdpoll_watch(r->ctx->poll, r->ctx->bolo.fd, FDPOLL_WRITE, relay_handler, r->ctx) != 0)
+					bail("failed to re-watch upstream relay fd");
+				r->ctx->bolo.watched = 1;
 			}
 
-			switch (r->buf[0]) {
-			default:
-				errorf("unrecognized metric type '%c' in collector output [%s]\n", r->buf[0], r->buf);
-				goto consume;
-
-			case 'S':
-				printf("SAMPLE OUT [%s]\n", r->buf + 2);
-				*eol++ = '\n';
-				memcpy(r->ctx->bolo.sndbuf + r->ctx->bolo.outstanding,
-					r->buf + 2, eol - r->buf - 2);
-				r->ctx->bolo.outstanding += eol - r->buf - 2;
-				if (!r->ctx->bolo.watched) {
-					debugf("watching upstream relay fd (we have data to send!)");
-					if (fdpoll_watch(r->ctx->poll, r->ctx->bolo.fd, FDPOLL_WRITE, relay_handler, r->ctx) != 0)
-						bail("failed to re-watch upstream relay fd");
-					r->ctx->bolo.watched = 1;
-				}
-				break;
-
-			case 'R':
-				printf("RATE TO KEEP [%s]\n", r->buf + 2);
-				/* FIXME: this is so wrong; we aren't actually calculating rates */
-				*eol++ = '\n';
-				memcpy(r->ctx->bolo.sndbuf + r->ctx->bolo.outstanding,
-					r->buf + 2, eol - r->buf - 2);
-				r->ctx->bolo.outstanding += eol - r->buf - 2;
-				if (!r->ctx->bolo.watched) {
-					debugf("watching upstream relay fd (we have data to send!)");
-					if (fdpoll_watch(r->ctx->poll, r->ctx->bolo.fd, FDPOLL_WRITE, relay_handler, r->ctx) != 0)
-						bail("failed to re-watch upstream relay fd");
-					r->ctx->bolo.watched = 1;
-				}
-				break;
-			}
-consume:
 			if (eol >= r->buf + r->nread) {
 				r->nread = 0;
 			} else {

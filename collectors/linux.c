@@ -326,18 +326,18 @@ int collect_meminfo(void)
 	}
 
 	M.used = M.total - (M.free + M.buffers + M.cached + M.slab);
-	printf("S mem.total %s %lu %lu\n",   tags, ts, M.total);
-	printf("S mem.used %s %lu %lu\n",    tags, ts, M.used);
-	printf("S mem.free %s %lu %lu\n",    tags, ts, M.free);
-	printf("S mem.buffers %s %lu %lu\n", tags, ts, M.buffers);
-	printf("S mem.cached %s %lu %lu\n",  tags, ts, M.cached);
-	printf("S mem.slab %s %lu %lu\n",    tags, ts, M.slab);
+	printf("mem.total %s %lu %lu\n",   tags, ts, M.total);
+	printf("mem.used %s %lu %lu\n",    tags, ts, M.used);
+	printf("mem.free %s %lu %lu\n",    tags, ts, M.free);
+	printf("mem.buffers %s %lu %lu\n", tags, ts, M.buffers);
+	printf("mem.cached %s %lu %lu\n",  tags, ts, M.cached);
+	printf("mem.slab %s %lu %lu\n",    tags, ts, M.slab);
 
 	S.used = S.total - (S.free + S.cached);
-	printf("S swap.total %s %lu %lu\n",  tags, ts, S.total);
-	printf("S swap.cached %s %lu %lu\n", tags, ts, S.cached);
-	printf("S swap.used %s %lu %lu\n",   tags, ts, S.used);
-	printf("S swap.free %s %lu %lu\n",   tags, ts, S.free);
+	printf("swap.total %s %lu %lu\n",  tags, ts, S.total);
+	printf("swap.cached %s %lu %lu\n", tags, ts, S.cached);
+	printf("swap.used %s %lu %lu\n",   tags, ts, S.used);
+	printf("swap.free %s %lu %lu\n",   tags, ts, S.free);
 
 	fclose(io);
 	return 0;
@@ -362,11 +362,11 @@ int collect_loadavg(void)
 	if (proc[0])
 		proc[0]--; /* don't count us */
 
-	printf("S load:1min"        " %s %lu %0.2f\n", tags, ts, load[0]);
-	printf("S load:5min"        " %s %lu %0.2f\n", tags, ts, load[1]);
-	printf("S load:15min"       " %s %lu %0.2f\n", tags, ts, load[2]);
-	printf("S load:runnable"    " %s %lu %lu\n",   tags, ts, proc[0]);
-	printf("S load:schedulable" " %s %lu %lu\n",   tags, ts, proc[1]);
+	printf("load:1min"        " %s %lu %0.2f\n", tags, ts, load[0]);
+	printf("load:5min"        " %s %lu %0.2f\n", tags, ts, load[1]);
+	printf("load:15min"       " %s %lu %0.2f\n", tags, ts, load[2]);
+	printf("load:runnable"    " %s %lu %lu\n",   tags, ts, proc[0]);
+	printf("load:schedulable" " %s %lu %lu\n",   tags, ts, proc[1]);
 	return 0;
 }
 
@@ -386,27 +386,27 @@ int collect_stat(void)
 		p = strchr(v, '\n'); if (p) *p = '\0';
 
 		if (streq(k, "processes"))
-			printf("R context.forks %s %lu %s\n", tags, ts, v);
+			printf("context.forks %s %lu %s\n", tags, ts, v);
 		else if (streq(k, "ctxt"))
-			printf("R context.switches %s %lu %s\n", tags, ts, v);
+			printf("context.switches %s %lu %s\n", tags, ts, v);
 		else if (strncmp(k, "cpu", 3) == 0 && isdigit(k[3]))
 			cpus++;
 
 		if (streq(k, "cpu")) {
 			while (*v && isspace(*v)) v++;
-			k = v; while (*k && !isspace(*k)) k++; *k++ = '\0'; printf("R cpu.user %s %lu %s\n",       tags, ts, v && *v ? v : "0"); v = k;
-			k = v; while (*k && !isspace(*k)) k++; *k++ = '\0'; printf("R cpu.nice %s %lu %s\n",       tags, ts, v && *v ? v : "0"); v = k;
-			k = v; while (*k && !isspace(*k)) k++; *k++ = '\0'; printf("R cpu.system %s %lu %s\n",     tags, ts, v && *v ? v : "0"); v = k;
-			k = v; while (*k && !isspace(*k)) k++; *k++ = '\0'; printf("R cpu.idle %s %lu %s\n",       tags, ts, v && *v ? v : "0"); v = k;
-			k = v; while (*k && !isspace(*k)) k++; *k++ = '\0'; printf("R cpu.iowait %s %lu %s\n",     tags, ts, v && *v ? v : "0"); v = k;
-			k = v; while (*k && !isspace(*k)) k++; *k++ = '\0'; printf("R cpu.irq %s %lu %s\n",        tags, ts, v && *v ? v : "0"); v = k;
-			k = v; while (*k && !isspace(*k)) k++; *k++ = '\0'; printf("R cpu.softirq %s %lu %s\n",    tags, ts, v && *v ? v : "0"); v = k;
-			k = v; while (*k && !isspace(*k)) k++; *k++ = '\0'; printf("R cpu.steal %s %lu %s\n",      tags, ts, v && *v ? v : "0"); v = k;
-			k = v; while (*k && !isspace(*k)) k++; *k++ = '\0'; printf("R cpu.guest %s %lu %s\n",      tags, ts, v && *v ? v : "0"); v = k;
-			k = v; while (*k && !isspace(*k)) k++; *k++ = '\0'; printf("R cpu.guest-nice %s %lu %s\n", tags, ts, v && *v ? v : "0"); v = k;
+			k = v; while (*k && !isspace(*k)) k++; *k++ = '\0'; printf("cpu.user %s %lu %s\n",       tags, ts, v && *v ? v : "0"); v = k;
+			k = v; while (*k && !isspace(*k)) k++; *k++ = '\0'; printf("cpu.nice %s %lu %s\n",       tags, ts, v && *v ? v : "0"); v = k;
+			k = v; while (*k && !isspace(*k)) k++; *k++ = '\0'; printf("cpu.system %s %lu %s\n",     tags, ts, v && *v ? v : "0"); v = k;
+			k = v; while (*k && !isspace(*k)) k++; *k++ = '\0'; printf("cpu.idle %s %lu %s\n",       tags, ts, v && *v ? v : "0"); v = k;
+			k = v; while (*k && !isspace(*k)) k++; *k++ = '\0'; printf("cpu.iowait %s %lu %s\n",     tags, ts, v && *v ? v : "0"); v = k;
+			k = v; while (*k && !isspace(*k)) k++; *k++ = '\0'; printf("cpu.irq %s %lu %s\n",        tags, ts, v && *v ? v : "0"); v = k;
+			k = v; while (*k && !isspace(*k)) k++; *k++ = '\0'; printf("cpu.softirq %s %lu %s\n",    tags, ts, v && *v ? v : "0"); v = k;
+			k = v; while (*k && !isspace(*k)) k++; *k++ = '\0'; printf("cpu.steal %s %lu %s\n",      tags, ts, v && *v ? v : "0"); v = k;
+			k = v; while (*k && !isspace(*k)) k++; *k++ = '\0'; printf("cpu.guest %s %lu %s\n",      tags, ts, v && *v ? v : "0"); v = k;
+			k = v; while (*k && !isspace(*k)) k++; *k++ = '\0'; printf("cpu.guest-nice %s %lu %s\n", tags, ts, v && *v ? v : "0"); v = k;
 		}
 	}
-	printf("S load:cpus %s %lu %i\n", tags, ts, cpus);
+	printf("load:cpus %s %lu %i\n", tags, ts, cpus);
 
 	fclose(io);
 	return 0;
@@ -471,13 +471,13 @@ int collect_procs(void)
 		}
 	}
 
-	printf("S procs.running %s %lu %i\n",  tags, ts, P.running);
-	printf("S procs.sleeping %s %lu %i\n", tags, ts, P.sleeping);
-	printf("S procs.blocked %s %lu %i\n",  tags, ts, P.blocked);
-	printf("S procs.zombies %s %lu %i\n",  tags, ts, P.zombies);
-	printf("S procs.stopped %s %lu %i\n",  tags, ts, P.stopped);
-	printf("S procs.paging %s %lu %i\n",   tags, ts, P.paging);
-	printf("S procs.unknown %s %lu %i\n",  tags, ts, P.unknown);
+	printf("procs.running %s %lu %i\n",  tags, ts, P.running);
+	printf("procs.sleeping %s %lu %i\n", tags, ts, P.sleeping);
+	printf("procs.blocked %s %lu %i\n",  tags, ts, P.blocked);
+	printf("procs.zombies %s %lu %i\n",  tags, ts, P.zombies);
+	printf("procs.stopped %s %lu %i\n",  tags, ts, P.stopped);
+	printf("procs.paging %s %lu %i\n",   tags, ts, P.paging);
+	printf("procs.unknown %s %lu %i\n",  tags, ts, P.unknown);
 	return 0;
 }
 
@@ -498,19 +498,19 @@ int collect_openfiles(void)
 	/* used file descriptors */
 	while (*a &&  isspace(*a)) a++; b = a;
 	while (*b && !isspace(*b)) b++; *b++ = '\0';
-	printf("S openfiles.used %s %lu %s\n", tags, ts, a && *a ? a : "0");
+	printf("openfiles.used %s %lu %s\n", tags, ts, a && *a ? a : "0");
 
 	a = b;
 	/* free file descriptors */
 	while (*a &&  isspace(*a)) a++; b = a;
 	while (*b && !isspace(*b)) b++; *b++ = '\0';
-	printf("S openfiles.free %s %lu %s\n", tags, ts, a && *a ? a : "0");
+	printf("openfiles.free %s %lu %s\n", tags, ts, a && *a ? a : "0");
 
 	a = b;
 	/* max file descriptors */
 	while (*a &&  isspace(*a)) a++; b = a;
 	while (*b && !isspace(*b)) b++; *b++ = '\0';
-	printf("S openfiles.max %s %lu %s\n", tags, ts, a && *a ? a : "0");
+	printf("openfiles.max %s %lu %s\n", tags, ts, a && *a ? a : "0");
 
 	return 0;
 }
@@ -572,13 +572,13 @@ int collect_mounts(void)
 			continue;
 		dev = resolv_path(dev);
 
-		printf("S fs.inodes.total %s,path=%s,dev=%s %lu %lu\n", tags, path, dev, ts, fs.f_files);
-		printf("S fs.inodes.free %s,path=%s,dev=%s %lu %lu\n",  tags, path, dev, ts, fs.f_favail);
-		printf("S fs.inodes.rfree %s,path=%s,dev=%s %lu %lu\n", tags, path, dev, ts, fs.f_ffree - fs.f_favail);
+		printf("fs.inodes.total %s,path=%s,dev=%s %lu %lu\n", tags, path, dev, ts, fs.f_files);
+		printf("fs.inodes.free %s,path=%s,dev=%s %lu %lu\n",  tags, path, dev, ts, fs.f_favail);
+		printf("fs.inodes.rfree %s,path=%s,dev=%s %lu %lu\n", tags, path, dev, ts, fs.f_ffree - fs.f_favail);
 
-		printf("S fs.bytes.total %s,path=%s,dev=%s %lu %lu\n",  tags, path, dev, ts, fs.f_frsize *  fs.f_blocks);
-		printf("S fs.bytes.free %s,path=%s,dev=%s %lu %lu\n",   tags, path, dev, ts, fs.f_frsize *  fs.f_bavail);
-		printf("S fs.bytes.rfree %s,path=%s,dev=%s %lu %lu\n",  tags, path, dev, ts, fs.f_frsize * (fs.f_bfree - fs.f_bavail));
+		printf("fs.bytes.total %s,path=%s,dev=%s %lu %lu\n",  tags, path, dev, ts, fs.f_frsize *  fs.f_blocks);
+		printf("fs.bytes.free %s,path=%s,dev=%s %lu %lu\n",   tags, path, dev, ts, fs.f_frsize *  fs.f_bavail);
+		printf("fs.bytes.rfree %s,path=%s,dev=%s %lu %lu\n",  tags, path, dev, ts, fs.f_frsize * (fs.f_bfree - fs.f_bavail));
 	}
 
 	fclose(io);
@@ -604,7 +604,7 @@ int collect_vmstat(void)
 			continue;
 
 #define VMSTAT_SIMPLE(x,n,v,t) do { \
-	if (streq((n), #t)) printf("R vm.%s %s %lu %lu\n", #t, tags, ts, (v)); \
+	if (streq((n), #t)) printf("vm.%s %s %lu %lu\n", #t, tags, ts, (v)); \
 } while (0)
 		VMSTAT_SIMPLE(VM, name, value, pswpin);
 		VMSTAT_SIMPLE(VM, name, value, pswpout);
@@ -619,9 +619,9 @@ int collect_vmstat(void)
 		if (strncmp(name, "pgscan_kswapd_", 14) == 0) pgscan_kswapd += value;
 		if (strncmp(name, "pgscan_direct_", 14) == 0) pgscan_direct += value;
 	}
-	printf("R vm.pgsteal %s %lu %lu\n",       tags, ts, pgsteal);
-	printf("R vm.pgscan.kswapd %s %lu %lu\n", tags, ts, pgscan_kswapd);
-	printf("R vm.pgscan.direct %s %lu %lu\n", tags, ts, pgscan_direct);
+	printf("vm.pgsteal %s %lu %lu\n",       tags, ts, pgsteal);
+	printf("vm.pgscan.kswapd %s %lu %lu\n", tags, ts, pgscan_kswapd);
+	printf("vm.pgscan.direct %s %lu %lu\n", tags, ts, pgscan_direct);
 
 	fclose(io);
 	return 0;
@@ -653,15 +653,15 @@ int collect_diskstats(void)
 		if (!matches(MATCH_DEV, name))
 			continue;
 
-		printf("R diskio.read-iops %s,dev=%s %lu %lu\n",   tags, name, ts, rd[0]);
-		printf("R diskio.read-miops %s,dev=%s %lu %lu\n",  tags, name, ts, rd[1]);
-		printf("R diskio.read-bytes %s,dev=%s %lu %lu\n",  tags, name, ts, rd[2] * 512);
-		printf("R diskio.read-msec %s,dev=%s %lu %lu\n",   tags, name, ts, rd[3]);
+		printf("diskio.read-iops %s,dev=%s %lu %lu\n",   tags, name, ts, rd[0]);
+		printf("diskio.read-miops %s,dev=%s %lu %lu\n",  tags, name, ts, rd[1]);
+		printf("diskio.read-bytes %s,dev=%s %lu %lu\n",  tags, name, ts, rd[2] * 512);
+		printf("diskio.read-msec %s,dev=%s %lu %lu\n",   tags, name, ts, rd[3]);
 
-		printf("R diskio.write-iops %s,dev=%s %lu %lu\n",  tags, name, ts, wr[0]);
-		printf("R diskio.write-miops %s,dev=%s %lu %lu\n", tags, name, ts, wr[1]);
-		printf("R diskio.write-bytes %s,dev=%s %lu %lu\n", tags, name, ts, wr[2] * 512);
-		printf("R diskio.write-msec %s,dev=%s %lu %lu\n",  tags, name, ts, wr[3]);
+		printf("diskio.write-iops %s,dev=%s %lu %lu\n",  tags, name, ts, wr[0]);
+		printf("diskio.write-miops %s,dev=%s %lu %lu\n", tags, name, ts, wr[1]);
+		printf("diskio.write-bytes %s,dev=%s %lu %lu\n", tags, name, ts, wr[2] * 512);
+		printf("diskio.write-msec %s,dev=%s %lu %lu\n",  tags, name, ts, wr[3]);
 	}
 
 	fclose(io);
@@ -716,23 +716,23 @@ int collect_netdev(void)
 		if (!matches(MATCH_IFACE, name))
 			continue;
 
-		printf("R net.rx.bytes %s,iface=%s %lu %lu\n",      tags, name, ts, rx.bytes);
-		printf("R net.rx.packets %s,iface=%s %lu %lu\n",    tags, name, ts, rx.packets);
-		printf("R net.rx.errors %s,iface=%s %lu %lu\n",     tags, name, ts, rx.errors);
-		printf("R net.rx.drops %s,iface=%s %lu %lu\n",      tags, name, ts, rx.drops);
-		printf("R net.rx.overruns %s,iface=%s %lu %lu\n",   tags, name, ts, rx.overruns);
-		printf("R net.rx.compressed %s,iface=%s %lu %lu\n", tags, name, ts, rx.compressed);
-		printf("R net.rx.frames %s,iface=%s %lu %lu\n",     tags, name, ts, rx.frames);
-		printf("R net.rx.multicast %s,iface=%s %lu %lu\n",  tags, name, ts, rx.multicast);
+		printf("net.rx.bytes %s,iface=%s %lu %lu\n",      tags, name, ts, rx.bytes);
+		printf("net.rx.packets %s,iface=%s %lu %lu\n",    tags, name, ts, rx.packets);
+		printf("net.rx.errors %s,iface=%s %lu %lu\n",     tags, name, ts, rx.errors);
+		printf("net.rx.drops %s,iface=%s %lu %lu\n",      tags, name, ts, rx.drops);
+		printf("net.rx.overruns %s,iface=%s %lu %lu\n",   tags, name, ts, rx.overruns);
+		printf("net.rx.compressed %s,iface=%s %lu %lu\n", tags, name, ts, rx.compressed);
+		printf("net.rx.frames %s,iface=%s %lu %lu\n",     tags, name, ts, rx.frames);
+		printf("net.rx.multicast %s,iface=%s %lu %lu\n",  tags, name, ts, rx.multicast);
 
-		printf("R net.tx.bytes %s,iface=%s %lu %lu\n",      tags, name, ts, tx.bytes);
-		printf("R net.tx.packets %s,iface=%s %lu %lu\n",    tags, name, ts, tx.packets);
-		printf("R net.tx.errors %s,iface=%s %lu %lu\n",     tags, name, ts, tx.errors);
-		printf("R net.tx.drops %s,iface=%s %lu %lu\n",      tags, name, ts, tx.drops);
-		printf("R net.tx.overruns %s,iface=%s %lu %lu\n",   tags, name, ts, tx.overruns);
-		printf("R net.tx.compressed %s,iface=%s %lu %lu\n", tags, name, ts, tx.compressed);
-		printf("R net.tx.collisions %s,iface=%s %lu %lu\n", tags, name, ts, tx.collisions);
-		printf("R net.tx.carrier %s,iface=%s %lu %lu\n",    tags, name, ts, tx.carrier);
+		printf("net.tx.bytes %s,iface=%s %lu %lu\n",      tags, name, ts, tx.bytes);
+		printf("net.tx.packets %s,iface=%s %lu %lu\n",    tags, name, ts, tx.packets);
+		printf("net.tx.errors %s,iface=%s %lu %lu\n",     tags, name, ts, tx.errors);
+		printf("net.tx.drops %s,iface=%s %lu %lu\n",      tags, name, ts, tx.drops);
+		printf("net.tx.overruns %s,iface=%s %lu %lu\n",   tags, name, ts, tx.overruns);
+		printf("net.tx.compressed %s,iface=%s %lu %lu\n", tags, name, ts, tx.compressed);
+		printf("net.tx.collisions %s,iface=%s %lu %lu\n", tags, name, ts, tx.collisions);
+		printf("net.tx.carrier %s,iface=%s %lu %lu\n",    tags, name, ts, tx.carrier);
 	}
 
 	fclose(io);
