@@ -308,6 +308,10 @@ body.docs .example div { margin-bottom: 1em; border: 1px solid #ccc; }
 body.docs .example .metric,
 body.docs .example .scatterplot,
 body.docs .example .placeholder { float: left; margin: 0 1em 1em 0; }
+
+body.docs .example.error { border: none; display: block; padding: 1em; }
+body.docs .example.error tt { background: none; }
+
 body.docs h1 {
 	border-bottom: 4px solid #eee;
 }

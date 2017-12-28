@@ -535,14 +535,30 @@
 		             other:  random(700, {min:10, max:240*0.25, spread:4}) };
 
 		$('.example').each(function (i, ex) {
-			var board = new Board($(ex).text());
-			var block = board.blocks[0];
+			var board, block;
+			try {
+				board = new Board($(ex).text());
+			} catch (e) {
+				$(ex).addClass('error').html(e.toString());
+				return;
+			}
 
+			block = board.blocks[0];
 			$(ex).html(block.html());
 			try {
 				block.update(data);
 			} catch (e) {
-				block.update({metric: data.metric});
+				if (e.toString().match(/more than one metric/i)) {
+					try {
+						block.update({metric: data.metric});
+					} catch (e) {
+						$(ex).addClass('error').html("Unable to render example BoardCode: " + e.toString());
+						return;
+					}
+				} else {
+					$(ex).addClass('error').html("Unable to render example BoardCode: " + e.toString());
+					return;
+				}
 			}
 		});
 
