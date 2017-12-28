@@ -17,7 +17,8 @@
 #define BOLO_EENDIAN   __bolo_errno(10)
 #define BOLO_ENOSLAB   __bolo_errno(11)
 #define BOLO_ENOBLOCK  __bolo_errno(12)
+#define BOLO_EBLKCONT  __bolo_errno(13)
 
-#define BOLO_ERROR_TOP __bolo_errno(12)
+#define BOLO_ERROR_TOP __bolo_errno(13)
 
 #endif

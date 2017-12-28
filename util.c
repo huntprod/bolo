@@ -26,6 +26,7 @@ static const char *errors[] = {
 	/* BOLO_EENDIAN */   "Datafile endian mismatch detected",
 	/* BOLO_ENOSLAB */   "No such database slab",
 	/* BOLO_ENOBLOCK */  "No such database block",
+	/* BOLO_EBLKCONT */  "Block continuity broken",
 };
 
 const char *

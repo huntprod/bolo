@@ -206,6 +206,7 @@ tslab_tblock(struct tslab *s, uint64_t id, bolo_msec_t ts)
 	if (tslab_number(id) != s->number)
 		return NULL;
 
+	errno = BOLO_EBLKCONT;
 	if (!s->blocks[tblock_number(id)].valid) {
 		/* FIXME: right now, we require the tblock to be next in line */
 		if (tblock_number(id) > 0
