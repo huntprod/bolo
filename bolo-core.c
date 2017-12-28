@@ -310,14 +310,22 @@ do_core(int argc, char **argv)
 	}
 
 	startlog(argv[0], getpid(), cfg.log_level);
-	debugf("dumping configuration....");
-	debugf("db.data_root = '%s'\n", cfg.db_data_root);
 
+	infof("mounting database at %s", cfg.db_data_root);
 	db = db_mount(cfg.db_data_root, key);
-	if (!db && (errno == BOLO_ENODBROOT || errno == BOLO_ENOMAINDB))
+	if (!db && (errno == BOLO_ENODBROOT || errno == BOLO_ENOMAINDB)) {
+		warningf("unable to mount database; doesn't look like %s has been initialized yet", cfg.db_data_root);
+		infof("initializing database at %s...", cfg.db_data_root);
 		db = db_init(cfg.db_data_root, key);
-	if (!db)
-		bail("db_mount failed");
+		if (!db) {
+			errnof("unable to create new bolo database at %s", cfg.db_data_root);
+			return 2;
+		}
+	}
+	if (!db) {
+		errnof("unable to mount bolo database at %s", cfg.db_data_root);
+		return 2;
+	}
 
 	/* configure query listener */
 	qlsnr.nconn = cfg.query_max_connections;
