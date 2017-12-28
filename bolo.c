@@ -1,6 +1,7 @@
 #include "bolo.h"
 
 #define EXT(x) extern int do_ ## x (int argc, char **argv)
+EXT(agent);         /* bolo agent [-c CONFIG] [-l LEVEL] [-D] */
 EXT(core);          /* bolo core [-c PATH] [-l LEVEL] [-D] */
 EXT(dbinfo);        /* bolo dbinfo DATADIR */
 EXT(help);          /* bolo help */
@@ -41,6 +42,7 @@ int main(int argc, char **argv)
 		command = "version";
 
 	#define RUN(c) if (streq(command, #c)) return do_ ## c (argc, argv)
+	RUN(agent);
 	RUN(core);
 	RUN(dbinfo);
 	RUN(idxinfo);

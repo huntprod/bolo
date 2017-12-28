@@ -230,6 +230,7 @@ int fdpoll(struct fdpoll *fdp);
 /****************************************************************  network  ***/
 
 int net_bind(const char *addr, int backlog);
+int net_connect(const char *addr);
 
 
 /****************************************************************  hashing  ***/
