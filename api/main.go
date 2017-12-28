@@ -25,7 +25,7 @@ func main() {
 	}
 
 	opt.Listen = ":8080"
-	opt.Endpoint = "127.0.0.1:2002"
+	opt.Endpoint = "127.0.0.1:2001"
 	opt.DB = "api.db"
 	opt.WebRoot = "htdocs"
 	opt.SessionLimit = 60
