@@ -20,7 +20,7 @@ var dedupe = function(q) {
 
 var ts = function (timestamp) {
 	var d = new Date();
-	d.setTime(timestamp * 1000);
+	d.setTime(timestamp);
 	return d;
 };
 
