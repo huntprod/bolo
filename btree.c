@@ -28,32 +28,32 @@ _print(struct btree *t, int indent)
 {
 	int i;
 
-	BUG(t != NULL,      "btree_print() given a NULL btree to print");
-	BUG(indent >= 0,    "btree_print() given a negative indent");
-	BUG(indent < 7 * 8, "btree_print() recursed more than 7 levels deep; possible recursion loop");
+	BUG(t != NULL,   "btree_print() given a NULL btree to print");
+	BUG(indent >= 0, "btree_print() given a negative indent");
+	BUG(indent < 7,  "btree_print() recursed more than 7 levels deep; possible recursion loop");
 
 	fprintf(stderr, "%*s[btree %p @%lu page %p // %d keys %s]\n",
-		indent, "", (void *)t, t->id,  t->page.data, t->used, t->leaf ? "LEAF" : "interior");
+		indent * 8, "", (void *)t, t->id,  t->page.data, t->used, t->leaf ? "LEAF" : "interior");
 
 	for (i = 0; i < t->used; i++) {
 		if (t->leaf) {
 			fprintf(stderr, "%*s[%03d] % 10ld / %010lx (= %lu / %010lx)\n",
-				indent + 2, "", i, keyat(t,i), keyat(t,i), valueat(t,i), valueat(t,i));
+				indent * 8 + 2, "", i, keyat(t,i), keyat(t,i), valueat(t,i), valueat(t,i));
 		} else {
 			fprintf(stderr, "%*s[%03d] % 10ld / %010lx (%p) -->\n",
-				indent + 2, "", i, keyat(t,i), keyat(t,i), (void *)t->kids[i]);
+				indent * 8 + 2, "", i, keyat(t,i), keyat(t,i), (void *)t->kids[i]);
 			if (t->kids[i])
-				_print(t->kids[i], indent + 8);
+				_print(t->kids[i], indent + 1);
 		}
 	}
 	if (t->leaf) {
 		fprintf(stderr, "%*s[%03d]          ~ (= %lu / %010lx)\n",
-			indent + 2, "", i, valueat(t,t->used), valueat(t,t->used));
+			indent * 8 + 2, "", i, valueat(t,t->used), valueat(t,t->used));
 	} else {
 		fprintf(stderr, "%*s[%03d]          ~ (%p) -->\n",
-			indent + 2, "", i, (void *)t->kids[t->used]);
+			indent * 8 + 2, "", i, (void *)t->kids[t->used]);
 		if (t->kids[t->used])
-			_print(t->kids[t->used], indent + 8);
+			_print(t->kids[t->used], indent + 1);
 	}
 }
 
