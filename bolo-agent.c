@@ -186,7 +186,6 @@ scheduler(int ignored, void *_u)
 	struct agent_check *check, *tmp_check;
 	int i;
 
-	debugf("scheduler firing...");
 	ctx = (struct context *)_u;
 	now = bolo_ms(NULL);
 	for (i = 0; (unsigned)i < ctx->config.nchecks; i++) {
