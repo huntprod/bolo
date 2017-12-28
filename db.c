@@ -155,8 +155,8 @@ s_istoplevel(const char *name)
 static uint64_t
 s_xval(char c)
 {
-	if (c >= 'A' && c <= 'F') return c - 'A';
-	if (c >= 'a' && c <= 'f') return c - 'a';
+	if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+	if (c >= 'a' && c <= 'f') return c - 'a' + 10;
 	if (c >= '0' && c <= '9') return c - '0';
 	return 0;
 }
