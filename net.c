@@ -12,8 +12,8 @@ s_net_parse(char *addr, char **node, char **port)
 {
 	char *p;
 
-	BUG(node != NULL, "s_net_parse() passed a NULL node receiver");
-	BUG(port != NULL, "s_net_parse() passed a NULL port receiver");
+	CHECK(node != NULL, "s_net_parse() passed a NULL node receiver");
+	CHECK(port != NULL, "s_net_parse() passed a NULL port receiver");
 
 	/*
 	   NETWORK ADDRESS SPECIFICATION FORMAT

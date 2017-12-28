@@ -132,8 +132,8 @@ mktree(int dirfd, const char *path, mode_t mode)
 {
 	char buf[PATH_MAX], *p, c;
 
-	BUG(path != NULL, "mktree() given a NULL path to make");
-	BUG(mode >= 0700, "mktree() given a suspicious mode (not rwx for owner)");
+	CHECK(path != NULL, "mktree() given a NULL path to make");
+	CHECK(mode >= 0700, "mktree() given a suspicious mode (not rwx for owner)");
 
 	if (!strncpy(buf, path, PATH_MAX - 1))
 		return -1;
@@ -154,7 +154,7 @@ len(const struct list *lst)
 	struct list *i;
 	size_t n;
 
-	BUG(lst != NULL, "len() given a NULL list to query");
+	CHECK(lst != NULL, "len() given a NULL list to query");
 
 	for (n = 0, i = lst->next; i != lst; i = i->next)
 		n++;
@@ -165,8 +165,8 @@ len(const struct list *lst)
 static void
 _splice(struct list *prev, struct list *next)
 {
-	BUG(prev != NULL, "splice() given a NULL previous pointer");
-	BUG(next != NULL, "splice() given a NULL next pointer");
+	CHECK(prev != NULL, "splice() given a NULL previous pointer");
+	CHECK(next != NULL, "splice() given a NULL next pointer");
 
 	prev->next = next;
 	next->prev = prev;
@@ -175,8 +175,8 @@ _splice(struct list *prev, struct list *next)
 void
 push(struct list *lst, struct list *add)
 {
-	BUG(lst != NULL, "psuh() given a NULL list to append to");
-	BUG(add != NULL, "psuh() given a NULL list to append");
+	CHECK(lst != NULL, "psuh() given a NULL list to append to");
+	CHECK(add != NULL, "psuh() given a NULL list to append");
 
 	_splice(lst->prev, add);
 	_splice(add,       lst);
@@ -185,7 +185,7 @@ push(struct list *lst, struct list *add)
 void
 delist(struct list *node)
 {
-	BUG(node != NULL, "delist() given a NULL list node to delist");
+	CHECK(node != NULL, "delist() given a NULL list node to delist");
 
 	_splice(node->prev, node->next);
 	empty(node);
@@ -200,8 +200,8 @@ void startlog(const char *bin, pid_t pid, int level)
 {
 	ssize_t n;
 
-	BUG(bin, "startlog() given a NULL program name");
-	BUG(level >= LOG_ERRORS || level <= LOG_INFO, "startlog() given an out-of-range log level");
+	CHECK(bin, "startlog() given a NULL program name");
+	CHECK(level >= LOG_ERRORS || level <= LOG_INFO, "startlog() given an out-of-range log level");
 
 	if (!OUT)
 		OUT = stdout;
@@ -219,7 +219,7 @@ void logto(int fd)
 {
 	FILE *out;
 
-	BUG(fd >= 0, "logto() given an invalid file descriptor to log to");
+	CHECK(fd >= 0, "logto() given an invalid file descriptor to log to");
 
 	out = fdopen(fd, "w");
 	if (!out)
@@ -271,8 +271,8 @@ void errorf(const char *fmt, ...)
 {
 	va_list args;
 
-	BUG(fmt != NULL, "errorf() given a NULL format string to print");
-	BUG(OUT != NULL, "errorf() has nowhere to print output");
+	CHECK(fmt != NULL, "errorf() given a NULL format string to print");
+	CHECK(OUT != NULL, "errorf() has nowhere to print output");
 
 	va_start(args, fmt);
 	_vlogf(OUT, "ERROR", fmt, args, 0);
@@ -283,8 +283,8 @@ void errnof(const char *fmt, ...)
 {
 	va_list args;
 
-	BUG(fmt != NULL, "errnof() given a NULL format string to print");
-	BUG(OUT != NULL, "errnof() has nowhere to print output");
+	CHECK(fmt != NULL, "errnof() given a NULL format string to print");
+	CHECK(OUT != NULL, "errnof() has nowhere to print output");
 
 	va_start(args, fmt);
 	_vlogf(OUT, "ERROR", fmt, args, 1);
@@ -295,8 +295,8 @@ void warningf(const char *fmt, ...)
 {
 	va_list args;
 
-	BUG(fmt != NULL, "warningf() given a NULL format string to print");
-	BUG(OUT != NULL, "warningf() has nowhere to print output");
+	CHECK(fmt != NULL, "warningf() given a NULL format string to print");
+	CHECK(OUT != NULL, "warningf() has nowhere to print output");
 
 	if (LEVEL < LOG_WARNINGS)
 		return;
@@ -310,8 +310,8 @@ void infof(const char *fmt, ...)
 {
 	va_list args;
 
-	BUG(fmt != NULL, "infof() given a NULL format string to print");
-	BUG(OUT != NULL, "infof() has nowhere to print output");
+	CHECK(fmt != NULL, "infof() given a NULL format string to print");
+	CHECK(OUT != NULL, "infof() has nowhere to print output");
 
 	if (LEVEL < LOG_INFO)
 		return;
@@ -326,7 +326,7 @@ debugto(int fd)
 {
 	FILE *f;
 
-	BUG(fd >= 0, "debugto() given an invalid file descriptor to send debug output to");
+	CHECK(fd >= 0, "debugto() given an invalid file descriptor to send debug output to");
 
 	f = fdopen(fd, "w");
 	if (f == NULL)
@@ -347,7 +347,7 @@ debugf2(const char *func, const char *file, unsigned long line, const char *fmt,
 	if (!DEBUG)
 		return;
 
-	BUG(fmt != NULL, "debugf() given a NULL format string to print");
+	CHECK(fmt != NULL, "debugf() given a NULL format string to print");
 
 	_logstart(DEBUG, "DEBUG");
 

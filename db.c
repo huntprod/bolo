@@ -17,8 +17,8 @@ rand_key(size_t len)
 {
 	struct dbkey *k;
 
-	BUG(len != 0, "rand_key() asked to generate a random zero-length key");
-	BUG(len <= 4096, "rand_key() asked to generate an impossible large (>4096) key");
+	CHECK(len != 0, "rand_key() asked to generate a random zero-length key");
+	CHECK(len <= 4096, "rand_key() asked to generate an impossible large (>4096) key");
 
 	k = xalloc(1, sizeof(*k));
 	k->len = len;
@@ -40,7 +40,7 @@ read_key(const char *s)
 	size_t i, len;
 	struct dbkey *k;
 
-	BUG(s != NULL, "read_key() given a NULL string to decode into a key");
+	CHECK(s != NULL, "read_key() given a NULL string to decode into a key");
 
 	len = strlen(s);
 	if (len % 2)
@@ -231,10 +231,10 @@ s_scandir(struct db *db, const char *path, const char *suffix, fs_handler fn)
 	uint64_t id;
 	struct dirent *e1, *e2;
 
-	BUG(db != NULL,      "s_scandir() given a NULL db to operate on");
-	BUG(db->rootfd >= 0, "s_scandir() given an invalid data directory file descriptor to read from");
-	BUG(path != NULL,    "s_scandir() given a NULL path name to scan");
-	BUG(suffix != NULL,  "s_scandir() given a NULL file prefix to scan for");
+	CHECK(db != NULL,      "s_scandir() given a NULL db to operate on");
+	CHECK(db->rootfd >= 0, "s_scandir() given an invalid data directory file descriptor to read from");
+	CHECK(path != NULL,    "s_scandir() given a NULL path name to scan");
+	CHECK(suffix != NULL,  "s_scandir() given a NULL file prefix to scan for");
 
 	dh1 = dh2 = NULL;
 	fd = -1;
@@ -365,7 +365,7 @@ fail:
 static uint64_t
 s_maindb_writer(const char *key, void *_idx, void *_)
 {
-	BUG(_idx != NULL, "main.db writer given a NULL time series index to convert");
+	CHECK(_idx != NULL, "main.db writer given a NULL time series index to convert");
 	return ((struct idx *)_idx)->number;
 }
 
@@ -434,7 +434,7 @@ s_maindb_reader(const char *key, uint64_t id, void *udata)
 	struct idx *i;
 	char *tags, *next;
 
-	BUG(udata != NULL, "main.db reader given a NULL db pointer to work with");
+	CHECK(udata != NULL, "main.db reader given a NULL db pointer to work with");
 
 	db = (struct db *)udata;
 	for_each(i, &db->idx, l) {
@@ -542,7 +542,7 @@ db_init(const char *path, struct dbkey *key)
 	int cwd, fd;
 	int esave;
 
-	BUG(path != NULL, "db_init() given a NULL path to read from");
+	CHECK(path != NULL, "db_init() given a NULL path to read from");
 
 	db = NULL;
 	fd = cwd = -1;
@@ -615,7 +615,7 @@ s_tmpcopyof(const char *path)
 	char *copy, *p;
 	int len;
 
-	BUG(path != NULL, "s_tmpcopyof() given a NULL path to make a copy of");
+	CHECK(path != NULL, "s_tmpcopyof() given a NULL path to make a copy of");
 
 	len = asprintf(&copy, "%s..%08x", path, rand());
 	if (len < 0)
@@ -636,9 +636,9 @@ s_tmpcopyat(int dirfd, const char *origpath, int flags, char **copypath)
 {
 	int fd;
 
-	BUG(dirfd >= 0,       "s_tmpcopyat() given an invalid working-directory file descriptor");
-	BUG(origpath != NULL, "s_tmpcopyat() given a NULL path to copy");
-	BUG(copypath != NULL, "s_tmpcopyat() given a NULL destination pointer for the copied path");
+	CHECK(dirfd >= 0,       "s_tmpcopyat() given an invalid working-directory file descriptor");
+	CHECK(origpath != NULL, "s_tmpcopyat() given a NULL path to copy");
+	CHECK(copypath != NULL, "s_tmpcopyat() given a NULL destination pointer for the copied path");
 
 	*copypath = s_tmpcopyof(origpath);
 	if (!*copypath)
@@ -705,7 +705,7 @@ db_unmount(struct db *db)
 	struct multidx *set,  *tmp_set;
 	int ok;
 
-	BUG(db != NULL, "db_unmount() given a NULL db pointer to unmount");
+	CHECK(db != NULL, "db_unmount() given a NULL db pointer to unmount");
 
 	ok = 0;
 	for_eachx(slab, tmp_slab, &db->slab, l) {
@@ -739,9 +739,9 @@ s_newidx(struct db *db, struct idx **idx, uint64_t *id)
 	int fd;
 	char path[64];
 
-	BUG(db  != NULL, "s_newidx() given a NULL db pointer to work with");
-	BUG(idx != NULL, "s_newidx() given a NULL destination pointer for the new time series index");
-	BUG(id  != NULL, "s_newidx() given a NULL detination pointer for the new time series id number");
+	CHECK(db  != NULL, "s_newidx() given a NULL db pointer to work with");
+	CHECK(idx != NULL, "s_newidx() given a NULL destination pointer for the new time series index");
+	CHECK(id  != NULL, "s_newidx() given a NULL detination pointer for the new time series id number");
 
 	*idx = NULL;
 	fd = -1;
@@ -785,7 +785,7 @@ s_findslab(struct db *db, uint64_t id)
 {
 	struct tslab *slab;
 
-	BUG(db != NULL, "s_findslab() given a NULL db pointer to work with");
+	CHECK(db != NULL, "s_findslab() given a NULL db pointer to work with");
 
 	id = tslab_number(id);
 	for_each(slab, &db->slab, l)
@@ -803,7 +803,7 @@ s_newslab(struct db *db, uint64_t id)
 	char path[64];
 	struct tslab *slab;
 
-	BUG(db != NULL, "s_newslab() given a NULL db pointer to work with");
+	CHECK(db != NULL, "s_newslab() given a NULL db pointer to work with");
 
 	slab = xmalloc(sizeof(*slab));
 	slab->key = db->key;
@@ -858,7 +858,7 @@ s_newblock(struct db *db, bolo_msec_t ts)
 	struct tslab *slab;
 	struct tblock *block;
 
-	BUG(db != NULL, "s_newblock() given a NULL db pointer to work with");
+	CHECK(db != NULL, "s_newblock() given a NULL db pointer to work with");
 
 	id = db->next_tblock;
 	slab = s_findslab(db, tslab_number(id));
@@ -872,7 +872,7 @@ s_newblock(struct db *db, bolo_msec_t ts)
 		return NULL;
 
 	db->next_tblock++;
-	BUG(db->next_tblock >= 0x800, "s_newblock() apparently rolled over to a tblock of < 0x800 (we never thought we'd hit this boundary)");
+	CHECK(db->next_tblock >= 0x800, "s_newblock() apparently rolled over to a tblock of < 0x800 (we never thought we'd hit this boundary)");
 	return block;
 }
 
@@ -881,7 +881,7 @@ s_findblock(struct db *db, uint64_t id, bolo_msec_t ts)
 {
 	struct tslab *slab;
 
-	BUG(db != NULL, "s_findblock() given a NULL db pointer to work with");
+	CHECK(db != NULL, "s_findblock() given a NULL db pointer to work with");
 
 	slab = s_findslab(db, id);
 	if (!slab)
@@ -898,19 +898,19 @@ db_insert(struct db *db, char *name, bolo_msec_t when, bolo_value_t what)
 	uint64_t idx_id, block_id;
 	char *next;
 
-	BUG(db != NULL,       "db_insert() given a NULL database to insert into");
-	BUG(db->main != NULL, "db_insert() given a database without a main.db hash");
-	BUG(name != NULL,     "db_insert() given a NULL metric|tagset name to insert");
+	CHECK(db != NULL,       "db_insert() given a NULL database to insert into");
+	CHECK(db->main != NULL, "db_insert() given a database without a main.db hash");
+	CHECK(name != NULL,     "db_insert() given a NULL metric|tagset name to insert");
 
 	if (hash_get(db->main, &idx, name) != 0) {
 		if (s_newidx(db, &idx, &idx_id) != 0)
 			return -1;
-		BUG(idx != NULL, "db_insert() failed to get a valid time series index structure after calling s_newidx()");
+		CHECK(idx != NULL, "db_insert() failed to get a valid time series index structure after calling s_newidx()");
 
 		if (hash_set(db->main, name, idx) != 0)
 			return -1;
 	}
-	BUG(idx != NULL, "db_insert() failed to get a valid time series index structure from the main.db");
+	CHECK(idx != NULL, "db_insert() failed to get a valid time series index structure from the main.db");
 
 	/* find the tblock ID, if we have one */
 	if (btree_find(idx->btree, &block_id, when) != 0) {

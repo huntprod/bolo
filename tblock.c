@@ -3,7 +3,7 @@
 int
 tblock_map(struct tblock *b, int fd, off_t offset, size_t len)
 {
-	BUG(b != NULL, "tblock_map() given a NULL tblock to map");
+	CHECK(b != NULL, "tblock_map() given a NULL tblock to map");
 
 	memset(b, 0, sizeof(*b));
 
@@ -21,8 +21,8 @@ tblock_map(struct tblock *b, int fd, off_t offset, size_t len)
 
 void tblock_init(struct tblock *b, uint64_t number, bolo_msec_t base)
 {
-	BUG(b != NULL,            "tblock_init() given a NULL tblock to initialize");
-	BUG(b->page.data != NULL, "tblock_init() given an unmapped tblock to initialize");
+	CHECK(b != NULL,            "tblock_init() given a NULL tblock to initialize");
+	CHECK(b->page.data != NULL, "tblock_init() given an unmapped tblock to initialize");
 
 	b->valid  = 1;
 	b->cells  = 0;
@@ -43,7 +43,7 @@ void tblock_init(struct tblock *b, uint64_t number, bolo_msec_t base)
 
 int tblock_isfull(struct tblock *b)
 {
-	BUG(b != NULL, "tblock_isfull() given a NULL tblock to query");
+	CHECK(b != NULL, "tblock_isfull() given a NULL tblock to query");
 
 	errno = BOLO_EBLKFULL;
 	return b->cells == TCELLS_PER_TBLOCK;
@@ -52,7 +52,7 @@ int tblock_isfull(struct tblock *b)
 int
 tblock_canhold(struct tblock *b, bolo_msec_t when)
 {
-	BUG(b != NULL, "tblock_canhold() given a NULL tblock to query");
+	CHECK(b != NULL, "tblock_canhold() given a NULL tblock to query");
 
 	errno = BOLO_EBLKRANGE;
 	return when - b->base <  MAX_U32;
@@ -61,7 +61,7 @@ tblock_canhold(struct tblock *b, bolo_msec_t when)
 int
 tblock_insert(struct tblock *b, bolo_msec_t when, double what)
 {
-	BUG(b != NULL, "tblock_insert() given a NULL tblock to insert into");
+	CHECK(b != NULL, "tblock_insert() given a NULL tblock to insert into");
 
 	if (tblock_isfull(b))
 		return -1;
@@ -69,7 +69,7 @@ tblock_insert(struct tblock *b, bolo_msec_t when, double what)
 	if (!tblock_canhold(b, when))
 		return -1;
 
-	BUG(when - b->base < MAX_U32, "tblock_insert() given a timestamp that is beyond the range of this block");
+	CHECK(when - b->base < MAX_U32, "tblock_insert() given a timestamp that is beyond the range of this block");
 	tblock_write32 (b, 32 + b->cells * 12,     when - b->base);
 	tblock_write64f(b, 32 + b->cells * 12 + 4, what);
 	tblock_write16 (b, 6, ++b->cells);

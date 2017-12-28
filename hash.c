@@ -62,7 +62,7 @@ hash_free(struct hash *h)
 void
 _hash_ebegn(struct hash *h, void *key, void *val)
 {
-	BUG(h != NULL, "hash_each() { ... } given a NULL hash to iterate over");
+	CHECK(h != NULL, "hash_each() { ... } given a NULL hash to iterate over");
 
 	h->i = 0;
 	h->last = NULL;
@@ -72,8 +72,8 @@ _hash_ebegn(struct hash *h, void *key, void *val)
 void
 _hash_enext(struct hash *h, void *key, void *val)
 {
-	BUG(h != NULL,                  "hash_each() { ... } given a NULL hash to iterate over");
-	BUG(key != NULL || val != NULL, "hash_each() { ... } given NULL key and value destination pointers");
+	CHECK(h != NULL,                  "hash_each() { ... } given a NULL hash to iterate over");
+	CHECK(key != NULL || val != NULL, "hash_each() { ... } given NULL key and value destination pointers");
 
 	while (h->i < HASH_STRIDE && !h->last) {
 		h->last = h->buckets[h->i++];
@@ -95,7 +95,7 @@ _hash_edone(struct hash *h)
 size_t
 hash_nset(struct hash *h)
 {
-	BUG(h != NULL, "hash_nset() given a NULL hash to query");
+	CHECK(h != NULL, "hash_nset() given a NULL hash to query");
 	return h->nset;
 }
 
@@ -105,8 +105,8 @@ hash_set(struct hash *h, const char *key, void *val)
 	unsigned int k;
 	struct bucket *b;
 
-	BUG(h != NULL,   "hash_set() given a NULL hash to insert into");
-	BUG(key != NULL, "hash_set() given a NULL key to insert");
+	CHECK(h != NULL,   "hash_set() given a NULL hash to insert into");
+	CHECK(key != NULL, "hash_set() given a NULL key to insert");
 
 	k = s_hash(key) % HASH_STRIDE;
 
@@ -135,8 +135,8 @@ hash_get(struct hash *h, void *dst, const char *key)
 	unsigned int k;
 	struct bucket *b;
 
-	BUG(h != NULL,   "hash_get() given a NULL hash to query");
-	BUG(key != NULL, "hash_get() given a NULL key to lookup");
+	CHECK(h != NULL,   "hash_get() given a NULL hash to query");
+	CHECK(key != NULL, "hash_get() given a NULL key to lookup");
 
 	k = s_hash(key) % HASH_STRIDE;
 
@@ -165,7 +165,7 @@ hash_read(int from, hash_reader_fn reader, void *udata)
 	uint64_t value;
 	void *ptr;
 
-	BUG(from >= 0, "hash_read() given an invalid file descriptor to read from");
+	CHECK(from >= 0, "hash_read() given an invalid file descriptor to read from");
 
 	lseek(from, 0, SEEK_SET);
 
@@ -216,8 +216,8 @@ hash_write(struct hash *h, int to, hash_writer_fn writer, void *udata)
 	int i, fd;
 	struct bucket *b;
 
-	BUG(h != NULL, "hash_write() given a NULL hash pointer to write");
-	BUG(to >= 0,   "hash_write() given an invalid file descriptor to write to");
+	CHECK(h != NULL, "hash_write() given a NULL hash pointer to write");
+	CHECK(to >= 0,   "hash_write() given an invalid file descriptor to write to");
 
 	if (ftruncate(to, 0) < 0)
 		return -1;

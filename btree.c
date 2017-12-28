@@ -28,9 +28,9 @@ _print(struct btree *t, int indent)
 {
 	int i;
 
-	BUG(t != NULL,   "btree_print() given a NULL btree to print");
-	BUG(indent >= 0, "btree_print() given a negative indent");
-	BUG(indent < 7,  "btree_print() recursed more than 7 levels deep; possible recursion loop");
+	CHECK(t != NULL,   "btree_print() given a NULL btree to print");
+	CHECK(indent >= 0, "btree_print() given a negative indent");
+	CHECK(indent < 7,  "btree_print() recursed more than 7 levels deep; possible recursion loop");
 
 	fprintf(stderr, "%*s[btree %p @%lu page %p // %d keys %s]\n",
 		indent * 8, "", (void *)t, t->id,  t->page.data, t->used, t->leaf ? "LEAF" : "interior");
@@ -121,7 +121,7 @@ s_extend(int fd)
 		return NULL;
 
 	lseek(fd, -1 * BTREE_PAGE_SIZE, SEEK_END);
-	BUG(BTREE_HEADER_SIZE == 8, "BTREE_HEADER_SIZE constant is under- or oversized");
+	CHECK(BTREE_HEADER_SIZE == 8, "BTREE_HEADER_SIZE constant is under- or oversized");
 	if (write(fd, "BTREE\x80\x00\x00", BTREE_HEADER_SIZE) != BTREE_HEADER_SIZE)
 		return NULL;
 
@@ -158,8 +158,8 @@ btree_read(int fd)
 static int
 s_flush(struct btree *t)
 {
-	BUG(t != NULL,            "btree_write() given a NULL btree to flush");
-	BUG(t->page.data != NULL, "btree_write() given a btree without a backing page");
+	CHECK(t != NULL,            "btree_write() given a NULL btree to flush");
+	CHECK(t->page.data != NULL, "btree_write() given a btree without a backing page");
 
 	page_write8 (&t->page, 5, t->leaf ? BTREE_LEAF : 0);
 	page_write16(&t->page, 6, t->used);
@@ -171,7 +171,7 @@ btree_write(struct btree *t)
 {
 	int i, rc;
 
-	BUG(t != NULL, "btree_write() given a NULL btree to write");
+	CHECK(t != NULL, "btree_write() given a NULL btree to write");
 
 	rc = 0;
 
@@ -210,7 +210,7 @@ btree_close(struct btree *t)
 static int
 s_find(struct btree *t, bolo_msec_t key)
 {
-	BUG(t != NULL, "s_find (by way of btree_find or btree_insert) given a NULL btree node");
+	CHECK(t != NULL, "s_find (by way of btree_find or btree_insert) given a NULL btree node");
 
 	int lo, mid, hi;
 
@@ -261,14 +261,14 @@ s_clone(struct btree *t)
 static void
 s_divide(struct btree *l, struct btree *r, int mid)
 {
-	BUG(l != NULL,                    "btree_insert() divide given a NULL left node");
-	BUG(r != NULL,                    "btree_insert() divide given a NULL right node");
-	BUG(l != r,                       "btree_insert() divide given identical left and right nodes");
-	BUG(l->page.data != NULL,         "btree_insert() divide given a left node with no backing page");
-	BUG(r->page.data != NULL,         "btree_insert() divide given a right node with no backing page");
-	BUG(l->page.data != r->page.data, "btree_insert() divide given left and right nodes that use the same backing page");
-	BUG(mid != 0,                     "btree_insert() divide attempted to divide with midpoint of 0");
-	BUG(l->used >= mid,               "btree_insert() divide attempted to divide with out-of-range midpoint");
+	CHECK(l != NULL,                    "btree_insert() divide given a NULL left node");
+	CHECK(r != NULL,                    "btree_insert() divide given a NULL right node");
+	CHECK(l != r,                       "btree_insert() divide given identical left and right nodes");
+	CHECK(l->page.data != NULL,         "btree_insert() divide given a left node with no backing page");
+	CHECK(r->page.data != NULL,         "btree_insert() divide given a right node with no backing page");
+	CHECK(l->page.data != r->page.data, "btree_insert() divide given left and right nodes that use the same backing page");
+	CHECK(mid != 0,                     "btree_insert() divide attempted to divide with midpoint of 0");
+	CHECK(l->used >= mid,               "btree_insert() divide attempted to divide with out-of-range midpoint");
 
 	r->used = l->used - mid - 1;
 	l->used = mid;
@@ -302,8 +302,8 @@ s_insert(struct btree *t, bolo_msec_t key, uint64_t block_number, bolo_msec_t *m
 	int i, mid;
 	struct btree *r;
 
-	BUG(t != NULL,               "btree_insert() given a NULL node to insert into");
-	BUG(t->used <= BTREE_DEGREE, "btree_insert() given a node that was impossibly full");
+	CHECK(t != NULL,               "btree_insert() given a NULL node to insert into");
+	CHECK(t->used <= BTREE_DEGREE, "btree_insert() given a node that was impossibly full");
 	/* invariant: Each node in the btree will always have enough
 	              free space in it to insert at least one value
 	              (either a literal, or a node pointer).
@@ -359,7 +359,7 @@ btree_insert(struct btree *t, bolo_msec_t key, uint64_t block_number)
 	struct btree *l, *r;
 	bolo_msec_t m;
 
-	BUG(t != NULL, "btree_insert() given a NULL node to insert into");
+	CHECK(t != NULL, "btree_insert() given a NULL node to insert into");
 
 	r = s_insert(t, key, block_number, &m);
 	if (r) {
@@ -386,8 +386,8 @@ btree_find(struct btree *t, uint64_t *dst, bolo_msec_t key)
 {
 	int i;
 
-	BUG(t != NULL, "btree_find() given a NULL btree node");
-	BUG(dst != NULL, "btree_find() told to place results in a NULL pointer");
+	CHECK(t != NULL, "btree_find() given a NULL btree node");
+	CHECK(dst != NULL, "btree_find() told to place results in a NULL pointer");
 
 	if (t->leaf && t->used == 0)
 		return -1; /* empty root node */
@@ -409,15 +409,15 @@ btree_find(struct btree *t, uint64_t *dst, bolo_msec_t key)
 int
 btree_isempty(struct btree *t)
 {
-	BUG(t != NULL, "btree_isempty() given a NULL btree node");
+	CHECK(t != NULL, "btree_isempty() given a NULL btree node");
 	return t->used == 0;
 }
 
 bolo_msec_t
 btree_first(struct btree *t)
 {
-	BUG(t != NULL, "btree_first() given a NULL btree node");
-	BUG(!btree_isempty(t), "btree_first() given an empty btree");
+	CHECK(t != NULL, "btree_first() given a NULL btree node");
+	CHECK(!btree_isempty(t), "btree_first() given an empty btree");
 
 	while (!t->leaf)
 		t = t->kids[0];
@@ -427,8 +427,8 @@ btree_first(struct btree *t)
 bolo_msec_t
 btree_last(struct btree *t)
 {
-	BUG(t != NULL, "btree_last() given a NULL btree node");
-	BUG(!btree_isempty(t), "btree_last() given an empty btree");
+	CHECK(t != NULL, "btree_last() given a NULL btree node");
+	CHECK(!btree_isempty(t), "btree_last() given an empty btree");
 
 	while (!t->leaf)
 		t = t->kids[t->used];

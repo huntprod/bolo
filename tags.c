@@ -148,11 +148,11 @@ tags_next(char *tags, char **tag, char **val)
 {
 	char *p;
 
-	BUG(tags != NULL, "tags_next() given a NULL tag string to iterate over");
-	BUG(tag != NULL,  "tags_next() given a NULL destination pointer for the next tag");
-	BUG(val != NULL,  "tags_next() given a NULL destination pointer for the next value");
+	CHECK(tags != NULL, "tags_next() given a NULL tag string to iterate over");
+	CHECK(tag != NULL,  "tags_next() given a NULL destination pointer for the next tag");
+	CHECK(val != NULL,  "tags_next() given a NULL destination pointer for the next value");
 
-	BUG(s_iskeystart(*tags), "tags_next() given a malformed tag string");
+	CHECK(s_iskeystart(*tags), "tags_next() given a malformed tag string");
 
 	*tag = tags;
 	for (p = tags; *p && !s_iskvsep(*p); p++);

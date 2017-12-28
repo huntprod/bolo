@@ -94,16 +94,16 @@ s_configure_core(struct core_config *cfg, int fd)
 			return 0;
 
 		next = eol;
-		BUG(next != NULL,  "configure() ended up with a NULL eol marker somehow (this is curious)");
-		BUG(*next == '\n', "configure() ended up with a non-newline eol marker somehow (this is curious)");
+		CHECK(next != NULL,  "configure() ended up with a NULL eol marker somehow (this is curious)");
+		CHECK(*next == '\n', "configure() ended up with a non-newline eol marker somehow (this is curious)");
 
 		/* treat comments as ending the line */
 		eol = strchr(buf, '#');
 		if (eol && *eol) *eol = '\n';
 		else              eol = next;
 
-		BUG(eol != NULL,  "configure() ended up with a NULL eol marker somehow (this is curious)");
-		BUG(*eol == '\n', "configure() ended up with a non-newline eol marker somehow (this is curious)");
+		CHECK(eol != NULL,  "configure() ended up with a NULL eol marker somehow (this is curious)");
+		CHECK(*eol == '\n', "configure() ended up with a non-newline eol marker somehow (this is curious)");
 
 		/* ignore trailing whitespace by shifting eol */
 		for (eol--; eol >= buf && isspace(*eol); eol--)
@@ -262,16 +262,16 @@ s_configure_agent(struct agent_config *cfg, int fd)
 			return 0;
 
 		next = eol;
-		BUG(next != NULL,  "configure() ended up with a NULL eol marker somehow (this is curious)");
-		BUG(*next == '\n', "configure() ended up with a non-newline eol marker somehow (this is curious)");
+		CHECK(next != NULL,  "configure() ended up with a NULL eol marker somehow (this is curious)");
+		CHECK(*next == '\n', "configure() ended up with a non-newline eol marker somehow (this is curious)");
 
 		/* treat comments as ending the line */
 		eol = strchr(buf, '#');
 		if (eol && *eol) *eol = '\n';
 		else              eol = next;
 
-		BUG(eol != NULL,  "configure() ended up with a NULL eol marker somehow (this is curious)");
-		BUG(*eol == '\n', "configure() ended up with a non-newline eol marker somehow (this is curious)");
+		CHECK(eol != NULL,  "configure() ended up with a NULL eol marker somehow (this is curious)");
+		CHECK(*eol == '\n', "configure() ended up with a non-newline eol marker somehow (this is curious)");
 
 		/* ignore trailing whitespace by shifting eol */
 		for (eol--; eol >= buf && isspace(*eol); eol--)

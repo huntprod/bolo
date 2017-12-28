@@ -19,7 +19,7 @@ rsv_free(struct rsv *rsv)
 
 void rsv_reset(struct rsv *rsv)
 {
-	BUG(rsv != NULL, "rsv_reset() given a NULL reservoir to reset");
+	CHECK(rsv != NULL, "rsv_reset() given a NULL reservoir to reset");
 
 	rsv->n = rsv->len = 0;
 }
@@ -28,7 +28,7 @@ void
 rsv_sample(struct rsv *rsv, double v)
 {
 	uint32_t j;
-	BUG(rsv != NULL, "rsv_sample() given a NULL reservoir to sample into");
+	CHECK(rsv != NULL, "rsv_sample() given a NULL reservoir to sample into");
 
 	if (rsv->n == rsv->len && rsv->len < rsv->cap) {
 		rsv->items[rsv->len++] = v;
@@ -56,7 +56,7 @@ double rsv_median(struct rsv *rsv)
 {
 	int mid;
 
-	BUG(rsv != NULL, "rsv_median() given a NULL reservoir to summarize");
+	CHECK(rsv != NULL, "rsv_median() given a NULL reservoir to summarize");
 
 	if (rsv->len == 0)
 		return NAN;
@@ -75,7 +75,7 @@ double rsv_average(struct rsv *rsv)
 	double v;
 	size_t i;
 
-	BUG(rsv != NULL, "rsv_average() given a NULL reservoir to summarize");
+	CHECK(rsv != NULL, "rsv_average() given a NULL reservoir to summarize");
 
 	if (rsv->len == 0)
 		return NAN;
@@ -91,7 +91,7 @@ double rsv_sum(struct rsv *rsv)
 	double v;
 	size_t i;
 
-	BUG(rsv != NULL, "rsv_sum() given a NULL reservoir to summarize");
+	CHECK(rsv != NULL, "rsv_sum() given a NULL reservoir to summarize");
 
 	if (rsv->len == 0)
 		return NAN;
@@ -107,7 +107,7 @@ double rsv_min(struct rsv *rsv)
 	double v;
 	size_t i;
 
-	BUG(rsv != NULL, "rsv_min() given a NULL reservoir to summarize");
+	CHECK(rsv != NULL, "rsv_min() given a NULL reservoir to summarize");
 
 	if (rsv->len == 0)
 		return NAN;
@@ -124,7 +124,7 @@ double rsv_max(struct rsv *rsv)
 	double v;
 	size_t i;
 
-	BUG(rsv != NULL, "rsv_max() given a NULL reservoir to summarize");
+	CHECK(rsv != NULL, "rsv_max() given a NULL reservoir to summarize");
 
 	if (rsv->len == 0)
 		return NAN;

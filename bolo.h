@@ -16,7 +16,7 @@
 #define ASSERTION_VERBOSE   1
 //#define ASSERTION_DEBUGGING 1
 #include "insist.h"
-#define BUG(t,msg) insist(t,msg THIS_IS_A_BUG)
+#define CHECK(t,msg) insist(t,msg THIS_IS_A_BUG)
 
 #include "compiler.h"
 #include "errno.h"
