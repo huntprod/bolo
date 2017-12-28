@@ -144,11 +144,8 @@
 						}
 
 						navbar(document.location.hash);
-						if (document.location.hash != '') {
-							page(document.location.hash.substr(1));
-						} else {
-							refresh();
-						}
+						page('board');
+						refresh();
 					});
 				},
 				error: function (r) {
