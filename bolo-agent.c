@@ -140,8 +140,6 @@ runner_handler(int fd, void *_u)
 					if (fdpoll_watch(r->ctx->poll, r->ctx->bolo.fd, FDPOLL_WRITE, relay_handler, r->ctx) != 0)
 						bail("failed to re-watch upstream relay fd");
 					r->ctx->bolo.watched = 1;
-				} else {
-					debugf("already watching upstream relay");
 				}
 				break;
 
