@@ -167,6 +167,7 @@ consume:
 				memmove(r->buf, eol, r->nread - (eol - r->buf));
 				r->nread -= eol - r->buf;
 			}
+			r->buf[r->nread] = '\0'; /* strchr needs NULL-termination */
 			continue;
 
 tryagain:
