@@ -111,6 +111,17 @@ int  debugto(int fd);
 void debugf2(const char *func, const char *file, unsigned long line, const char *fmt, ...);
 
 
+/********************************************************************  time ***/
+
+typedef uint64_t bolo_msec_t;
+typedef uint32_t bolo_sec_t;
+
+#define INVALID_MS (bolo_msec_t)(-1)
+#define INVALID_S  (bolo_sec_t)(-1)
+
+bolo_msec_t bolo_ms(const struct timeval *tv) RETURNS;
+bolo_msec_t bolo_s (const struct timeval *tv) RETURNS;
+
 /*****************************************************************  config  ***/
 
 #define AGENT_CONFIG 1
@@ -237,24 +248,6 @@ int  _hash_edone(struct hash *h);
 	for (_hash_ebegn((h), k, v); \
 	    !_hash_edone((h)); \
 	     _hash_enext((h), k, v))
-
-/********************************************************************  time ***/
-
-typedef uint64_t bolo_msec_t;
-typedef uint32_t bolo_sec_t;
-
-#define INVALID_MS (bolo_msec_t)(-1)
-#define INVALID_S  (bolo_sec_t)(-1)
-
-typedef double   bolo_value_t;
-
-bolo_msec_t
-bolo_ms(const struct timeval *tv)
-RETURNS;
-
-bolo_msec_t
-bolo_s(const struct timeval *tv)
-RETURNS;
 
 /***********************************************************  bit twiddling ***/
 
@@ -408,6 +401,8 @@ struct dbkey * rand_key(size_t len) RETURNS;
 struct dbkey * read_key(const char *s) RETURNS;
 
 /********************************************************  database blocks  ***/
+
+typedef double bolo_value_t;
 
 struct tblock {
 	int valid;         /* is this block real? */
