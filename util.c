@@ -1,5 +1,7 @@
 #include "bolo.h"
 #include <limits.h>
+#include <time.h>
+#include <stdarg.h>
 
 /* LCOV_EXCL_START */
 void
@@ -180,6 +182,183 @@ push(struct list *lst, struct list *add)
 	_splice(add,       lst);
 }
 
+void
+delist(struct list *node)
+{
+	BUG(node != NULL, "delist() given a NULL list node to delist");
+
+	_splice(node->prev, node->next);
+	empty(node);
+}
+
+static FILE *OUT   = NULL;
+static char *PRE   = NULL;
+static int   LEVEL = LOG_ERRORS;
+static FILE *DEBUG = NULL;
+
+void startlog(const char *bin, pid_t pid, int level)
+{
+	ssize_t n;
+
+	BUG(bin, "startlog() given a NULL program name");
+	BUG(level >= LOG_ERRORS || level <= LOG_INFO, "startlog() given an out-of-range log level");
+
+	if (!OUT)
+		OUT = stdout;
+
+	free(PRE);
+	if (pid > 0) n = asprintf(&PRE, "%s[%d]", bin, pid);
+	else         n = asprintf(&PRE, "%s",     bin);
+	if (n < (ssize_t)strlen(bin))
+		bail("failed to allocate memory in startlog()");
+
+	LEVEL = level;
+}
+
+void logto(int fd)
+{
+	FILE *out;
+
+	BUG(fd >= 0, "logto() given an invalid file descriptor to log to");
+
+	out = fdopen(fd, "w");
+	if (!out)
+		bail("failed to reopen log output fd");
+
+	OUT = out;
+}
+
+static void
+_logstart(FILE *io, const char *level)
+{
+	struct tm tm;
+	time_t t;
+	char date[256];
+
+	if (!time(&t)) {
+		strcpy(date, "(date/time unknown -- time() failed)");
+		goto print;
+	}
+
+	if (!gmtime_r(&t, &tm)) {
+		strcpy(date, "(date/time unknown -- gmtime_r() failed)");
+		goto print;
+	}
+
+	/* date format is rfc1123 / rfc822 compliant
+	     [Fri, 06 Aug 2010 16:45:17-0400] */
+	if (strftime(date, 256, "[%a, %d %b %Y %H:%M:%S%z]", &tm) == 0) {
+		strcpy(date, "(date/time unknown -- strftime failed");
+		goto print;
+	}
+
+print:
+	fprintf(io, "%s %s: %s ", date, PRE, level);
+}
+
+static void
+_vlogf(FILE *io, const char *level, const char *fmt, va_list args, int printerr)
+{
+	_logstart(io, level);
+	vfprintf(io, fmt, args);
+	if (printerr)
+		fprintf(io, ": %s (error %d)", error(errno), errno);
+	fprintf(io, "\n");
+	fflush(io);
+}
+
+void errorf(const char *fmt, ...)
+{
+	va_list args;
+
+	BUG(fmt != NULL, "errorf() given a NULL format string to print");
+	BUG(OUT != NULL, "errorf() has nowhere to print output");
+
+	va_start(args, fmt);
+	_vlogf(OUT, "ERROR", fmt, args, 0);
+	va_end(args);
+}
+
+void errnof(const char *fmt, ...)
+{
+	va_list args;
+
+	BUG(fmt != NULL, "errnof() given a NULL format string to print");
+	BUG(OUT != NULL, "errnof() has nowhere to print output");
+
+	va_start(args, fmt);
+	_vlogf(OUT, "ERROR", fmt, args, 1);
+	va_end(args);
+}
+
+void warningf(const char *fmt, ...)
+{
+	va_list args;
+
+	BUG(fmt != NULL, "warningf() given a NULL format string to print");
+	BUG(OUT != NULL, "warningf() has nowhere to print output");
+
+	if (LEVEL < LOG_WARNINGS)
+		return;
+
+	va_start(args, fmt);
+	_vlogf(OUT, "WARN ", fmt, args, 0);
+	va_end(args);
+}
+
+void infof(const char *fmt, ...)
+{
+	va_list args;
+
+	BUG(fmt != NULL, "infof() given a NULL format string to print");
+	BUG(OUT != NULL, "infof() has nowhere to print output");
+
+	if (LEVEL < LOG_INFO)
+		return;
+
+	va_start(args, fmt);
+	_vlogf(OUT, "INFO ", fmt, args, 0);
+	va_end(args);
+}
+
+int
+debugto(int fd)
+{
+	FILE *f;
+
+	BUG(fd >= 0, "debugto() given an invalid file descriptor to send debug output to");
+
+	f = fdopen(fd, "w");
+	if (f == NULL)
+		return -1;
+
+	if (DEBUG)
+		fclose(DEBUG);
+
+	DEBUG = f;
+	return 0;
+}
+
+void
+debugf2(const char *func, const char *file, unsigned long line, const char *fmt, ...)
+{
+	va_list args;
+
+	if (!DEBUG)
+		return;
+
+	BUG(fmt != NULL, "debugf() given a NULL format string to print");
+
+	_logstart(DEBUG, "DEBUG");
+
+	va_start(args, fmt);
+	vfprintf(DEBUG, fmt, args);
+	va_end(args);
+
+	fprintf(DEBUG, " (in %s(), at %s:%lu)\n", func, file, line);
+	fflush(DEBUG);
+}
+
 #ifdef TEST
 /* LCOV_EXCL_START */
 struct data {
@@ -317,6 +496,42 @@ TESTS {
 		always_lt(urandn(1000), 1000);
 
 #undef always_eq
+	}
+
+	subtest {
+		int fd;
+		char buf[8192], *line, *c;
+
+		fd = memfd("log");
+		logto(fd);
+		startlog("test-driver", 12345, LOG_WARNINGS);
+		infof("an informational message (number %d)", 42);
+		warningf("oh noes, a %s (%x)!", "warning", 0xdecafbad);
+		errorf("error %d (%s)", ENOENT, error(ENOENT));
+
+		lseek(fd, 0, SEEK_SET);
+		ok(read(fd, buf, 8192) > 0,
+			"logging subsystem should have written some octets");
+
+		line = buf;
+		c = strchr(line, '\n');
+		ok(c && *c, "should have found a newline in the output");
+		*c++ = '\0';
+
+		memset(line+1, 'X', 30);
+		is_string(line,
+			"[XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX] test-driver[12345]: WARN  oh noes, a warning (decafbad)!",
+			"warnf() should have written a log message");
+
+		line = c;
+		c = strchr(line, '\n');
+		ok(c && *c, "should have found a second newline in the output");
+		*c++ = '\0';
+
+		memset(line+1, 'X', 30);
+		is_string(line,
+			"[XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX] test-driver[12345]: ERROR error 2 (No such file or directory)",
+			"errorf() should have written a log message");
 	}
 }
 /* LCOV_EXCL_STOP */

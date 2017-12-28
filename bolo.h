@@ -84,9 +84,6 @@ struct list {
 size_t len(const struct list *l) RETURNS;
 void push(struct list *list, struct list *add);
 
-
-/****************************************************************  logging  ***/
-
 #define LOG_ERRORS   0
 #define LOG_WARNINGS 1
 #define LOG_INFO     2
@@ -98,12 +95,9 @@ void errnof(const char *fmt, ...);
 void warningf(const char *fmt, ...);
 void infof(const char *fmt, ...);
 
-
-/**************************************************************  debugging  ***/
-
 int  debugto(int fd);
-#define debugf(...) debugf2(__FILE__, __LINE__, __VA_ARGS__)
-void debugf2(const char *file, unsigned long line, const char *fmt, ...);
+#define debugf(...) debugf2(__func__, __FILE__, __LINE__, __VA_ARGS__)
+void debugf2(const char *func, const char *file, unsigned long line, const char *fmt, ...);
 
 
 /*****************************************************************  config  ***/
