@@ -1,3 +1,5 @@
+default: all
+
 CFLAGS += -Wall -Wextra -Wpedantic -Wunused -Wunused-result -Wno-unused-parameter
 TEST_CFLAGS := -g -DTEST -fprofile-arcs -ftest-coverage -It
 LDLIBS += -lm -lpthread
@@ -17,7 +19,12 @@ TESTS += tags query db
 TESTS += bqip
 TESTS += ingest
 
-all: bolo
+COLLECTORS :=
+COLLECTORS += linux
+linux: collectors/linux.o hash.o time.o util.o
+	$(CC) $(LDFLAGS) -o $@ $+ -lpcre
+
+all: bolo $(COLLECTORS)
 bolo: bolo.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o \
       btree.o tags.o query.o rsv.o bql/bql.a bqip.o net.o fdpoll.o ingest.o cfg.o \
       \
@@ -29,6 +36,7 @@ bqlx: bql/main.o bql/bql.a util.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -Wno-error -o $@ $+ $(LDLIBS)
 
 clean:
+	rm -f bolo $(COLLECTORS)
 	rm -f *.o *.gcno *.gcda
 	rm -f bql/*.o bql/*.gcno bql/*.gcda
 	rm -f $(TESTS)

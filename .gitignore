@@ -4,6 +4,9 @@
 /httpx
 /slow
 
+# collectors
+/linux
+
 # tests
 /bits
 /bqip
