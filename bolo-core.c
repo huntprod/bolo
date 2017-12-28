@@ -169,29 +169,37 @@ metric_handler(int fd, void *_u)
 	pthread_mutex_lock(&db_lock);
 	while (n-- > 0) {
 		debugf("ingesting metric submission from fd %d", in->fd);
-		if (ingest(in) != 0)
+		if (ingest(in) != 0) {
+			errnof("failed to ingest metric submission from fd %d");
 			goto lockfail;
+		}
 
-		debugf("inserting new measurement from fd %d", in->fd);
-		if (db_insert(db, in->metric, in->time, in->value) != 0)
+		debugf("inserting new measurement [%lu] %s=%e from fd %d",
+			in->time, in->metric, in->value, in->fd);
+		if (db_insert(db, in->metric, in->time, in->value) != 0) {
+			errnof("failed to insert [%lu] %s=%e measurement into database",
+				in->time, in->metric, in->value);
 			goto lockfail;
+		}
 	}
 
 	debugf("syncing database...");
-	if (db_sync(db) != 0)
+	if (db_sync(db) != 0) {
+		errnof("failed to sync database after updating metric measurements");
 		goto lockfail;
+	}
 	pthread_mutex_unlock(&db_lock);
 
 done:
 	if (ingest_eof(in)) {
-		in->fd = -1;
+		debugf("at eof on ingestor fd %d; shutting down this connection.", in->fd);
+		in->eof = in->fd = -1;
 		return -1;
 	}
 	return 0;
 
 lockfail:
 	pthread_mutex_unlock(&db_lock);
-	errorf("failed to deal with stuff; bailing out (fd %d)", in->fd);
 fail:
 	in->fd = -1;
 	return -1;
