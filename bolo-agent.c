@@ -119,9 +119,8 @@ runner_handler(int fd, void *_u)
 				goto tryagain;
 
 			*eol++ = '\n';
-			memcpy(r->ctx->bolo.sndbuf + r->ctx->bolo.outstanding,
-				r->buf + 2, eol - r->buf - 2);
-			r->ctx->bolo.outstanding += eol - r->buf - 2;
+			memcpy(r->ctx->bolo.sndbuf + r->ctx->bolo.outstanding, r->buf, eol - r->buf);
+			r->ctx->bolo.outstanding += eol - r->buf;
 			if (!r->ctx->bolo.watched) {
 				debugf("watching upstream relay fd (we have data to send!)");
 				if (fdpoll_watch(r->ctx->poll, r->ctx->bolo.fd, FDPOLL_WRITE, relay_handler, r->ctx) != 0)
