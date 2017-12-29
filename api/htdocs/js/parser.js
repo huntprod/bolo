@@ -48,7 +48,7 @@ var only_metric = function (d, key) {
 
 var sparkline = function (svg, data) {
 	var bounds = svg.node().getBoundingClientRect(),
-	     width = bounds.width,
+	    width  = bounds.width,
 	    height = bounds.height;
 
 	var x = d3.scaleTime()
@@ -109,14 +109,14 @@ Break.prototype.html = function () {
 var PlaceholderBlock = function (attrs) { init(this, attrs, 'placeholder') };
 PlaceholderBlock.prototype = Object.create(Block.prototype);
 PlaceholderBlock.prototype.update = function () {
-	var svg = this.select().append('svg'),
-	    box = svg.node().getBoundingClientRect()
-	      c = color.spec(this.color);
+	var svg    = this.select().append('svg'),
+	    bounds = svg.node().getBoundingClientRect()
+	    c      = color.spec(this.color);
 
 	svg.style("background-color", c.bg)
 	   .append("text")
-	     .attr("x", box.width  / 2)
-	     .attr("y", box.height / 2)
+	     .attr("x", bounds.width  / 2)
+	     .attr("y", bounds.height / 2)
 	     .style("fill", c.fg)
 	     .text(this.text);
 };
