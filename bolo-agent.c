@@ -1,4 +1,8 @@
 #include "bolo.h"
+
+#include <sys/types.h>
+#include <sys/wait.h>
+
 #include <getopt.h>
 
 #ifndef DEFAULT_CONFIG_FILE
@@ -152,7 +156,11 @@ scheduler(int ignored, void *_u)
 	bolo_msec_t now;
 	struct context *ctx;
 	struct agent_check *check, *tmp_check;
-	int i;
+	int i, rc;
+	pid_t kid;
+
+	while ((kid = waitpid(-1, &rc, WNOHANG)) != -1)
+		;
 
 	ctx = (struct context *)_u;
 	now = bolo_ms(NULL);
