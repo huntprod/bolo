@@ -200,8 +200,17 @@ GraphBlock.prototype = Object.create(Block.prototype);
 GraphBlock.prototype.update = function (data) {
 	var svg    = this.select().append('svg'),
 	    bounds = svg.node().getBoundingClientRect(),
-	    margin = {top: 20, right: 20, bottom: 30, left: 50},
-	    width  = bounds.width  - margin.left - margin.right,
+	    margin = {top: 20, right: 20, bottom: 50, left: 70};
+
+	/* adjust margins based on axis labeling */
+	if (!this.axis.y.on) {
+		margin.left -= 50;
+	}
+	if (!this.axis.x.on) {
+		margin.bottom -= 30;
+	}
+
+	var width  = bounds.width  - margin.left - margin.right,
 	    height = bounds.height - margin.top  - margin.bottom,
 	    frame  = svg.append("g")
 	                .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
@@ -253,19 +262,38 @@ GraphBlock.prototype.update = function (data) {
 		}
 	}
 
-	frame.append("g")
-	     .attr("transform", "translate(0," + height + ")")
-	     .call(d3.axisBottom(x));
+	svg.append("g")
+	   .attr("transform", "translate(" + (bounds.width / 2) + ",10)")
+	   .append("text")
+	      .attr("text-anchor", "middle")
+	      .style("font-size", "10px") /* FIXME: can we move this to a stylesheet? */
+	      .style("fill", "#000")
+	      .text(this.label);
 
-	frame.append("g")
-	     .call(d3.axisLeft(y))
-	     .append("text")
-	     .attr("fill", "#000")
-	     .attr("transform", "rotate(-90)")
-	     .attr("y", 6)
-	     .attr("dy", "0.71em")
-	     .attr("text-anchor", "end")
-	     .text(this.label);
+	svg.append("g")
+	   .attr("transform", "translate(" + (bounds.width / 2) + "," + (bounds.height - 5) + ")")
+	   .append("text")
+	      .attr("text-anchor", "middle")
+	      .style("font-size", "10px") /* FIXME: can we move this to a stylesheet? */
+	      .style("fill", "#000")
+	      .text(this.axis.x.label);
+	if (this.axis.x.on) {
+		frame.append("g")
+		     .attr("transform", "translate(0," + height + ")")
+		     .call(d3.axisBottom(x));
+	}
+
+	svg.append("g")
+	   .attr("transform", "translate(15," + (bounds.height / 2) + ") rotate(-90)")
+	   .append("text")
+	      .attr("text-anchor", "middle")
+	      .style("font-size", "10px") /* FIXME: can we move this to a stylesheet? */
+	      .style("fill", "#000")
+	      .text(this.axis.y.label);
+	if (this.axis.y.on) {
+		frame.append("g")
+		     .call(d3.axisLeft(y));
+	}
 };
 
 var ScatterPlotBlock = function (attrs) { init(this, attrs, 'scatterplot') };
@@ -273,8 +301,17 @@ ScatterPlotBlock.prototype = Object.create(Block.prototype);
 ScatterPlotBlock.prototype.update = function (data) {
 	var svg    = this.select().append('svg'),
 	    bounds = svg.node().getBoundingClientRect(),
-	    margin = {top: 20, right: 20, bottom: 30, left: 50},
-	    width  = bounds.width  - margin.left - margin.right,
+	    margin = {top: 20, right: 20, bottom: 40, left: 60};
+
+	/* adjust margins based on axis labeling */
+	if (!this.axis.y.on) {
+		margin.left -= 40;
+	}
+	if (!this.axis.x.on) {
+		margin.bottom -= 20;
+	}
+
+	var width  = bounds.width  - margin.left - margin.right,
 	    height = bounds.height - margin.top  - margin.bottom,
 	    frame  = svg.append("g")
 	                .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
@@ -305,11 +342,38 @@ ScatterPlotBlock.prototype.update = function (data) {
 	         .attr('cy', function (d) { return y(d.y) })
 	         .style('fill', this.color);
 
-	frame.append("g")
-	     .attr("transform", "translate(0," + height + ")")
-	     .call(d3.axisBottom(x));
-	frame.append("g")
-	     .call(d3.axisLeft(y));
+	svg.append("g")
+	   .attr("transform", "translate(" + (bounds.width / 2) + ",10)")
+	   .append("text")
+	      .attr("text-anchor", "middle")
+	      .style("font-size", "10px") /* FIXME: can we move this to a stylesheet? */
+	      .style("fill", "#000")
+	      .text(this.label);
+
+	svg.append("g")
+	   .attr("transform", "translate(" + (bounds.width / 2) + "," + (bounds.height - 5) + ")")
+	   .append("text")
+	      .attr("text-anchor", "middle")
+	      .style("font-size", "10px") /* FIXME: can we move this to a stylesheet? */
+	      .style("fill", "#000")
+	      .text(this.axis.x.label);
+	if (this.axis.x.on) {
+		frame.append("g")
+		     .attr("transform", "translate(0," + height + ")")
+		     .call(d3.axisBottom(x));
+	}
+
+	svg.append("g")
+	   .attr("transform", "translate(15," + (bounds.height / 2) + ") rotate(-90)")
+	   .append("text")
+	      .attr("text-anchor", "middle")
+	      .style("font-size", "10px") /* FIXME: can we move this to a stylesheet? */
+	      .style("fill", "#000")
+	      .text(this.axis.y.label);
+	if (this.axis.y.on) {
+		frame.append("g")
+		     .call(d3.axisLeft(y));
+	}
 };
 
 var parse = function (s,prefix) {
@@ -651,12 +715,48 @@ var parse = function (s,prefix) {
 		}
 	}
 
+	var parse_axis = function (lead, axis) {
+		var ctx = 'parsing an axis formatter';
+		var t, val;
+
+		lead = lead.substr(0,1);
+
+		t = expect_token(ctx);
+		if (iskeyword(t, 'label')) {
+			if (lead == 'a') {
+				/* FIXME: do we have an error for semantic issues? */
+				throw unexpected_token(ctx, t, 'one of either <tt>on</tt>, or <tt>off</tt>');
+			}
+			val = expect_token(ctx);
+			axis[lead].label = val[1];
+			return axis;
+		}
+
+		if (iskeyword(t, 'on') || iskeyword(t, 'yes')) {
+			if (lead == 'a' || lead == 'x') { axis.x.on = true; }
+			if (lead == 'a' || lead == 'y') { axis.y.on = true; }
+			return axis;
+		}
+
+		if (iskeyword(t, 'off') || iskeyword(t, 'no')) {
+			if (lead == 'a' || lead == 'x') { axis.x.on = false; }
+			if (lead == 'a' || lead == 'y') { axis.y.on = false; }
+			return axis;
+		}
+
+		throw unexpected_token(ctx, t, 'an axis sub-command keyword');
+	};
+
 	var parse_graph = function () {
 		var ctx = 'parsing a graph definition';
 		var t, o = new GraphBlock({
 			size:  '4x3',
 			label: '',
-			plots: []
+			plots: [],
+			axis: {
+				x: { on: true, label: '' },
+				y: { on: true, label: '' }
+			}
 		});
 
 		expect_open(ctx);
@@ -667,6 +767,13 @@ var parse = function (s,prefix) {
 			) {
 				var val = expect_token(ctx);
 				o[t[1]] = val[1];
+				continue;
+			}
+			if (iskeyword(t, 'x-axis') ||
+			    iskeyword(t, 'y-axis') ||
+			    iskeyword(t, 'axis')
+			) {
+				o.axis = parse_axis(t[1], o.axis);
 				continue;
 			}
 			if (iskeyword(t, 'plot')) {
@@ -694,7 +801,11 @@ var parse = function (s,prefix) {
 		var t, o = new ScatterPlotBlock({
 			size:  '4x3',
 			label: '',
-			color: '#000'
+			color: '#000',
+			axis: {
+				x: { on: true, label: '' },
+				y: { on: true, label: '' }
+			}
 		});
 
 		expect_open(ctx);
@@ -708,6 +819,13 @@ var parse = function (s,prefix) {
 			) {
 				var val = expect_token(ctx);
 				o[t[1]] = val[1];
+				continue;
+			}
+			if (iskeyword(t, 'x-axis') ||
+			    iskeyword(t, 'y-axis') ||
+			    iskeyword(t, 'axis')
+			) {
+				o.axis = parse_axis(t[1], o.axis);
 				continue;
 			}
 			if (t[0] == T_CLOSE) {

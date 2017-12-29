@@ -486,6 +486,115 @@ metric {
 
 
 
+		<a id="axes"></a>
+		<h2 toc="*">Labeling X and Y</h2>
+
+		<p>Both graphs and scatterplots feature X and Y axes, which plot one
+		dimension of a two-dimensional dataset.  BoardCode allows you to
+		customize how these axes are drawn.</p>
+
+		<p>You can label one or both axes, to convey the substance of that
+		particular dimension of the dataset.  For example, in graphs, the Y axis
+		is usually the dependent variable, i.e. bytes used, requests/s, etc.</p>
+
+		<span class="example">
+			graph {
+				label "Axis Labels"
+				size 8x3
+				query [SELECT metric WHERE some-tag = value]
+				plot "metric" {
+					as line
+					color #ccc
+				}
+				y-axis label "Requests/s"
+				x-axis label "Time"
+			}
+		</span>
+
+		<p>Here, the labels are set using the `x-axis label` and `y-axis label`
+		properties, like this:</p>
+
+		<pre><code>graph {
+  % ... rest of definition ...
+
+  y-axis label "Requests/s"
+  x-axis label "Time"
+}</code></pre>
+
+		<p>The same effect can be achieved with scatterplots, using the same
+		syntax:</p>
+
+		<span class="example">
+			scatterplot {
+				label "Axis Labels"
+				size 8x3
+				query [SELECT metric, other WHERE some-tag = value]
+				x metric
+				y other
+				color #ccc
+
+				x-axis label "Metric (bytes)"
+				y-axis label "Other (req/s)"
+			}
+		</span>
+
+		<p>Here, the labels are set using the `x-axis label` and `y-axis label`
+		properties, like this:</p>
+
+		<pre><code>graph {
+  % ... rest of definition ...
+
+  y-axis label "Requests/s"
+  x-axis label "Time"
+}</code></pre>
+
+		<p>By default, graphs and scatterplots come with X and Y axes featuring
+		gradation markers, or "ticks" that show approximately spaced values
+		along that dimension.  BoardCode allows you to remove those axes, if you
+		want:</p>
+
+		<span class="example">
+			scatterplot {
+				label "No Axes, Just Data"
+				size 8x3
+				query [SELECT metric, other WHERE some-tag = value]
+				x metric
+				y other
+				color #ccc
+
+				axis off
+			}
+		</span>
+
+		<pre><code>scatterplot {
+  % ... rest of scatterplot definition ...
+
+  axis off
+  % or, individually:
+  % x-axis off
+  % y-axis off
+}</code></pre>
+
+		<p>You can even combine the two and get just labels, without the axis
+		markers:</p>
+
+		<span class="example">
+			graph {
+				label "Labels, Without the Markers"
+				size 8x3
+				query [SELECT metric WHERE some-tag = value]
+				plot "metric" {
+					as line
+					color #ccc
+				}
+				axis off
+				y-axis label "Requests/s"
+				x-axis label "Time"
+			}
+		</span>
+
+
+
 		<a id="placeholder"></a>
 		<h2 toc="*">Placeholder Blocks</h2>
 
