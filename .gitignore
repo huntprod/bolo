@@ -6,6 +6,7 @@
 
 # collectors
 /linux
+/process
 
 # tests
 /bits

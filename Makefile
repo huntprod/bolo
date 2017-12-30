@@ -24,6 +24,10 @@ COLLECTORS += linux
 linux: collectors/linux.o hash.o time.o util.o
 	$(CC) $(LDFLAGS) -o $@ $+ -lpcre
 
+COLLECTORS += process
+process: collectors/process
+	cp $+ $@
+
 all: bolo $(COLLECTORS)
 bolo: bolo.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o \
       btree.o tags.o query.o rsv.o bql/bql.a bqip.o net.o fdpoll.o ingest.o cfg.o \

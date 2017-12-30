@@ -1,0 +1,368 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+
+sub usage
+{
+	print <<EOF;
+process (a Bolo collector)
+USAGE: process -t proc=nginx [options]
+
+OPTIONS:
+   -h, --help               Show this help screen.
+
+   -t, --tag TAG=VALUE      Required tag to add to the \$BOLO_TAGS
+                            set when submitting results.
+
+       --children           Aggregate data from child processes.
+
+SELECTION CRITERIA:
+
+   -x, --exact              Treat PATTERN as a literal search string,
+                            not as a regular expression.
+
+   -m, --match PATTERN
+
+   -c, --command PATTERN    Only match processes if their command name
+                            (/proc/<PID>/comm) matches PATTERN.
+                            By default, the full command line, with all
+                            arguments, is checked.
+
+   -P, --ppid PID           Only match processes that are direct
+                            children of the given process (by PID).
+
+   -p, --pidfile FILE       Only match processes whose PIDs are listed
+                            in FILE, which is whitespace-delimited.
+
+   -b, --bind [IP:]PORT     Only match processes that have sockets
+       --bind [IF:]PORT     bound to the given address / interface.
+
+   -e, --executable FILE    Only match processes that are executing
+                            the binary at FILE.
+
+EOF
+	exit 0;
+}
+
+use POSIX;
+use Getopt::Long qw/:config bundling/;
+my %OPTIONS = ();
+GetOptions(\%OPTIONS, qw/
+	help|h|?
+	debug|D
+
+	tag|t=s
+	children
+
+	exact|x
+	command|c=s
+	match|m=s
+	ppid|P=s
+	pidfile|p=s
+	bind|b=s
+	exec|executable|e=s
+/) or usage();
+my $PATTERN = $ARGV[0] || '';
+
+usage() if $OPTIONS{help};
+usage() unless $OPTIONS{tag};
+usage() unless $OPTIONS{command} || $OPTIONS{match} || $OPTIONS{ppid} || $OPTIONS{pidfile} || $OPTIONS{bind} || $OPTIONS{exec};
+
+$OPTIONS{tag} = "$ENV{BOLO_TAGS},$OPTIONS{tag}"
+	if $ENV{BOLO_TAGS};
+
+sub SLURP
+{
+	my ($file) = @_;
+	open my $fh, "<", $file or return;
+	if (wantarray) {
+		my @s = <$fh>;
+		close $fh;
+		return @s;
+	} else {
+		my $s = do { local $/; <$fh>; };
+		close $fh;
+		return $s;
+	}
+}
+
+sub DEBUG
+{
+	return unless $OPTIONS{debug};
+	print STDERR "$_\n" for @_;
+}
+
+sub smaps
+{
+	my ($file) = @_;
+	my @smaps;
+	my $this;
+
+	open my $fh, "<", $file or return;
+	while (<$fh>) {
+		if (m/^([0-9a-f]+)-([0-9a-f]+) (\S+) ([0-9a-f]+) ([0-9a-f]+:[0-9a-f]+) ([0-9]+)\s+(\S*)$/) {
+			$this = {
+				address => { start => $1, end => $2 },
+				mode    => $3,
+				offset  => hex($4),
+				dev     => $5,
+				inode   => int($6),
+				path    => $7 || '[anon]',
+			};
+			push @smaps, $this;
+			next;
+		}
+		next unless $this;
+
+		   if (m/^(\S+):\s+([0-9]+) kB$/) { $this->{usage}{lc $1} = $2 * 1024; }
+		elsif (m/&(\S+):\s+(.*)$/)        { $this->{usage}{lc $1} = $2; }
+	}
+	close $fh;
+
+	my %sum;
+	for my $m (@smaps) {
+		my $path = $m->{path};
+		$path = '[libs]'  if $path =~ m{/lib/|\.so};
+		$path = '[stack]' if $path =~ m{^\[stack};
+		$path = '[mmap]'  if $path =~ m{^/};
+		$sum{$path}{usage}{$_} += $m->{usage}{$_}
+			for keys %{$m->{usage}};
+	}
+	return \%sum;
+}
+
+my %BINDS;
+sub get_binds
+{
+	for (SLURP "/proc/net/tcp") {
+		next unless m/\s+\d+: ([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2}):([0-9a-f]{4}) 00000000:0000 0A(?:\s+\S+){5} (\d+) /i;
+		my $ip   = hex($4) . '.' . hex($3) . '.' . hex($2) . '.' . hex($1);
+		my $port = hex($5);
+		$BINDS{$6} = $ip eq '0.0.0.0' ? $port
+		                              : "$ip:$port";
+	}
+}
+
+sub get_pid_binds
+{
+	my ($pid) = @_;
+	my $binds = {};
+
+	opendir my $dh, "/proc/$pid/fd"
+		or return {};
+	while ((my $fd = readdir($dh))) {
+		next unless -l "/proc/$pid/fd/$fd";
+		my $dst = readlink "/proc/$pid/fd/$fd"
+			or continue;
+
+		DEBUG "found pid $pid fd $fd -> $dst";
+		next unless $dst =~ m/socket:\[(\d+)\]/;
+		DEBUG "found pid $pid socket fd $fd inode $1";
+		next unless $BINDS{$1};
+		$binds->{$BINDS{$1}} = 1;
+	}
+	closedir($dh);
+	return $binds;
+}
+
+my %PIDS;
+sub get_pstree
+{
+	return if %PIDS;
+
+	opendir my $dh, "/proc"
+		or return;
+	while ((my $pid = readdir($dh))) {
+		next unless $pid =~ m/^\d+$/;
+		my $cmdline = SLURP "/proc/$pid/cmdline" or next;
+		$cmdline =~ s/\0+$//;
+		$cmdline =~ s/\0/ /g;
+
+		my $comm = SLURP "/proc/$pid/comm"       or next;
+		chomp($comm);
+
+		my $exe = '';
+		if ($OPTIONS{exec}) {
+			$exe = readlink "/proc/$pid/exe"     or next;
+		}
+
+		my $binds = {};
+		if ($OPTIONS{bind}) {
+			$binds = get_pid_binds $pid          or next;
+		}
+
+		my $stat = SLURP "/proc/$pid/stat"       or next;
+		my (undef, undef, undef, $ppid) = split /\s/, $stat;
+
+		DEBUG "found process $pid (ppid $ppid): `$cmdline`";
+		$PIDS{$pid+0} = {
+			pid      => $pid+0,
+			ppid     => $ppid,
+			comm     => $comm,
+			exe      => $exe,
+			cmdline  => $cmdline,
+			binds    => $binds,
+			children => [],
+		};
+	}
+	closedir($dh);
+
+	push @{$PIDS{$PIDS{$_}{ppid}}{children}}, $_
+		for grep { $PIDS{$_}{ppid} && $PIDS{$PIDS{$_}{ppid}} } keys %PIDS;
+}
+
+sub get_pids
+{
+	my %matches;
+
+	my @look = keys %PIDS;
+	if ($OPTIONS{pidfile}) {
+		my $want = SLURP $OPTIONS{pidfile}
+			or return ();
+		@look = grep { $PIDS{$_} } split /\s+/, $want;
+	}
+
+	for my $p (map { $PIDS{$_} } @look) {
+		next if $p->{pid} == $$+0;
+
+		DEBUG "checking process $p->{pid} (ppid $p->{ppid}): `$p->{cmdline}`...";
+
+		if ($OPTIONS{ppid}) {
+			DEBUG "  - checking ppid [$p->{ppid}] against --ppid $OPTIONS{ppid}...";
+			next unless $p->{ppid} == $OPTIONS{ppid};
+			DEBUG "    ... PPID OK";
+		}
+
+		if ($OPTIONS{command}) {
+			DEBUG "  - checking comm '$p->{comm}' against --command '$OPTIONS{command}'...";
+			next unless $OPTIONS{exact} ? $p->{comm} eq $OPTIONS{command}
+			                            : $p->{comm} =~ $OPTIONS{command};
+			DEBUG "    ... COMM OK";
+		}
+
+		if ($OPTIONS{exec}) {
+			DEBUG "  - checking exe '$p->{exe}' against --executable '$OPTIONS{exec}'...";
+			next unless $OPTIONS{exact} ? $p->{exe} eq $OPTIONS{exec}
+			                            : $p->{exe} =~ $OPTIONS{exec};
+			DEBUG "    ... EXE OK";
+		}
+
+		if ($OPTIONS{match}) {
+			DEBUG "  - checking cmdline '$p->{cmdline}' against --match '$OPTIONS{match}'...";
+			next unless $OPTIONS{exact} ? $p->{cmdline} eq $OPTIONS{match}
+			                            : $p->{cmdline} =~ $OPTIONS{match};
+			DEBUG "    ... CMDLINE OK";
+		}
+
+		if ($OPTIONS{bind}) {
+			DEBUG "  - checking binds [".join(', ', sort keys %{$p->{binds}})."] against --bind '$OPTIONS{bind}'...";
+			next unless $p->{binds}{$OPTIONS{bind}};
+			DEBUG "    ... BIND OK";
+		}
+
+		DEBUG "matched process $p->{pid} (ppid $p->{ppid}): `$p->{cmdline}`";
+		$matches{$p->{pid}} = 1;
+	}
+
+	# only return the upper-most parent processes
+	my @pids;
+	for (keys %matches) {
+		if ($matches{$PIDS{$_}{ppid}}) {
+			DEBUG "skipping process $PIDS{$_}{pid} (ppid $PIDS{$_}{ppid} was also matched)";
+			next;
+		}
+		DEBUG "accepting process $PIDS{$_}{pid} (ppid $PIDS{$_}{ppid}): `$PIDS{$_}{cmdline}`";
+		push @pids, $_;
+	}
+	return @pids;
+}
+
+sub get_children
+{
+	my ($parent) = @_;
+	my @pids = @{ $PIDS{$parent}{children} || []};
+	push @pids, get_children($_) for @pids;
+	return @pids;
+}
+
+sub pidstats
+{
+	my ($pid, $is_child) = @_;
+	my $data = {};
+	$data->{processes} = 1;
+
+	my $of;
+	opendir $of, "/proc/$pid/fd" and do {
+		$data->{openfiles} = scalar(grep { ! /^\./ } readdir $of);
+		close $of;
+	};
+
+	for (SLURP "/proc/$pid/status") {
+		if (m/^(VmPeak|VmSize|VmRSS|VmHWM):\s+(\d+)/) {
+			$data->{lc($1)} = $2 * 1024;
+		}
+		if (m/^Threads:\s+(\d+)/) {
+			$data->{threads} = $1;
+		}
+	}
+
+	my %io;
+	for (SLURP "/proc/$pid/io") {
+		$io{$1} = $2 if m/^(.*):\s+(\d+)/;
+	}
+	if (%io) {
+		$data->{io_reads}   = $io{syscr};
+		$data->{io_writes}  = $io{syscw};
+		$data->{io_all_rd}  = $io{rchar};
+		$data->{io_all_wr}  = $io{wchar};
+		$data->{io_disk_rd} = $io{read_bytes};
+		$data->{io_disk_wr} = $io{write_bytes} - $io{cancelled_write_bytes};
+	}
+
+	my $smaps = smaps("/proc/$pid/smaps");
+	for (qw(heap anon stack libs mmap)) {
+		my $h;
+		$data->{"mem_$_"} = 0;
+		$data->{"swp_$_"} = 0;
+		if ($h = $smaps->{"[$_]"}{usage}) {
+			$data->{"mem_$_"} += $h->{private_clean} + $h->{private_dirty};
+			$data->{"mem_$_"} += $h->{shared_clean}  + $h->{shared_dirty}
+				unless $is_child;
+			$data->{"swp_$_"} = $h->{swap};
+		}
+	}
+
+	my @pidstat = split / /, SLURP "/proc/$pid/stat";
+	$data->{utime}      = $pidstat[13] / CLOCKS_PER_SEC * 1000;
+	$data->{stime}      = $pidstat[14] / CLOCKS_PER_SEC * 1000;
+	$data->{guest_time} = $pidstat[42] / CLOCKS_PER_SEC * 1000;
+	$data->{iowait}     = $pidstat[41] / CLOCKS_PER_SEC * 1000;
+
+	return $data;
+}
+
+get_binds;
+get_pstree;
+my $stats = { processes => 0 };
+my @pids = get_pids;
+
+for my $pid (@pids) {
+	DEBUG "looking up parent pid $pid";
+	my $data = pidstats($pid, 0);
+	$stats->{$_} += $data->{$_} for (keys %$data);
+}
+
+if ($OPTIONS{children}) {
+	for my $pid (@pids) {
+		DEBUG "looking up children of pid $pid";
+		for my $kid (get_children($pid)) {
+			my $data = pidstats($kid, 1);
+			$stats->{$_} += $data->{$_} for (keys %$data);
+		}
+	}
+}
+
+my $ts = time;
+printf "proc.%s %s %lu %s\n", $_, $OPTIONS{tag}, $ts * 1000, $stats->{$_}
+	for keys %$stats;
+exit 0;
