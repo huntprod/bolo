@@ -32,9 +32,6 @@ bolo: bolo.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o \
       bolo-import.o bolo-parse.o bolo-query.o bolo-init.o bolo-agent.o
 	$(CC) $(LDFLAGS) -o $@ $+ $(LDLIBS)
 
-bqlx: bql/main.o bql/bql.a util.o
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -Wno-error -o $@ $+ $(LDLIBS)
-
 clean:
 	rm -f bolo $(COLLECTORS)
 	rm -f *.o *.gcno *.gcda
