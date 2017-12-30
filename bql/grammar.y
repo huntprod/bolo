@@ -58,18 +58,23 @@ pushex(struct qexpr *lst, struct qexpr *node)
 %token T_AS
 %token T_BEFORE
 %token T_BETWEEN
+%token T_DAILY
 %token T_DAYS
 %token T_DOES
 %token T_EQ
 %token T_EXIST
+%token T_HOURLY
 %token T_HOURS
+%token T_MINUTELY
 %token T_MINUTES
 %token T_NE
 %token T_NOT
 %token T_NOW
 %token T_OR
-%token T_SELECT
+%token T_PER
+%token T_SECONDLY
 %token T_SECONDS
+%token T_SELECT
 %token T_WHERE
 
 %token <number> T_NUMBER
@@ -79,6 +84,7 @@ pushex(struct qexpr *lst, struct qexpr *node)
 %token <text>   T_BAREWORD
 
 %type <number> timespan
+%type <number> aggrspan
 %type <number> walltime
 %type <number> unit
 
@@ -152,10 +158,21 @@ tagvalue: T_DQSTRING { $$ = $1; }
         ;
 
 aggr_clause: T_AGGREGATE timespan { $$ = (int)$2; }
+           | T_AGGREGATE aggrspan { $$ = (int)$2; }
            ;
 
 timespan: T_NUMBER unit { $$ = $1 * $2; }
         | T_TIME        { $$ = $1; }
+        ;
+
+aggrspan: T_DAILY         { $$ = 86400; }
+        | T_PER T_DAYS    { $$ = 86400; }
+        | T_HOURLY        { $$ = 3600;  }
+        | T_PER T_HOURS   { $$ = 3600;  }
+        | T_MINUTELY      { $$ = 60;    }
+        | T_PER T_MINUTES { $$ = 60;    }
+        | T_SECONDLY      { $$ = 1;     }
+        | T_PER T_SECONDS { $$ = 1;     }
         ;
 
 unit: T_DAYS     { $$ = 86400; }
