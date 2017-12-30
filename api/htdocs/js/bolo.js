@@ -1,4 +1,139 @@
 (function (document,window,undefined) {
+	var init = false;
+	var c1, picker, w1 = 200, h1 = 200;
+	var c2, strip,  w2 =  16, h2 = 200;
+	var swatches;
+
+	var hex = function (d) {
+		var x = '0123456789abcdef';
+		return '#' + x[(d[0] & 0xf0) >> 4] + x[(d[0] & 0x0f)] +
+		             x[(d[1] & 0xf0) >> 4] + x[(d[1] & 0x0f)] +
+		             x[(d[2] & 0xf0) >> 4] + x[(d[2] & 0x0f)];
+	};
+
+	var gradient = function (base) {
+		var g;
+
+		c1.fillStyle = base;
+		c1.fillRect(0, 0, w1, h1);
+
+		g = c1.createLinearGradient(0, 0, w1, 0);
+		g.addColorStop(0, 'rgba(255,255,255,1)');
+		g.addColorStop(1, 'rgba(255,255,255,0)');
+		c1.fillStyle = g;
+		c1.fillRect(0, 0, w1, h1);
+
+		g = c1.createLinearGradient(0, h1, 0, 0);
+		g.addColorStop(0, 'rgba(0,0,0,1)');
+		g.addColorStop(1, 'rgba(0,0,0,0)');
+		c1.fillStyle = g;
+		c1.fillRect(0, 0, w1, h1);
+	};
+
+	var swatch = function (color) {
+		swatches.append(
+			$('<li>')
+			  .css({backgroundColor: color})
+			  .attr('data-color', color));
+
+		while (swatches.find('li').length > 40) {
+			swatches.find('li').first().remove();
+		}
+
+		return color;
+	};
+
+	var choose = function (color) {
+		$('textarea[name=code]').write(color);
+		$('#colorpicker').hide();
+	};
+
+	$.fn.colorpicker = function () {
+		if (!init) {
+			$(document.body).append($('<div id="colorpicker">'+
+			                            '<ul class="swatches"></ul>'+
+			                            '<canvas class="picker"></canvas>'+
+			                            '<canvas class="strip"></canvas>'+
+			                          '</div>').hide());
+			picker   = $('#colorpicker .picker').attr({height: h1, width: w1});
+			strip    = $('#colorpicker .strip').attr({height: h2, width: w2});
+			swatches = $('#colorpicker .swatches');
+
+			/* initialize swatch palette */
+			swatches.on('click', 'li', function (event) {
+				event.preventDefault();
+				event.stopPropagation();
+
+				var color = $(event.target).data('color');
+				choose(color);
+			});
+
+			/* initialize color saturation/value picker */
+			c1 = picker[0].getContext('2d');
+			gradient('rgba(255,0,0,1)');
+
+			picker.on('click', function (event) {
+				event.preventDefault();
+				event.stopPropagation();
+
+				var x = event.offsetX,
+				    y = event.offsetY,
+				    d = c1.getImageData(x,y, 1,1).data;
+
+				choose(swatch(hex(d)));
+			});
+
+
+			/* initialize color hue picker */
+			c2 = strip[0].getContext('2d');
+			var g = c2.createLinearGradient(0, 0, 0, h2);
+			g.addColorStop(0.00, 'rgba(255,   0,   0, 1)');
+			g.addColorStop(0.17, 'rgba(255, 255,   0, 1)');
+			g.addColorStop(0.34, 'rgba(  0, 255,   0, 1)');
+			g.addColorStop(0.51, 'rgba(  0, 255, 255, 1)');
+			g.addColorStop(0.68, 'rgba(  0,   0, 255, 1)');
+			g.addColorStop(0.85, 'rgba(255,   0, 255, 1)');
+			g.addColorStop(1.00, 'rgba(255,   0,   0, 1)');
+			c2.fillStyle = g;
+			c2.fillRect(0, 0, w2, h2);
+
+			strip.on('click', function (event) {
+				event.preventDefault();
+				event.stopPropagation();
+
+				var x = event.offsetX,
+				    y = event.offsetY,
+				    d = c2.getImageData(x,y, 1,1).data;
+
+				gradient('rgba(' + d[0] + ',' + d[1] + ',' + d[2] + ',1)');
+			});
+
+			swatch('#004c99'); /* blue */
+			swatch('#990000'); /* red */
+			swatch('#00994c'); /* green */
+			swatch('#cccc00'); /* yellow */
+			swatch('#ff8000'); /* orange */
+			swatch('#00cccc'); /* cyan */
+			swatch('#6600cc'); /* purple */
+			swatch('#cc0066'); /* pink */
+			swatch('#808080'); /* grey */
+		}
+
+		this.on('click', function (event) {
+			event.preventDefault();
+			event.stopPropagation();
+
+			var $ctl = $(event.target),
+			    offt = $ctl.offset();
+
+			$('#colorpicker').show().css({
+				top  :     offt.top,
+				left : 5 + offt.left + $ctl.width()
+			});
+		});
+	};
+})(document,window);
+(function (document,window,undefined) {
 	var $BOARDS = [];
 	var $AUTH = undefined;
 
@@ -21,6 +156,28 @@
 				'<span>' + error.toString() + '</span>' +
 			'</p>');
 	}
+
+	$.fn.write = function (s) {
+		var e = this[0];
+		if (document.selection) {
+			e.focus();
+			var ss = document.selection.createRange();
+			ss.text = s;
+
+		} else if (e.selectionStart || e.SelectionStart == '0') {
+			var a = e.selectionStart;
+			    b = e.selectionEnd;
+
+			e.value = e.value.substr(0, a) + s + e.value.substring(b, e.value.length);
+			b = a + s.length;
+			e.setSelectionRange(b,b);
+			e.focus();
+
+		} else {
+			e.value += s;
+			e.focus();
+		}
+	};
 
 	function editor(board) {
 		var $e = $('#editor');
@@ -156,7 +313,52 @@
 				}
 			});
 
+			$('#editor #insert-color').colorpicker();
+
 			$(document.body)
+			.on('click', function (event) {
+				$('#colorpicker').hide();
+			})
+			.on('keyup', function (event) {
+				if (event.keyCode == 27) { /* ESC */
+					$('#colorpicker').hide();
+				}
+			})
+			.on('click', '#editor #insert-graph', function (event) {
+				$('textarea[name=code]').write(
+					'\ngraph {\n'+
+					'  size 4x3\n'+
+					'  query [...]\n'+
+					'\n'+
+					'  plot "..." {\n'+
+					'    as area\n'+
+					'    color skyblue\n'+
+					'  }\n'+
+					'}\n\n');
+			})
+			.on('click', '#editor #insert-sparkline', function (event) {
+				$('textarea[name=code]').write(
+					'\nsparkline {\n'+
+					'  label  "My Sparkline"\n'+
+					'  query  [...]\n'+
+					'}\n\n');
+			})
+			.on('click', '#editor #insert-scatterplot', function (event) {
+				$('textarea[name=code]').write(
+					'\nscatterplot {\n'+
+					'  size 4x3\n'+
+					'  query [...]\n'+
+					'  x used\n'+
+					'  y total\n'+
+					'}\n\n');
+			})
+			.on('click', '#editor #insert-placeholder', function (event) {
+				$('textarea[name=code]').write(
+					'placeholder {\n'+
+					'  size 3x3\n'+
+					'  text "placeholder"\n'+
+					'}\n\n');
+			})
 			.on('click', '#editor button[type=preview]', function (event) {
 				event.preventDefault();
 				$('#editor .fail').hide();

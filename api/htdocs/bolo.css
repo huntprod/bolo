@@ -8,6 +8,9 @@ body {
 	overflow: hidden;
 	padding: 10px;
 }
+#editor .grid {
+  overflow: visible;
+}
 .grid > div {
 	float: left;
 	margin: 10px;
@@ -290,6 +293,30 @@ body {
 	width: 80px;
 }
 
+#editor #tools {
+  position: absolute;
+  left: -32px;
+  top: 24px;
+}
+#editor #tools a {
+  width: 24px;
+  height: 24px;
+  margin: 8px 0;
+  border: 1px solid #ccc;
+  display: block;
+  text-indent: -5000px;
+
+  background-image: url(/sprites.png);
+  background-position-x: -52px;
+}
+#editor #tools a#insert-color       { background-position-y: -72px; background-position-x: -28px; }
+#editor #tools a#insert-graph       { background-position-y:   0px; }
+#editor #tools a#insert-sparkline   { background-position-y: -24px; }
+#editor #tools a#insert-placeholder { background-position-y: -48px; }
+#editor #tools a#insert-scatterplot { background-position-y: -72px; }
+
+#editor #tools a       { opacity: 0.5; }
+#editor #tools a:hover { opacity: 1.0; border-color: #333; }
 
 .form.grid > .w3 {
 	padding-top: 18px;
@@ -680,6 +707,41 @@ body[page="browse"]  #browse
   padding: 4px 12px;
   border: 0;
 }
+
+
+#colorpicker {
+  position: absolute;
+  background-color: #fff;
+  box-shadow: 0px 0px 12px #777;
+  width: 317px;
+  padding-top: 4px;
+}
+#colorpicker .strip,
+#colorpicker .picker {
+  position: relative;
+  left: 88px;
+  border: 1px solid #777;
+  cursor: crosshair;
+}
+#colorpicker .strip {
+  margin-left: 4px;
+}
+#colorpicker .swatches {
+  position: absolute;
+  list-style: none;
+  padding: 4px;
+  margin: 0;
+  width: 96px;
+}
+#colorpicker .swatches li {
+  width: 14px;
+  height: 14px;
+  margin: 2px;
+  float: left;
+  border: 1px solid #333;
+}
+
+
 
 
 @media print {
