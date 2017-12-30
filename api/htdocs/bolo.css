@@ -10,6 +10,7 @@ body {
 }
 #editor .grid {
   overflow: visible;
+  clear: both;
 }
 .grid > div {
 	float: left;
