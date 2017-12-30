@@ -102,7 +102,7 @@ void ctap_cmp_ok(int a, const char *op, int b, const char *file, unsigned long l
 
 #define SKIP(why) for (ctapX(), ctap_push(CTAP_SKIP, why); ctapY(); ctap_pop(), ctapZ())
 #define TODO(why) for (ctapX(), ctap_push(CTAP_TODO, why); ctapY(); ctap_pop(), ctapZ())
-#define BAIL_OUT(msg) ctap_bail(msg)
+#define BAIL_OUT ctap_bail
 
 #define note(...) ctap_diag(stdout, __VA_ARGS__)
 #define diag(...) ctap_diag(stderr, __VA_ARGS__)
