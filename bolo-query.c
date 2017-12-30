@@ -83,15 +83,13 @@ do_query(int argc, char **argv)
 			}
 		}
 
+		key = NULL;
 		if (key_str) {
 			key = read_key(key_str);
 			if (!key) {
 				fprintf(stderr, "invalid database encryption key given\n");
 				return 1;
 			}
-		} else {
-			printf("USAGE: %s query [--key \"key-in-hex\"] [--debug] /path/to/db/\n\n", argv[0]);
-			return 1;
 		}
 	}
 
@@ -110,7 +108,7 @@ do_query(int argc, char **argv)
 	}
 
 	if (argc != optind+3) {
-		fprintf(stderr, "USAGE: bolo query DATABASE 'QUERY...'\n");
+		fprintf(stderr, "USAGE: %s query [--key \"key-in-hex\"] [--debug] /path/to/db/\n\n", argv[0]);
 		return 1;
 	}
 

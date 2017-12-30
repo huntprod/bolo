@@ -484,8 +484,6 @@ db_mount(const char *path, struct dbkey *key)
 	db = xalloc(1, sizeof(struct db));
 	db->rootfd = fd;
 	db->key = key;
-	if (!db->key)
-		goto fail;
 
 	infof("checking for main.db index file at %s/%s", path, PATH_TO_MAINDB);
 	fd = openat(db->rootfd, PATH_TO_MAINDB, O_RDONLY);
@@ -901,6 +899,10 @@ db_insert(struct db *db, char *name, bolo_msec_t when, bolo_value_t what)
 	CHECK(db != NULL,       "db_insert() given a NULL database to insert into");
 	CHECK(db->main != NULL, "db_insert() given a database without a main.db hash");
 	CHECK(name != NULL,     "db_insert() given a NULL metric|tagset name to insert");
+
+	errno = BOLO_ERDONLY;
+	if (!db->key)
+		return -1;
 
 	if (hash_get(db->main, &idx, name) != 0) {
 		if (s_newidx(db, &idx, &idx_id) != 0)

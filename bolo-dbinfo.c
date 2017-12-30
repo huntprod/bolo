@@ -44,15 +44,13 @@ do_dbinfo(int argc, char **argv)
 			}
 		}
 
+		key = NULL;
 		if (key_str) {
 			key = read_key(key_str);
 			if (!key) {
 				fprintf(stderr, "invalid database encryption key given\n");
 				return 1;
 			}
-		} else {
-			printf("USAGE: %s dbinfo [--key \"key-in-hex\"] [--debug] /path/to/db/\n\n", argv[0]);
-			return 1;
 		}
 	}
 

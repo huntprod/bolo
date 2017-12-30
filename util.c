@@ -27,6 +27,7 @@ static const char *errors[] = {
 	/* BOLO_ENOSLAB */   "No such database slab",
 	/* BOLO_ENOBLOCK */  "No such database block",
 	/* BOLO_EBLKCONT */  "Block continuity broken",
+	/* BOLO_ERDONLY */   "Database is read-only",
 };
 
 const char *
