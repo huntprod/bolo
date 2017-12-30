@@ -432,7 +432,7 @@ var parse = function (s,prefix) {
 
 		/* store our pre-lexeme line/column, for error messages */
 		last = { line: line, column: column };
-d
+
 		if (s[i] == '%') {
 			while (i < s.length && s[i] != '\n') { i++; };
 			line++; column = 0;
