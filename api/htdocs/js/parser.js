@@ -381,11 +381,10 @@ var parse = function (s,prefix) {
 		prefix = 'block';
 	}
 
-	var i = 0;
-	var line = 1;
-	var column = 0;
-	var isspace = ' \f\n\r\t\v\u00A0\u2028\u2029';
-	var isalnum = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_@/#';
+	var i    = 0, line = 1, column = 0,
+	    last =  { line : 1, column : 0 },
+	    isspace = ' \f\n\r\t\v\u00A0\u2028\u2029',
+	    isalnum = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_@/#';
 
 	const T_IDENTIFIER = 1;
 	const T_STRING     = 2;
@@ -430,6 +429,10 @@ var parse = function (s,prefix) {
 			if (s[i] == '\n') { line++; column = 0; }
 		};
 		if (i >= s.length) { return undefined; }
+
+		/* store our pre-lexeme line/column, for error messages */
+		last = { line: line, column: column };
+d
 		if (s[i] == '%') {
 			while (i < s.length && s[i] != '\n') { i++; };
 			line++; column = 0;
@@ -499,9 +502,9 @@ var parse = function (s,prefix) {
 		var k = i;
 		while (k+1 < s.length && s[k+1] != '\n') { k++; }
 
-		return message+'<br><br>(on line '+line+', character '+column+')<br>'+
-				 '<xmp>'+s.substr(j,k)+'\n'+
-				 ' '.repeat(column) + '^^^</xmp>';
+		return message+'<br><br>(on line '+last.line+', character '+last.column+')<br>'+
+				 '<xmp>'+s.substr(j,k).replace(/\t/g, ' ')+'\n'+
+				 ' '.repeat(last.column - 1) + '^^^</xmp>';
 	}
 	function unexpected_token(what, got, want) {
 		return with_lineno(
