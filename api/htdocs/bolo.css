@@ -680,3 +680,8 @@ body[page="browse"]  #browse
   padding: 4px 12px;
   border: 0;
 }
+
+
+@media print {
+  body.docs #toc { display: none; }
+}
