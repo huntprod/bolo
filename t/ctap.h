@@ -278,7 +278,7 @@ void plan(int n)
 	CTAP.stack[0].type = CTAP_NORM;
 
 	// register the atexit handler
-	atexit(ctap_atexit);
+	if (n >= 0) atexit(ctap_atexit);
 }
 
 void no_plan(void)
