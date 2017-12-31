@@ -1,6 +1,6 @@
 default: all
 
-CFLAGS += -Wall -Wextra -Wpedantic -Wunused -Wunused-result -Wno-unused-parameter
+CFLAGS += -Wall -Wextra -Wpedantic -Wunused -Wunused-result -Wno-unused-parameter -std=gnu99
 TEST_CFLAGS := -g -DTEST -fprofile-arcs -ftest-coverage -It
 LDLIBS += -lm -lpthread
 
