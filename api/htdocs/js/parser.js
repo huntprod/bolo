@@ -121,6 +121,18 @@ PlaceholderBlock.prototype.update = function () {
 	     .text(this.text);
 };
 
+var HTMLContentBlock = function (attrs) { init(this, attrs, 'html') };
+HTMLContentBlock.prototype = Object.create(Block.prototype);
+HTMLContentBlock.prototype.update = function (data) {
+	this.select().html(this.content);
+};
+
+var TextContentBlock = function (attrs) { init(this, attrs, 'html') };
+TextContentBlock.prototype = Object.create(Block.prototype);
+TextContentBlock.prototype.update = function (data) {
+	this.select().text(this.content);
+};
+
 var MetricBlock = function (attrs) { init(this, attrs, 'metric') };
 MetricBlock.prototype = Object.create(Block.prototype);
 MetricBlock.prototype.update = function (data) {
@@ -622,6 +634,42 @@ var parse = function (s,prefix) {
 		}
 	}
 
+	var parse_content = function (ctx, o) {
+		t = expect_token(ctx);
+		switch (t[0]) {
+		default:
+			throw unexpected_token(ctx, t, 'a size of a quoted string literal');
+
+		case T_SIZE:
+			o.size = t[1];
+			t = expect_token(ctx);
+			if (t[0] != T_STRING) { throw unexpected_token(ctx, t, 'a quoted string literal'); }
+		case T_STRING:
+			o.content = t[1];
+			return o;
+		}
+	}
+
+	var parse_html = function () {
+		return parse_content(
+			'parsing an html content block',
+			new HTMLContentBlock({
+				size:    '12x1',
+				content: ''
+			})
+		);
+	};
+
+	var parse_text = function () {
+		return parse_content(
+			'parsing a text content block',
+			new TextContentBlock({
+				size:    '12x1',
+				content: ''
+			})
+		);
+	};
+
 	var parse_metric = function() {
 		var ctx = 'parsing a metric definition';
 		var t, o = new MetricBlock({
@@ -875,6 +923,16 @@ var parse = function (s,prefix) {
 		if (iskeyword(t, 'threshold')) {
 			o = parse_threshold();
 			thresholds[o.name] = o;
+			continue;
+		}
+		if (iskeyword(t, 'html')) {
+			n++;
+			blocks.push(parse_html());
+			continue;
+		}
+		if (iskeyword(t, 'text')) {
+			n++;
+			blocks.push(parse_text());
 			continue;
 		}
 		if (iskeyword(t, 'metric')) {

@@ -120,7 +120,9 @@ metric {
 		<p>Blocks come in a few flavors: <em>metric</em>, <em>sparkline</em>,
 		<em>graph</em>, and <em>scatterplot</em> blocks.  There's also a
 		<tt>break</tt> keyword that will force the grid to continue on the
-		next available left-most slot.</p>
+		next available left-most slot, an <tt>html</tt> block for displaying
+		arbitrary (unsanitized) HTML, and a <tt>text</tt> block for, well,
+		text.</p>
 
 		<p>So, without further ado, let's build a board!</p>
 
@@ -646,6 +648,36 @@ metric {
 		orange">orange</span> or <span class="swatch navy">navy</span>,
 		or hex values like <span class="swatch x1b2">#1b2</span> or <span
 		class="swatch xf0f7">#ff00ff77 (rgba!)</span></p>
+
+
+
+		<a id="misc"></a>
+		<h2 toc="*">Odds &amp; Ends</h2>
+
+		<p>You can embed arbitrary HTML into your board via the <tt>html</tt>
+		block:</p>
+
+		<pre><code>html [&lt;p&gt;For more info, see &lt;a href="..."&gt;here.&lt;/a&gt;&lt;/p&gt;]
+
+% optionally, you can set a grid block size
+html 3x3 [this is a &lt;strong&gt;&amp;frac14;&lt;/strong&gt; box]</code></pre>
+
+		<p>We highly, <em>highly</em> recommend the bracket-style quoting here,
+		so that you don't have to escape all those double quotes.</p>
+
+		<p>The <tt>html</tt> block will not sanitize your input in any way;
+		so if you write <tt>&lt;script&gt;</tt> tags, Javascript execution is
+		what you shall get.  If you want to display text without rendering it
+		as HTML, use the <tt>text</tt> block instead; it has the same syntax:</p>
+
+		<pre><code>text "we &lt;3 bolo"
+
+% again, you can set a grid block size
+html 6x1 "half of us REALLY &lt;3 bolo"</code></pre>
+
+		<p>You'll notice that we didn't employ the bracket-quoted string style
+		here.  It's still perfectly acceptable, but you don't need it since
+		there aren't all those pesky HTML attribute values to escape.</p>
 
 
 
