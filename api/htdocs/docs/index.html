@@ -370,6 +370,83 @@ metric {
   }
 }</code></pre>
 
+		<p>Metric series can be plotted as <em>lines</em>, <em>areas</em>, or
+		<em>stacks</em>.  Lines are pretty self explanatory; see the above
+		example graph.  Area graphs fill the area below the line, and use a
+		darkened color for the "cap line" of the area:</p>
+
+		<span class="example">
+			graph {
+				size 8x3 axis off
+				query [SELECT metric WHERE some-tag = value]
+				plot "metric" {
+					as area           % a key distinction
+					color skyblue
+				}
+			}
+		</span>
+
+		<p>Area graphs are great, but plotting more than one area quickly
+		runs afoul of ugly data-hiding, especially if the second series
+		plotted is strictly less than the first.  You can usually employ
+		opacity hacks to deal with that though:</p>
+
+		<span class="example">
+			graph {
+				size 8x3 axis off
+				query [SELECT metric, other WHERE some-tag = value]
+				plot "metric" {
+					as      area
+					color   skyblue
+					opacity 50
+				}
+				plot "other" {
+					as      area
+					color   lavender
+					opacity 50
+				}
+			}
+		</span>
+
+		<p>There is, however, a better way: you can <em>stack</em> the
+		series -- each subsequent plot will "stack" atop the previous:</p>
+
+		<span class="example">
+			graph {
+				size 8x3 axis off
+				query [SELECT metric, other WHERE some-tag = value]
+				plot "metric" {
+					as      stack
+					color   skyblue
+				}
+				plot "other" {
+					as      stack
+					color   lavender
+				}
+			}
+		</span>
+
+		<p>This approach has its own downside &mdash; namely that volatility in
+		the lowest plot will propagate through higher (later) plots, which
+		could lead to cognitive issues.</p>
+
+		<p>You can freely mix <em>stack</em> and <em>line</em> plots to good
+		effect:</p>
+
+		<span class="example">
+			graph {
+				size 8x3 axis off
+				query [SELECT metric, other WHERE some-tag = value]
+				plot "metric" { as stack color skyblue  }
+				plot "other"  { as stack color lavender }
+				plot "other"  { as line  color black    }
+			}
+		</span>
+
+		<p>Here, the black line and the lavender stack represent the same
+		underlying data.</p>
+
+		<h2>Graph Properties</h2>
 		<h3>query (required)</h3>
 		<p><tt>query</tt> defines the data query that will feed data into
 		the graph.  To avoid taxing the Bolo server, and to avoid artifacts
@@ -420,6 +497,12 @@ metric {
 		<h3>width (plot)</h3>
 		<p>How wide to draw the plot line in a <tt>line</tt> plot.  Has
 		absolutely no effect on the <tt>area</tt> plots.  Defaults to 2.</p>
+
+		<h3>opacity (plot)</h3>
+		<p>Sets the opacity of the plotted data, on a scale from 1 (mostly
+		transparent) to 100 (fully opaque).  Very useful for layering area
+		plots. Out-of-range values will probably have disastrous effects, or
+		none at all.</p>
 
 
 

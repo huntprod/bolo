@@ -242,35 +242,83 @@ GraphBlock.prototype.update = function (data) {
 	             .x(function(d) { return x(ts(d.t)); })
 	             .y(function(d) { return y(dv(d)); });
 
+	/* normalize stacks */
+	var stacks = {};
+	var running = [];
+	for (var i = 0; i < this.plots.length; i++) {
+		if (this.plots[i][1].as != 'stack') { continue; }
+		var s = []
+		if (running.length == 0) {
+			for (var j = 0; j < data[this.plots[i][0]].length; j++) {
+				s[j] = {t: data[this.plots[i][0]][j].t,
+				        v: data[this.plots[i][0]][j].v};
+			}
+		} else {
+			for (var j = 0; j < data[this.plots[i][0]].length; j++) {
+				s[j] = {t: data[this.plots[i][0]][j].t,
+				        v: data[this.plots[i][0]][j].v
+				         + running[j].v};
+			}
+		}
+		stacks[this.plots[i][0]] = s;
+		running = s;
+	}
+
 	var min = 0,
 	    max = 0;
 	for (var i = 0; i < this.plots.length; i++) {
 		min = Math.min(min, d3.min(data[this.plots[i][0]], dv));
 		max = Math.max(max, d3.max(data[this.plots[i][0]], dv));
 	}
+	for (var k in stacks) {
+		min = Math.min(min, d3.min(stacks[k], dv));
+		max = Math.max(max, d3.max(stacks[k], dv));
+	}
 
 	x.domain(d3.extent(data[this.plots[0][0]], function(d) { return ts(d.t); }));
 	y.domain([min, max]);
 	area.y0(y(0));
 
-	for (var i = 0; i < this.plots.length; i++) {
+	for (var i = this.plots.length - 1; i >= 0; i--) {
 		var field = this.plots[i][0];
 		var plot = this.plots[i][1];
 
-		if (plot.as == 'line') {
+		switch (plot.as) {
+		case 'stack':
+			frame.append("path")
+			     .datum(stacks[field])
+			     .style("fill", plot.color)
+			     .style("stroke-width", plot.width)
+			     .style("stroke", color.darken(plot.color))
+			     .style("opacity", plot.opacity / 100.0)
+			     .attr("d", area);
+			break;
+		}
+	}
+	for (var i = this.plots.length - 1; i >= 0; i--) {
+		var field = this.plots[i][0];
+		var plot = this.plots[i][1];
+
+		switch (plot.as) {
+		case 'line':
 			frame.append("path")
 			     .datum(data[field])
 			     .style("stroke-width", plot.width)
 			     .style("stroke", plot.color)
 			     .style("fill", "none")
+			     .style("opacity", plot.opacity / 100.0)
 			     .attr("d", line);
-		} else {
+			break;
+
+		case 'area':
 			frame.append("path")
 			     .datum(data[field])
 			     .style("fill", plot.color)
 			     .style("stroke-width", plot.width)
 			     .style("stroke", color.darken(plot.color))
+			     .style("opacity", plot.opacity / 100.0)
 			     .attr("d", area);
+			break;
 		}
 	}
 
@@ -741,14 +789,16 @@ var parse = function (s,prefix) {
 	var parse_plot = function () {
 		var ctx = 'parsing a plot for a graph definition';
 		var t, o = {
-			type:  'plot',
-			as:    'area',
-			color: 'skyblue',
-			width: '2'
+			type:    'plot',
+			as:      'area',
+			color:   'skyblue',
+			width:   '2',
+			opacity: 100.0
 		};
 		while ((t = expect_token(ctx)) !== undefined) {
-			if (iskeyword(t, 'as')  ||
-				iskeyword(t, 'color') ||
+			if (iskeyword(t, 'as')    ||
+				iskeyword(t, 'color')   ||
+				iskeyword(t, 'opacity') ||
 				iskeyword(t, 'width')
 			) {
 				var val = expect_token(ctx);
@@ -756,9 +806,9 @@ var parse = function (s,prefix) {
 				continue;
 			}
 			if (t[0] == T_CLOSE) {
-				if (o.as != 'line' && o.as != 'area') {
+				if (o.as != 'line' && o.as != 'area' && o.as != 'stack') {
 					throw 'I ran into problems '+ctx+';<br/>'+
-						  "You used an invalid value for the plot type ('<tt>"+o.as+"</tt>') -- it should be either 'line' or 'area'";
+						  "You used an invalid value for the plot type ('<tt>"+o.as+"</tt>') -- it should be either 'line', 'area', or 'stack'";
 				}
 				return o;
 			}
