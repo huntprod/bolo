@@ -365,8 +365,7 @@ GraphBlock.prototype.update = function (data) {
 	if (this.axis.x.on) {
 		frame.append("g")
 		     .attr("transform", "translate(0," + height + ")")
-		     .call(d3.axisBottom(x)
-		             .tickFormat(this.axis.x.fmt || as_self));
+		     .call(d3.axisBottom(x));
 	}
 
 	svg.append("g")
@@ -447,7 +446,8 @@ ScatterPlotBlock.prototype.update = function (data) {
 	if (this.axis.x.on) {
 		frame.append("g")
 		     .attr("transform", "translate(0," + height + ")")
-		     .call(d3.axisBottom(x));
+		     .call(d3.axisBottom(x)
+		             .tickFormat(this.axis.x.fmt || as_self));
 	}
 
 	svg.append("g")
