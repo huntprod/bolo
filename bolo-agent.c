@@ -11,6 +11,14 @@
 
 #define RUNNER_BUFSIZ 8192
 
+struct sndbuf {
+	struct list send;
+
+	size_t len;
+	size_t off;
+	char   data[];
+};
+
 struct context {
 	struct agent_config config;
 
@@ -23,10 +31,10 @@ struct context {
 	struct list    runq;
 
 	struct {
-		int    fd;           /* network socket to send data to bolo on */
-		int    watched;      /* whether or not fdpoll is watching bolo.fd */
-		char   sndbuf[8192]; /* buffered results to be sent */
-		size_t outstanding;  /* how much of sndbuf still needs sent */
+		int fd;      /* network socket to send data to bolo on */
+		int watched; /* whether or not fdpoll is watching bolo.fd */
+
+		struct list bufs; /* buffers to send */
 	} bolo;
 };
 
@@ -95,15 +103,18 @@ runner_handler(int fd, void *_u)
 	ssize_t nread;
 	struct runner *r;
 	char *eol;
+	struct sndbuf *buf;
 
 	r = (struct runner *)_u;
 	for (;;) {
+		debugf("reading from fd %d; into %p at offset %d, up to %d bytes",
+			fd, r->buf, r->nread, RUNNER_BUFSIZ - r->nread);
 		nread = read(fd, r->buf + r->nread, RUNNER_BUFSIZ - r->nread);
 		if (nread == 0) {
+			debugf("eof on fd %d", fd);
 			r->outfd = -1;
 			r->pid = 0;
 			delist(&r->check->q);
-			debugf("eof on fd %d", fd);
 			return -1;
 		}
 
@@ -113,37 +124,39 @@ runner_handler(int fd, void *_u)
 			errnof("failed to read from runner fd %d", fd);
 			return -1;
 		}
-
+		debugf("read %d bytes...", nread);
 		r->nread += nread;
-		while (r->nread > 2) {
-			eol = strchr(r->buf, '\n');
-			if (!eol) return 0;
+		r->buf[r->nread] = '\0';
 
-			if ((sizeof(r->ctx->bolo.sndbuf) - r->ctx->bolo.outstanding) < (unsigned)(eol - r->buf))
-				goto tryagain;
+		/* find the largest substring that ends in a newline */
+		eol = strrchr(r->buf, '\n');
+		if (!eol) return 0;
+		eol++;
 
-			*eol++ = '\n';
-			memcpy(r->ctx->bolo.sndbuf + r->ctx->bolo.outstanding, r->buf, eol - r->buf);
-			r->ctx->bolo.outstanding += eol - r->buf;
-			if (!r->ctx->bolo.watched) {
-				debugf("watching upstream relay fd (we have data to send!)");
-				if (fdpoll_watch(r->ctx->poll, r->ctx->bolo.fd, FDPOLL_WRITE, relay_handler, r->ctx) != 0)
-					bail("failed to re-watch upstream relay fd");
-				r->ctx->bolo.watched = 1;
-			}
+		/* allocate a new send buffer */
+		buf = xmalloc(sizeof(struct sndbuf) + (eol - r->buf));
+		buf->off = 0;
+		buf->len = (eol - r->buf);
+		empty(&buf->send);
+		memcpy(buf->data, r->buf, buf->len);
+		debugf("allocated new sendbuf %p for %d octets of data from runner %p", buf, buf->len, r);
 
-			if (eol >= r->buf + r->nread) {
-				r->nread = 0;
-			} else {
-				memmove(r->buf, eol, r->nread - (eol - r->buf));
-				r->nread -= eol - r->buf;
-			}
-			r->buf[r->nread] = '\0'; /* strchr needs NULL-termination */
-			continue;
+		/* slide the runner buffer */
+		debugf("possibly sliding the runner buffer (nread is %d / buf->len is %d)", r->nread, buf->len);
+		if (buf->len < (unsigned)r->nread)
+			memmove(r->buf, eol, r->nread - buf->len);
+		r->nread -= buf->len;
+		r->buf[r->nread] = '\0';
 
-tryagain:
-			infof("bolo send buffer is too full, trying again in a little bit.");
-			break;
+		/* append our buffer to the list to send upstream */
+		push(&r->ctx->bolo.bufs, &buf->send);
+
+		/* re-watch the bolo upstream fd, if necessary */
+		if (!r->ctx->bolo.watched) {
+			debugf("watching upstream relay fd (we have data to send!)");
+			if (fdpoll_watch(r->ctx->poll, r->ctx->bolo.fd, FDPOLL_WRITE, relay_handler, r->ctx) != 0)
+				bail("failed to re-watch upstream relay fd");
+			r->ctx->bolo.watched = 1;
 		}
 	}
 
@@ -201,13 +214,14 @@ relay_handler(int fd, void *_u)
 {
 	ssize_t nwrit;
 	struct context *ctx;
+	struct sndbuf *buf, *tmp;
 
 	ctx = (struct context *)_u;
 
 	debugf("relay: spinning up to flush send buffer");
-	while (ctx->bolo.outstanding > 0) {
-		debugf("relay: %d octets still to be sent to bolo core", ctx->bolo.outstanding);
-		nwrit = write(fd, ctx->bolo.sndbuf, ctx->bolo.outstanding);
+	for_eachx(buf, tmp, &ctx->bolo.bufs, send) {
+		debugf("relay: sending %d octets from sendbuf %p...", buf->len - buf->off, buf);
+		nwrit = write(fd, buf->data + buf->off, buf->len - buf->off);
 		debugf("relay: nwrit = %d", nwrit);
 		if (nwrit == 0)
 			return -1; /* FIXME: reconnect? */
@@ -217,9 +231,13 @@ relay_handler(int fd, void *_u)
 			return -1; /* FIXME: recover? */
 		}
 
-		memmove(ctx->bolo.sndbuf, ctx->bolo.sndbuf + nwrit, ctx->bolo.outstanding - nwrit);
-		ctx->bolo.outstanding -= nwrit;
-		debugf("relay: %d octets left to be sent to bolo core", ctx->bolo.outstanding);
+		debugf("relay: sent %d/%d octets from sendbuf %p", nwrit, buf->len - buf->off, buf);
+		buf->off += nwrit;
+		if (buf->off == buf->len) {
+			debugf("finished sending all of sendbuf %p; removing it from the list...", buf);
+			delist(&buf->send);
+			free(buf);
+		}
 	}
 
 	ctx->bolo.watched = 0;
@@ -234,6 +252,7 @@ do_agent(int argc, char **argv)
 	struct context ctx;
 
 	memset(&ctx, 0, sizeof(ctx));
+	empty(&ctx.bolo.bufs);
 
 	{
 		int fd, override_log_level = -1;
