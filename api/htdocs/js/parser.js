@@ -56,6 +56,21 @@ var as_bytes = function (b) {
 	                return fmt(b) + ' GB';
 }
 
+var as_si = function (n) {
+	var fmt = d3.format('.1f');
+	if (n < 1000) { return fmt(n) + '';  } n /= 1000;
+	if (n < 1000) { return fmt(n) + 'k'; } n /= 1000;
+	if (n < 1000) { return fmt(n) + 'M'; } n /= 1000;
+	                return fmt(n) + 'B';
+}
+
+var as_whole = function (n) {
+	if (Math.floor(n) != n) {
+		return '';
+	}
+	return n;
+};
+
 var sparkline = function (svg, data) {
 	var bounds = svg.node().getBoundingClientRect(),
 	    width  = bounds.width,
@@ -854,8 +869,11 @@ var parse = function (s,prefix) {
 				/* FIXME: do we have an error for semantic issues? */
 				throw unexpected_token(ctx, t, 'a format name, like "bytes"');
 
-			case 'bytes': fmt = as_bytes; break;
-			case 'plain': fmt = as_self;  break;
+			case 'bytes'  : fmt = as_bytes; break;
+			case 'si'     : fmt = as_si;    break;
+			case 'number' : fmt = as_si;    break;
+			case 'plain'  : fmt = as_self;  break;
+			case 'whole'  : fmt = as_whole; break;
 			}
 			if (lead == 'a' || lead == 'x') { axis.x.fmt = fmt; }
 			if (lead == 'a' || lead == 'y') { axis.y.fmt = fmt; }
