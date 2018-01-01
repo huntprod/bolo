@@ -46,6 +46,16 @@ var only_metric = function (d, key) {
 	return d[kk[0]];
 };
 
+var as_self = function (x) { return x; };
+
+var as_bytes = function (b) {
+	var fmt = d3.format('.1f');
+	if (b < 1024) { return fmt(b) + ' B';  } b /= 1024;
+	if (b < 1024) { return fmt(b) + ' kB'; } b /= 1024;
+	if (b < 1024) { return fmt(b) + ' MB'; } b /= 1024;
+	                return fmt(b) + ' GB';
+}
+
 var sparkline = function (svg, data) {
 	var bounds = svg.node().getBoundingClientRect(),
 	    width  = bounds.width,
@@ -340,7 +350,8 @@ GraphBlock.prototype.update = function (data) {
 	if (this.axis.x.on) {
 		frame.append("g")
 		     .attr("transform", "translate(0," + height + ")")
-		     .call(d3.axisBottom(x));
+		     .call(d3.axisBottom(x)
+		             .tickFormat(this.axis.x.fmt || as_self));
 	}
 
 	svg.append("g")
@@ -352,7 +363,8 @@ GraphBlock.prototype.update = function (data) {
 	      .text(this.axis.y.label);
 	if (this.axis.y.on) {
 		frame.append("g")
-		     .call(d3.axisLeft(y));
+		     .call(d3.axisLeft(y)
+		             .tickFormat(this.axis.y.fmt || as_self));
 	}
 };
 
@@ -432,7 +444,8 @@ ScatterPlotBlock.prototype.update = function (data) {
 	      .text(this.axis.y.label);
 	if (this.axis.y.on) {
 		frame.append("g")
-		     .call(d3.axisLeft(y));
+		     .call(d3.axisLeft(y)
+		             .tickFormat(this.axis.y.fmt || as_self));
 	}
 };
 
@@ -830,6 +843,22 @@ var parse = function (s,prefix) {
 			}
 			val = expect_token(ctx);
 			axis[lead].label = val[1];
+			return axis;
+		}
+
+		if (iskeyword(t, 'format')) {
+			var fmt = as_self;
+			val = expect_token(ctx);
+			switch (val[1]) {
+			default:
+				/* FIXME: do we have an error for semantic issues? */
+				throw unexpected_token(ctx, t, 'a format name, like "bytes"');
+
+			case 'bytes': fmt = as_bytes; break;
+			case 'plain': fmt = as_self;  break;
+			}
+			if (lead == 'a' || lead == 'x') { axis.x.fmt = fmt; }
+			if (lead == 'a' || lead == 'y') { axis.y.fmt = fmt; }
 			return axis;
 		}
 
