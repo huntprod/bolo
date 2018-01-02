@@ -306,6 +306,42 @@ sub pidstats
 		}
 	}
 
+	$data->{'fd.total'}   = 0;
+	$data->{'fd.block'}   = 0;
+	$data->{'fd.char'}    = 0;
+	$data->{'fd.dir'}     = 0;
+	$data->{'fd.file'}    = 0;
+	$data->{'fd.socket'}  = 0;
+	$data->{'fd.tty'}     = 0;
+	$data->{'fd.unknown'} = 0;
+	{
+		opendir my $dh, "/proc/$pid/fd";
+		if ($dh) {
+			while ((my $fd = readdir($dh))) {
+				next unless -l "/proc/$pid/fd/$fd";
+				my $dst = readlink "/proc/$pid/fd/$fd"
+					or next;
+
+				DEBUG "found pid $pid fd $fd -> $dst";
+				$data->{'fd.total'}++;
+
+				if ($dst =~ m/socket:\[(\d+)\]/) {
+					$data->{'fd.socket'}++;
+					next;
+				}
+
+				if (-b $dst) { $data->{'fd.block'}++;  next; }
+				if (-c $dst) { $data->{'fd.char'}++;   next; }
+				if (-d $dst) { $data->{'fd.dir'}++;    next; }
+				if (-f $dst) { $data->{'fd.file'}++;   next; }
+				if (-S $dst) { $data->{'fd.socket'}++; next; }
+				if (-t $dst) { $data->{'fd.tty'}++;    next; }
+				$data->{'fd.unknown'}++;
+			}
+			closedir($dh);
+		};
+	}
+
 	my %io;
 	for (SLURP "/proc/$pid/io") {
 		$io{$1} = $2 if m/^(.*):\s+(\d+)/;
