@@ -143,7 +143,7 @@ sub get_binds
 	}
 }
 
-sub get_pid_binds
+sub get_process_binds
 {
 	my ($pid) = @_;
 	my $binds = {};
@@ -153,7 +153,7 @@ sub get_pid_binds
 	while ((my $fd = readdir($dh))) {
 		next unless -l "/proc/$pid/fd/$fd";
 		my $dst = readlink "/proc/$pid/fd/$fd"
-			or continue;
+			or next;
 
 		DEBUG "found pid $pid fd $fd -> $dst";
 		next unless $dst =~ m/socket:\[(\d+)\]/;
@@ -188,7 +188,7 @@ sub get_pstree
 
 		my $binds = {};
 		if ($OPTIONS{bind}) {
-			$binds = get_pid_binds $pid          or next;
+			$binds = get_process_binds $pid      or next;
 		}
 
 		my $stat = SLURP "/proc/$pid/stat"       or next;
