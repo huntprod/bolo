@@ -12,7 +12,7 @@ do_dbinfo(int argc, char **argv)
 	const char *k;
 
 	{
-		char *key_str;
+		char *key_str = NULL;
 		int idx = 0;
 		char c, *shorts = "hDk:";
 		struct option longs[] = {
