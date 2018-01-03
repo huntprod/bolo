@@ -362,11 +362,11 @@ int collect_loadavg(void)
 	if (proc[0])
 		proc[0]--; /* don't count us */
 
-	printf("load:1min"        " %s %lu %0.2f\n", tags, ts, load[0]);
-	printf("load:5min"        " %s %lu %0.2f\n", tags, ts, load[1]);
-	printf("load:15min"       " %s %lu %0.2f\n", tags, ts, load[2]);
-	printf("load:runnable"    " %s %lu %lu\n",   tags, ts, proc[0]);
-	printf("load:schedulable" " %s %lu %lu\n",   tags, ts, proc[1]);
+	printf("load.1min"        " %s %lu %0.2f\n", tags, ts, load[0]);
+	printf("load.5min"        " %s %lu %0.2f\n", tags, ts, load[1]);
+	printf("load.15min"       " %s %lu %0.2f\n", tags, ts, load[2]);
+	printf("load.runnable"    " %s %lu %lu\n",   tags, ts, proc[0]);
+	printf("load.schedulable" " %s %lu %lu\n",   tags, ts, proc[1]);
 	return 0;
 }
 
@@ -406,7 +406,7 @@ int collect_stat(void)
 			k = v; while (*k && !isspace(*k)) k++; *k++ = '\0'; printf("cpu.guest-nice %s %lu %s\n", tags, ts, v && *v ? v : "0"); v = k;
 		}
 	}
-	printf("load:cpus %s %lu %i\n", tags, ts, cpus);
+	printf("load.cpus %s %lu %i\n", tags, ts, cpus);
 
 	fclose(io);
 	return 0;
