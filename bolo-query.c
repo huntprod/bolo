@@ -108,7 +108,7 @@ do_query(int argc, char **argv)
 	}
 
 	if (argc != optind+3) {
-		fprintf(stderr, "USAGE: %s query [--key \"key-in-hex\"] [--debug] /path/to/db/\n\n", argv[0]);
+		fprintf(stderr, "USAGE: %s query [--key \"key-in-hex\"] [--debug] /path/to/db/ QUERY\n\n", argv[0]);
 		return 1;
 	}
 
