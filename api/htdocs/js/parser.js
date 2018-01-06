@@ -488,6 +488,8 @@ var parse = function (s,prefix) {
 	const T_GT         = 12;
 	const T_EQ         = 13;
 	const T_NE         = 14;
+	const T_OPEN_BCOM  = 15;
+	const T_CLOSE_BCOM = 16;
 
 	function token_description(t) {
 		switch (t[0]) {
@@ -505,6 +507,8 @@ var parse = function (s,prefix) {
 		case T_GT:         return "the strictly-greater-than operator (<tt>></tt>)";
 		case T_EQ:         return "the equality operator (<tt>=</tt>)";
 		case T_NE:         return "the inequality operator (<tt>!=</tt>)";
+		case T_OPEN_BCOM:  return "block comment opening sequence (<tt>/*</tt>)";
+		case T_CLOSE_BCOM: return "block comment closing sequence (<tt>*/</tt>)";
 		default:           return "an unrecognized token.  :/";
 		}
 	}
@@ -561,6 +565,8 @@ var parse = function (s,prefix) {
 		if (s[i] == '=') { i++; column++; return [T_EQ]; }
 		if (s[i] == '!') { i++; column++; if (s[i] == '=') { i++; column++; return [T_NE] };
 			console.log('failed'); return undefined; }
+		if (s[i] == '/' && s[i+1] == '*') { i += 2; column += 2; return [T_OPEN_BCOM];  }
+		if (s[i] == '*' && s[i+1] == '/') { i += 2; column += 2; return [T_CLOSE_BCOM]; }
 
 		j = i;
 		while (i < s.length && isalnum.indexOf(s[i]) > -1) { i++; column++; };
@@ -603,8 +609,32 @@ var parse = function (s,prefix) {
 		t = expect_token(what); if (t[0] == T_OPEN) { return t; }
 		return unexpected_token(what, t, 'an opening curly brace, <tt>{</tt>');
 	}
+	function next() {
+		while (true) {
+			t = lex();
+			if (t && t[0] == T_OPEN_BCOM) {
+				var depth = 1;
+				while (depth > 0) {
+					t = lex();
+					if (!t) {
+						throw with_lineno(
+							'I had trouble with a block comment (<tt>/* ... */</tt>)<br>'+
+							'I ran out of code to parse!');
+					}
+					switch (t[0]) {
+					case T_OPEN_BCOM:  depth++; break;
+					case T_CLOSE_BCOM: depth--; break;
+					}
+				}
+
+			} else {
+				return t;
+			}
+		}
+	}
 	function expect_token(what) {
-		t = lex(); if (t) { return t; }
+		t = next();
+		if (t) { return t; }
 		throw with_lineno(
 			'I had trouble '+what+';<br>'+
 			'I ran out of code to parse!');
@@ -1016,7 +1046,7 @@ var parse = function (s,prefix) {
 	    blocks     = [],
 	    queries    = {},
 	    n = 0;
-	while (typeof(t = lex()) !== 'undefined') {
+	while (typeof(t = next()) !== 'undefined') {
 		if (iskeyword(t, 'threshold')) {
 			o = parse_threshold();
 			thresholds[o.name] = o;
