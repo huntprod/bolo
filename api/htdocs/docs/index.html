@@ -106,6 +106,66 @@ metric {
 		the double-quoted style for text strings.  We think you will too.</p>
 
 
+		<a id="vars"></a>
+		<h2 toc="*">Variables</h2>
+
+		<p>BoardCode lets you define variables, which can you can then reference
+		from block definitions, inside quote strings, etc.</p>
+
+		<pre><code>let what := metric
+let host := "localhost"
+let size := 3x3
+
+metric {
+  size  $size
+  label "average latency ($what)"
+  query [SELECT $what WHERE host = $host]
+}
+
+metric {
+  size  3x3
+  label "average latency (metric)"
+  query [SELECT metric WHERE host = localhost]
+}</code></pre>
+
+		<p>Those two <tt>metric</tt> blocks are equivalent, however it is easier
+		to change the metric being graphed in the first block, just by changing
+		the value of the <tt>$what</tt> variable.</p>
+
+		<p>Each set of <tt>{ ... }</tt> introduces a new scope.  When you define
+		a variable, via the <tt>let varname := "value"</tt> construct, the
+		current scope is affected.  When you assign a value to a variable, via
+		the <tt>$varname := "new value"</tt> construct, the innermost scope that
+		defines that variable is updated.  Lookup proceeds at the current scope
+		and works outwards.</p>
+
+		<p>It's probably easiest to understand with a simple example:</p>
+
+		<pre><code data-example="var-scopes">let text := "outer"
+let w := 8x1
+
+placeholder {
+  size $w
+  text $text
+  color #777
+}
+
+placeholder {
+  let text := "inner"
+
+  size $w
+  text $text
+  color #444
+}
+
+placeholder {
+  size $w
+  text $text
+  color #000
+}</code></pre>
+		<span class="full-example" data-from="var-scopes"></span>
+
+
 		<a id="grid"></a>
 		<h2 toc="*">Life On The Grid</h2>
 

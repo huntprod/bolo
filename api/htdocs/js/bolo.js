@@ -763,6 +763,40 @@
 				}
 			}
 		});
+		$('.full-example').each(function (i, ex) {
+			var board;
+			try {
+				if ($(ex).is('[data-from]')) {
+					board = new Board($('[data-example="'+$(ex).attr('data-from')+'"]').text());
+				} else {
+					board = new Board($(ex).text());
+				}
+			} catch (e) {
+				throw e;
+				$(ex).addClass('error').html("Unable to parse example BoardCode: "+e.toString());
+				return;
+			}
+
+			$(ex).empty();
+			for (var i = 0; i < board.blocks.length; i++) {
+				$(ex).append(board.blocks[i].html());
+				try {
+					board.blocks[i].update(data);
+				} catch (e) {
+					if (e.toString().match(/more than one metric/i)) {
+						try {
+							board.blocks[i].update({metric: data.metric});
+						} catch (e) {
+							$(ex).addClass('error').html("Unable to render example BoardCode: " + e.toString());
+							return;
+						}
+					} else {
+						$(ex).addClass('error').html("Unable to render example BoardCode: " + e.toString());
+						return;
+					}
+				}
+			}
+		});
 
 		$toc = $('.docs #toc');
 		$('.docs h2[toc]').each(function (i, h2) {

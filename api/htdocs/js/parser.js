@@ -464,7 +464,10 @@ ScatterPlotBlock.prototype.update = function (data) {
 	}
 };
 
-var parse = function (s,prefix) {
+var parse = function (s, prefix) {
+  if (typeof(s) == 'undefined') {
+    s = '';
+  }
 	if (typeof(prefix) === 'undefined') {
 		prefix = 'block';
 	}
@@ -472,7 +475,7 @@ var parse = function (s,prefix) {
 	var i    = 0, line = 1, column = 0,
 	    last =  { line : 1, column : 0 },
 	    isspace = ' \f\n\r\t\v\u00A0\u2028\u2029',
-	    isalnum = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_@/#';
+	    isalnum = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_@/#-';
 
 	const T_IDENTIFIER = 1;
 	const T_STRING     = 2;
@@ -490,6 +493,8 @@ var parse = function (s,prefix) {
 	const T_NE         = 14;
 	const T_OPEN_BCOM  = 15;
 	const T_CLOSE_BCOM = 16;
+	const T_ASSIGN     = 17;
+	const T_VAR        = 18;
 
 	function token_description(t) {
 		switch (t[0]) {
@@ -509,9 +514,21 @@ var parse = function (s,prefix) {
 		case T_NE:         return "the inequality operator (<tt>!=</tt>)";
 		case T_OPEN_BCOM:  return "block comment opening sequence (<tt>/*</tt>)";
 		case T_CLOSE_BCOM: return "block comment closing sequence (<tt>*/</tt>)";
+		case T_ASSIGN:     return "the assignment operator (<tt>:=</tt>)";
+		case T_VAR:        return "a variable (<tt>$"+t[1]+"</tt>)";
 		default:           return "an unrecognized token.  :/";
 		}
 	}
+
+	var interp = (function () {
+		var re = new RegExp('\\${(['+isalnum+']+)}|\\$(['+isalnum+']+)', 'g');
+		return function (str, style) {
+			return str.replace(re, function (m, braced, bare, off, whole) {
+				if (!braced && !bare) { throw 'unable to parse variable interpolation: "'+whole+'"'; }
+				return getvar(braced || bare)[1];
+			});
+		};
+	})();
 
 	var lex = function() {
 		var j = 0;
@@ -537,7 +554,7 @@ var parse = function (s,prefix) {
 				if (s[i] == '\n') { line++; column = 0; }
 			}
 			i++; column++;
-			return [T_STRING, s.substr(j, i-j-1)];
+			return [T_STRING, interp(s.substr(j, i-j-1), '"')];
 		}
 		if (s[i] == '[') {
 			j = i = i + 1; column++;
@@ -550,20 +567,25 @@ var parse = function (s,prefix) {
 					   .replace(/^\s+/, '')
 					   .replace(/\s+$/, '')
 					   .replace(/\n\s+/gm, ' ');
-			return [T_STRING, str];
+			return [T_STRING, interp(str, '[')];
+		}
+		if (s[i] == '$') {
+			j = i = i + 1; column++;
+			while (i < s.length && isalnum.indexOf(s[i]) > -1) { i++; column++; };
+			return [T_VAR, s.substr(j, i-j)];
 		}
 		if (s[i] == '@') {
 			j = i = i + 1; column++;
 			while (i < s.length && isalnum.indexOf(s[i]) > -1) { i++; column++; };
 			return [T_REF, s.substr(j, i-j)];
 		}
-		if (s[i] == '{') { i++; column++; return [T_OPEN];  }
-		if (s[i] == '}') { i++; column++; return [T_CLOSE]; }
-		if (s[i] == ':') { i++; column++; return [T_COLON]; }
-		if (s[i] == '<') { i++; column++; if (s[i] == '=') { i++; column++; return [T_LE] }; return [T_LT]; }
-		if (s[i] == '>') { i++; column++; if (s[i] == '=') { i++; column++; return [T_GE] }; return [T_GT]; }
+		if (s[i] == '{') { i++; column++; scopes[++scope] = {}; return [T_OPEN];  }
+		if (s[i] == '}') { i++; column++; scopes[scope--] = {}; return [T_CLOSE]; }
+		if (s[i] == ':') { i++; column++; if (s[i] == '=') { i++; column++; return [T_ASSIGN]; }; return [T_COLON]; }
+		if (s[i] == '<') { i++; column++; if (s[i] == '=') { i++; column++; return [T_LE]; }; return [T_LT]; }
+		if (s[i] == '>') { i++; column++; if (s[i] == '=') { i++; column++; return [T_GE]; }; return [T_GT]; }
 		if (s[i] == '=') { i++; column++; return [T_EQ]; }
-		if (s[i] == '!') { i++; column++; if (s[i] == '=') { i++; column++; return [T_NE] };
+		if (s[i] == '!') { i++; column++; if (s[i] == '=') { i++; column++; return [T_NE]; };
 			console.log('failed'); return undefined; }
 		if (s[i] == '/' && s[i+1] == '*') { i += 2; column += 2; return [T_OPEN_BCOM];  }
 		if (s[i] == '*' && s[i+1] == '/') { i += 2; column += 2; return [T_CLOSE_BCOM]; }
@@ -586,6 +608,33 @@ var parse = function (s,prefix) {
 	var thresholds = {};
 	var blocks = [];
 
+	var scope = 0;
+	var scopes = [{}];
+	var defvar = function (name, value) {
+		scopes[scope][name] = value;
+	};
+	var setvar = function (name, value) {
+		for (var i = scope; i >= 0; i--) {
+			if (name in scopes[i]) {
+				scopes[i][name] = value;
+				return value;
+			}
+		}
+		throw with_lineno(
+			'I was unable to assign to the (undeclared) variable <tt>$'+name+'</tt><br>'+
+			'Perhaps you meant to type <tt>let '+name+' := ...</tt>?');
+	};
+	var getvar = function (name) {
+		for (var i = scope; i >= 0; i--) {
+			if (name in scopes[i]) {
+				return scopes[i][name];
+			}
+		}
+		throw with_lineno(
+			'I was unable to find the variable <tt>$'+name+'</tt><br>'+
+			'Did you forget to declare it?');
+	};
+
 	var iskeyword = function (t, kw) {
 		return t[0] == T_IDENTIFIER && t[1] == kw;
 	}
@@ -596,9 +645,10 @@ var parse = function (s,prefix) {
 		var k = i;
 		while (k+1 < s.length && s[k+1] != '\n') { k++; }
 
+		var pad = last.column > 1 ? last.column - 1 : 0;
 		return message+'<br><br>(on line '+last.line+', character '+last.column+')<br>'+
 				 '<xmp>'+s.substr(j,k).replace(/\t/g, ' ')+'\n'+
-				 ' '.repeat(last.column - 1) + '^^^</xmp>';
+				 ' '.repeat(pad) + '^^^</xmp>';
 	}
 	function unexpected_token(what, got, want) {
 		return with_lineno(
@@ -612,7 +662,10 @@ var parse = function (s,prefix) {
 	function next() {
 		while (true) {
 			t = lex();
-			if (t && t[0] == T_OPEN_BCOM) {
+			if (!t) { return undefined; }
+
+			switch (t[0]) {
+			case T_OPEN_BCOM:
 				var depth = 1;
 				while (depth > 0) {
 					t = lex();
@@ -626,9 +679,19 @@ var parse = function (s,prefix) {
 					case T_CLOSE_BCOM: depth--; break;
 					}
 				}
+				break;
 
-			} else {
-				return t;
+			case T_VAR:
+				return getvar(t[1]);
+
+			default:
+				if (iskeyword(t, "let")) {
+					v = parse_letvar();
+					defvar(v.name, v.value);
+				} else {
+					return t;
+				}
+				break;
 			}
 		}
 	}
@@ -665,6 +728,36 @@ var parse = function (s,prefix) {
 				  'You seem to have forgotten to specify a query!';
 		}
 	}
+
+	var parse_letvar = function () {
+		var ctx = 'parsing a variable definition';
+		var t = expect_token(ctx);
+		if (t[0] != T_IDENTIFIER) { throw unexpected_token(ctx, t, 'a variable name'); }
+		return {
+			name: t[1],
+			value: parse_setvar(ctx)
+		};
+	};
+
+	var parse_setvar = function (ctx) {
+		var t;
+		var v = undefined;
+		if (typeof(ctx) === 'undefined') {
+			ctx = 'parsing a variable assignment';
+		}
+
+		t = expect_token(ctx);
+		if (t[0] != T_ASSIGN) { throw unexpected_token(ctx, t, 'the assignment operator (<tt>:=</tt>)'); }
+
+		t = expect_token(ctx);
+		switch (t[0]) {
+		case T_STRING:
+		case T_NUMERIC:
+		case T_SIZE:
+				return t;
+		}
+		throw unexpected_token(ctx, t, 'a scalar value (a string, number, or a size)');
+	};
 
 	var parse_threshold = function() {
 		var ctx = 'parsing a threshold name';
@@ -1047,6 +1140,16 @@ var parse = function (s,prefix) {
 	    queries    = {},
 	    n = 0;
 	while (typeof(t = next()) !== 'undefined') {
+		if (iskeyword(t, 'let')) {
+			v = parse_letvar();
+			defvar(v.name, v.value);
+			continue;
+		}
+		if (t[0] == T_VAR) {
+			v = parse_setvar();
+			setvar(t[1], v);
+			continue;
+		}
 		if (iskeyword(t, 'threshold')) {
 			o = parse_threshold();
 			thresholds[o.name] = o;
