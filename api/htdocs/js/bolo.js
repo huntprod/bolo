@@ -181,7 +181,7 @@
 
 	function editor(board) {
 		var $e = $('#editor');
-		$e.find('.fail').hide();
+		$e.find('.fail, .preview').hide();
 
 		$e.attr('method', board.link ? 'PUT' : 'POST');
 		$e.find('input[name=link]').val(board.link || '');
