@@ -141,8 +141,8 @@ struct agent_config {
 	int log_level;
 
 	char         *bolo_endpoint;
-	unsigned int  schedule_splay;
-	unsigned int  max_runners;
+	int           schedule_splay;
+	int           max_runners;
 
 	size_t              nchecks;
 	struct agent_check *checks;
