@@ -340,6 +340,8 @@ body.docs .example .placeholder { float: left; margin: 0 1em 1em 0; }
 body.docs .example.error { border: none; display: block; padding: 1em; }
 body.docs .example.error tt { background: none; }
 
+body.docs .full-example.grid { display: block; width: 90%; }
+
 body.docs h1 {
 	border-bottom: 4px solid #eee;
 }
@@ -395,6 +397,10 @@ body.docs ul {
 }
 body.docs ul li {
 	list-style: none;
+}
+body.docs ul li,
+body.docs ol li {
+	line-height: 1.4em;
 }
 body.docs ul li:before {
 	content: '- ';

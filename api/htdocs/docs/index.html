@@ -166,6 +166,108 @@ placeholder {
 		<span class="full-example" data-from="var-scopes"></span>
 
 
+		<a id="func"></a>
+		<h2 toc="*">Functions</h2>
+
+		<p>Variables are neat, and all, but it's when you combine them with
+		<em>functions</em> that they become truly powerful.  With functions,
+		you can build a template block, and flesh out the details when someone
+		calls the function.  Code reuse <strong>and</strong> customization!</p>
+
+		<p>Here's an example, using simple <tt>placeholder</tt> blocks to show
+		off the flexibility, without getting bogged down in the details of
+		blocks (which we will cover next!):</p>
+
+		<pre><code data-example="func-hello">def hello($name, $color) {
+  placeholder {
+    text "Hello, $name!"
+    color $color
+  }
+}
+
+hello("James",  navy/skyblue)
+hello("Vistor", skyblue/navy)</code></pre>
+		<span class="full-example grid" data-from="func-hello"></span>
+
+		<p>This is incredibly useful when you start passing queries, or
+		parts of queries, to functions that define data visualization blocks
+		like <tt>graph</tt> or <tt>sparkline</tt>.</p>
+
+		<p>BoardCode functions have <em>fixed arity</em>.  That means that
+		when you define a function, you have to define how many arguments
+		it takes, and name each of those arguments explicitly.  Does it
+		take only one argument (<em>unary</em>), two arguments (<em>binary</em>),
+		or more?</p>
+
+		<p>Furthermore, BoardCode prohibits some things you may be accustomed
+		to in other, more general-purpose programming languages:</p>
+
+		<ol>
+			<li><em>Nested Function Definitions</em> - All functions must
+			be defined at the top level.</li>
+			<li><em>Default Parameter Values</em> - Callers <strong>must</strong>
+			specify all of the arguments, every time they call.  No exceptions.</li>
+			<li><em>Higher-Order Functions</em> - Functions cannot take other
+			functions as arguments; only literals and variables.</li>
+		</ol>
+
+		<p>Calling a function introduces a new variable scope, making it
+		more difficult (but not impossible!) for functions to accidentally
+		affect their calling environment.</p>
+
+		<pre><code data-example="func-scope">let title := "My Board"
+
+def tmp($title) {
+  placeholder {
+    text "TEMP: $title"
+  }
+}
+
+html "&lt;h1&gt;$title&lt;/h1&gt;"
+tmp("thing")
+text "title is still $title"</code></pre>
+
+		<p>While the function <em>tmp()</em> defines a formal parameter
+		named <tt>$title</tt>, that variable does not interact with the
+		top-level variable of the same name.  The function definition doesn't
+		perturb the <tt>html</tt> call; the call to it does not impact the
+		<tt>text</tt> call that follows.</p>
+
+		<p>That's not to say that BoardCode has lexical scoping.
+		In fact, for now, scoping is dynamic, meaning that functions
+		<em>can</em> in fact reach into the calling environment and make
+		changes, if the <tt>let v := ...</tt> form isn't used judiciously.</p>
+
+		<pre><code>let global := "GLOBAL!"
+let local := "local..."
+
+
+def oops() {
+  $global := "overridden"
+  let local := "overrode"
+
+  text "in oops: global is $global; local is $local"
+}
+
+text "before:  global is $global; local is $local"
+oops
+text "after:  global is $global; local is $local"</code></pre>
+
+		<p>This prints:</p>
+
+		<pre><code>before:  global is GLOBAL!; local is local...
+in oops: global is overridden; local is overrode
+after:   global is overridden; local is local...</code></pre>
+
+		Because of the <em>assignment</em> to <tt>$global</tt> inside the <tt>oops()</tt>
+		call, the calling environment's <tt>$global</tt> variable gets updated.  The
+		<tt>$local</tt> variable is left alone, however, because the function uses a
+		<em>let</em> form to declare a shadowing copy of the variable.</p>
+
+		<p><strong>Bottom line</strong>: always declare the temporary variables in
+		any functions you define.</p>
+
+
 		<a id="grid"></a>
 		<h2 toc="*">Life On The Grid</h2>
 
