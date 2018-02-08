@@ -36,6 +36,9 @@
 /bql/lexer.c
 /bql/bql.a
 
+/docker/bolo/core/root
+/docker/bolo/web/root
+
 # fuzzing tests
 /t/fuzz/json
 /t/fuzz/http
