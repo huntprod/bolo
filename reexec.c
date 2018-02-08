@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
@@ -50,8 +51,15 @@ no_cooldown:
 	usleep(COOLDOWN_MAX_MS * 1000);
 }
 
+pid_t pid = 0;
+int keep_going = 1;
+void handle_sigterm(int sig) {
+	keep_going = 0;
+	if (pid)
+		kill(pid, SIGTERM);
+}
 int main(int argc, char **argv) {
-	int rc, i;
+	int i;
 	char **cmd, **envp;
 
 	envp = argv+1;
@@ -77,26 +85,31 @@ int main(int argc, char **argv) {
 		fprintf(stderr, "  [%d]: '%s'\n", i-1, cmd[i]);
 	}
 
-	for (;;) {
-		pid_t pid;
+	signal(SIGINT,  handle_sigterm);
+	signal(SIGTERM, handle_sigterm);
+
+	while (keep_going) {
 		int status;
 
 		pid = fork();
-		if (pid < 0) continue;
-
-		if (pid == 0) {
-			execve(cmd[0], cmd, envp);
+		if (pid < 0) {
+			fprintf(stderr, "fork() failed: %s (error %d)\n", strerror(errno), errno);
+			cooldown();
 			continue;
 		}
 
-		for (;;) {
-			rc = waitpid(pid, &status, 0);
-			if (rc == -1 && errno == EINTR) continue;
-			if (rc == -1 && errno == ECHILD) break;
-			break;
+		if (pid == 0) {
+			execve(cmd[0], cmd, envp);
+			fprintf(stderr, "(child %d) execve(%s) failed: %s (error %d)\n",
+				getpid(), cmd[0], strerror(errno), errno);
+			exit(77);
 		}
 
-		cooldown();
+		waitpid(pid, &status, 0);
+		if (WIFSIGNALED(status) && WTERMSIG(status) == SIGINT)
+			keep_going = 0;
+		if (keep_going)
+			cooldown();
 	}
 	return 0;
 }
