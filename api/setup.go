@@ -8,7 +8,7 @@ func (d *DB) Setup() error {
 	var err error
 
 	err = d.c.Exec(`
-CREATE TABLE users IF NOT EXISTS (
+CREATE TABLE IF NOT EXISTS users (
   id       INTEGER PRIMARY KEY,
   username VARCHAR(100) NOT NULL UNIQUE,
   name     VARCHAR(100) NOT NULL,
@@ -20,7 +20,7 @@ CREATE TABLE users IF NOT EXISTS (
 	}
 
 	err = d.c.Exec(`
-CREATE TABLE boards IF NOT EXISTS (
+CREATE TABLE IF NOT EXISTS boards (
   id    INTEGER PRIMARY KEY,
   name  VARCHAR(100) NOT NULL UNIQUE,
   link  VARCHAR(100) NOT NULL UNIQUE,
@@ -43,7 +43,7 @@ CREATE TABLE boards IF NOT EXISTS (
 	}
 
 	err = d.c.Exec(`
-CREATE TABLE nav IF NOT EXISTS (
+CREATE TABLE IF NOT EXISTS nav (
   owner    INTEGER NOT NULL,
   board    INTEGER NOT NULL,
   position INTEGER NOT NULL DEFAULT 0,
@@ -65,7 +65,7 @@ CREATE TABLE nav IF NOT EXISTS (
 	}
 
 	err = d.c.Exec(`
-CREATE TABLE sessions IF NOT EXISTS (
+CREATE TABLE IF NOT EXISTS sessions (
   sid CHAR(64) NOT NULL PRIMARY KEY,
   uid INTEGER  NOT NULL,
 
