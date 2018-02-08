@@ -1,0 +1,5 @@
+FROM scratch
+COPY root /
+
+CMD ["/reexec", "--", "/api", "--db", "/db/web.db", "--root", "/htdocs", "--listen", ":80", "--endpoint", "172.17.0.2:2001"]
+EXPOSE 80

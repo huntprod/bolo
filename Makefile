@@ -104,6 +104,20 @@ sure: memtest
 fixme:
 	find . -name '*.[ch]' -not -path '*/ice/*' | xargs grep -rin fixme
 
+docker: docker-core docker-web
+docker-core: bolo reexec
+	docker/build setup docker/bolo/core
+	docker/build copy  docker/bolo/core bolo reexec docker/bolo/core/addon/*
+	docker/build libs  docker/bolo/core bolo reexec
+	docker/build clean docker/bolo/core
+	docker build -t bolo/core:latest docker/bolo/core
+docker-web: bolo reexec
+	docker/build setup docker/bolo/web
+	docker/build copy  docker/bolo/web reexec api/api api/htdocs docker/bolo/web/addon/*
+	docker/build libs  docker/bolo/web reexec api
+	docker/build clean docker/bolo/web
+	docker build -t bolo/web:latest docker/bolo/web
+
 bql/lexer.c: bql/lexer.l
 	flex -FTvs -o $@ $<
 	#patch -p1 <bql/flex.patch
