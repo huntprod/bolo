@@ -3,6 +3,7 @@
 /bqlx
 /httpx
 /slow
+/reexec
 
 # collectors
 /linux

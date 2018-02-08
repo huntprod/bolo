@@ -42,6 +42,7 @@ clean:
 	rm -f bql/*.o bql/*.gcno bql/*.gcda
 	rm -f $(TESTS)
 	rm -f lcov.info
+	rm -f slow reexec
 
 realclean: clean
 	rm -rf t/data/db
