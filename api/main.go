@@ -43,6 +43,9 @@ func main() {
 	d, err := Database(opt.DB)
 	bail(err)
 
+	err = d.Setup()
+	bail(err)
+
 	api := &API{
 		SessionLimit: opt.SessionLimit * 86400,
 		Bolo: &Bolo{
