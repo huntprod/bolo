@@ -6,6 +6,7 @@ import (
 
 	fmt "github.com/jhunt/go-ansi"
 	"github.com/jhunt/go-cli"
+	env "github.com/jhunt/go-envirotron"
 )
 
 func bail(err error) {
@@ -19,9 +20,9 @@ func main() {
 	var opt struct {
 		Listen       string `cli:"-l, --listen"`
 		DB           string `cli:"-d, --db, --database"`
-		Endpoint     string `cli:"-e, --endpoint"`
+		Endpoint     string `cli:"-e, --endpoint"         env:"BOLO_CORE"`
 		WebRoot      string `cli:"-r, --root"`
-		SessionLimit int    `cli:"--session-limit"`
+		SessionLimit int    `cli:"--session-limit"        env:"SESSION_LIMIT"`
 	}
 
 	opt.Listen = ":8080"
@@ -29,6 +30,7 @@ func main() {
 	opt.DB = "api.db"
 	opt.WebRoot = "htdocs"
 	opt.SessionLimit = 60
+	env.Override(&opt)
 
 	_, args, err := cli.Parse(&opt)
 	bail(err)
