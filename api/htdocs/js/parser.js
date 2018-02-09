@@ -1342,7 +1342,7 @@ var evaluate = function (s, prefix) {
 			}
 			val = expect_token(ctx);
 			world.op(OP_SET, lead+'-label', val);
-			return axis;
+			return;
 		}
 
 		if (iskeyword(t, 'format')) {
