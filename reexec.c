@@ -58,10 +58,11 @@ void handle_sigterm(int sig) {
 	if (pid)
 		kill(pid, SIGTERM);
 }
-int main(int argc, char **argv) {
-	int i;
-	char **cmd, **envp;
+int main(int argc, char **argv, char **environ) {
+	int i, bail, n;
+	char **cmd, **envp, **p;
 
+	bail = 0;
 	envp = argv+1;
 	cmd  = NULL;
 	for (i = 1; i < argc; i++) {
@@ -78,8 +79,26 @@ int main(int argc, char **argv) {
 
 	fprintf(stderr, "setting up execution environment:\n");
 	for (i = 0; envp[i]; i++) {
+		if (!strchr(envp[i], '=')) {
+			n = strlen(envp[i]);
+			for (p = environ; *p; p++) {
+				if (strncmp(*p, envp[i], n) == 0 && (*p)[n] == '=') {
+					envp[i] = *p;
+					break;
+				}
+			}
+			if (!*p) {
+				fprintf(stderr, "  %s (UNDEFINED)\n", envp[i]);
+				bail = 1;
+				continue;
+			}
+		}
 		fprintf(stderr, "  %s\n", envp[i]);
 	}
+	if (bail) {
+		return 1;
+	}
+
 	fprintf(stderr, "running command %s with arguments:\n", cmd[0]);
 	for (i = 1; cmd[i]; i++) {
 		fprintf(stderr, "  [%d]: '%s'\n", i-1, cmd[i]);
