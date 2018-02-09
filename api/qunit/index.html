@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <title>Bolo Unit Tests</title>
+  <link rel="stylesheet" href="https://code.jquery.com/qunit/qunit-2.5.0.css">
+</head>
+<body>
+  <div id="qunit"></div>
+  <div id="qunit-fixture"></div>
+  <script src="https://code.jquery.com/qunit/qunit-2.5.0.js"></script>
+  <script type="text/javascript" src="/htdocs/js/jq.js"></script>
+  <script type="text/javascript" src="/htdocs/js/d3.js"></script>
+  <script type="text/javascript" src="/htdocs/js/color.js"></script>
+  <script type="text/javascript" src="/htdocs/js/parser.js"></script>
+  <script type="text/javascript" src="/htdocs/js/bolo.js"></script>
+
+  <script type="text/javascript" src="tests.js"></script>
+
+  <div style="display: none">
+    <div class="valid-board" assertion="Placeholder blocks should work">
+      placeholder {
+        text "coming soon"
+      }
+      placeholder {
+        text "coming soon"
+        color "blue"
+      }
+      placeholder {
+        text "coming soon"
+        color "green"
+      }
+      placeholder {
+        text "coming soon"
+        color "orange"
+      }
+    </div>
+    <div class="valid-board" assertion="Metric blocks should work">
+      metric {
+        size  3x3
+        unit  "ms"
+        label "average latency"
+        graph yes
+        query [SELECT MEDIAN(get.latency) WHERE site = "bolo.cloud"]
+      }
+    </div>
+    <div class="valid-board" assertion="Sparkline blocks should work">
+      sparkline {
+        size    12x1
+        label  "Average Request Latency"
+        color   forestgreen
+        query [SELECT mean(get.latency)
+                WHERE host = web1
+                  AND env  = prod
+              BETWEEN 1h ago and now]
+      }
+    </div>
+    <div class="valid-board" assertion="Graph blocks should work">
+      graph {
+        size 4x3
+        label "Diego Containers"
+        query [SELECT diego.running.containers
+                WHERE cf = "prod/1"
+                AFTER 30m ago]
+
+        plot "num.containers" {
+          as area
+          color darkblue
+        }
+      }
+    </div>
+    <div class="valid-board" assertion="Sparkline blocks should work">
+      scatterplot {
+        size 4x3
+        query [SELECT mem.used, mem.total
+                WHERE env     = prod
+                  AND cluster = web1
+                AFTER 30m AGO]
+
+        x used
+        y total
+      }
+    </div>
+
+    <div class="valid-board" assertion="Graph blocks can label their axes">
+      graph {
+        size 4x3
+        label "Diego Containers"
+        query [SELECT diego.running.containers
+                WHERE cf = "prod/1"
+                AFTER 30m ago]
+
+        plot "num.containers" {
+          as area
+          color darkblue
+        }
+
+        x-axis label "Time"
+        y-axis label "Containers"
+      }
+    </div>
+
+    <div id="unknown-block-1">
+      unknown {}
+    </div>
+
+    <div id="metric-block-1">
+      metric {}
+    </div>
+  </div>
+</body>
+</html>
