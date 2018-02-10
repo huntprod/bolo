@@ -467,9 +467,138 @@ ScatterPlotBlock.prototype.update = function (data) {
 	}
 };
 
-var evaluate = function (s, prefix) {
-	if (typeof(s)      === 'undefined') { s      = ''; }
-	if (typeof(prefix) === 'undefined') { prefix = 'block'; }
+const T_IDENTIFIER  =  1;
+const T_STRING      =  2;
+const T_NUMERIC     =  3;
+const T_SIZE        =  4;
+const T_REF         =  5;
+const T_OPEN        =  6;
+const T_CLOSE       =  7;
+const T_COLON       =  8;
+const T_LE          =  9;
+const T_LT          = 10;
+const T_GE          = 11;
+const T_GT          = 12;
+const T_EQ          = 13;
+const T_NE          = 14;
+const T_OPEN_BCOM   = 15;
+const T_CLOSE_BCOM  = 16;
+const T_ASSIGN      = 17;
+const T_VAR         = 18;
+const T_OPEN_PAREN  = 19;
+const T_CLOSE_PAREN = 20;
+const T_COMMA       = 21;
+
+var World = function () {
+	var $w = function() {
+		this.env = [];
+		this.scope = -1;
+
+		this.funs = {};
+		this.ctx = '';
+
+		this.blocks = [];
+		this.board  = [];
+
+		this.enter();
+		this.define('main', []);
+		return this;
+	};
+
+	$w.prototype.define = function (id, formals) {
+		this.ctx = id;
+		this.funs[id] = {
+			args: formals,
+			ops:  []
+		};
+	};
+	$w.prototype.enter = function () {
+		this.env[++this.scope] = {
+			var:   {}, /* variable bindings */
+			thold: {}  /* defined thresholds */
+		};
+	};
+	$w.prototype.leave = function () {
+		this.env[this.scope--] = undefined;
+	};
+	$w.prototype.op = function () {
+		this.funs[this.ctx].ops.push(Array.prototype.slice.call(arguments));
+	};
+	$w.prototype.get = function (type, id) {
+		if (!(type in {var:1,thold:1})) {
+			throw 'I seem to be having some internal issues.<br>'+
+						'Called world.get() with type "'+type+'", which is invalid.<br>'+
+						'Please file a bug report.';
+		}
+		for (var i = this.scope; i >= 0; i--) {
+			if (id in this.env[i][type]) {
+				return this.valueof(this.env[i][type][id]);
+			}
+		}
+		if (type == "var") {
+			throw 'I was unable to find the variable <tt>$'+id+'</tt><br>'+
+						'Did you forget to declare it?';
+		}
+		throw 'No such '+type+' binding, <tt>'+id+'</tt>';
+	};
+	$w.prototype.declare = function (type, id, value) {
+		if (!(type in {var:1,thold:1})) {
+			throw 'I seem to be having some internal issues.<br>'+
+						'Called world.declare() with type "'+type+'", which is invalid.<br>'+
+						'Please file a bug report.';
+		}
+		this.env[this.scope][type][id] = value;
+	};
+	$w.prototype.bind = function (type, id, value) {
+		if (!(type in {var:1,thold:1})) {
+			throw 'I seem to be having some internal issues.<br>'+
+						'Called world.bind() with type "'+type+'", which is invalid.<br>'+
+						'Please file a bug report.';
+		}
+		for (var i = this.scope; i >= 0; i--) {
+			if (!(id in this.env[i][type])) { continue; }
+			this.env[i][type][id] = value;
+			return;
+		}
+
+		throw "No such "+type+" binding: <tt>"+id+"</tt>";
+	};
+	$w.prototype.valueof = function (thing) {
+		switch (thing[0]) {
+		case T_NUMERIC:
+		case T_SIZE:
+		case T_IDENTIFIER:
+			return thing[1];
+
+		case T_STRING:
+			var s = '';
+			for (var i = 0; i < thing[1].length; i++) {
+				if (typeof(thing[1][i]) === 'string') {
+					s += thing[1][i];
+				} else {
+					s += this.get('var', thing[1][i].ref);
+				}
+			}
+			return s;
+
+		case T_VAR:
+			return this.get('var', thing[1]);
+		}
+	};
+
+	$w.prototype.eval = function (id) {
+		var fn = this.funs[id];
+		for (var i = 0; i < fn.ops.length; i++) {
+			fn.ops[i][0](this, fn.ops[i]);
+		}
+		return this.board;
+	};
+
+	return $w;
+}();
+
+var parse = function (s) {
+	if (typeof(s) === 'undefined') { s = ''; }
 
 	var i    = 0, line = 1, column = 0,
 	    last =  { line : 1, column : 0 },
@@ -477,28 +606,7 @@ var evaluate = function (s, prefix) {
 	    isalnum = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_@/#-',
 	    isvar   = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-';
 
-	const T_IDENTIFIER  =  1;
-	const T_STRING      =  2;
-	const T_NUMERIC     =  3;
-	const T_SIZE        =  4;
-	const T_REF         =  5;
-	const T_OPEN        =  6;
-	const T_CLOSE       =  7;
-	const T_COLON       =  8;
-	const T_LE          =  9;
-	const T_LT          = 10;
-	const T_GE          = 11;
-	const T_GT          = 12;
-	const T_EQ          = 13;
-	const T_NE          = 14;
-	const T_OPEN_BCOM   = 15;
-	const T_CLOSE_BCOM  = 16;
-	const T_ASSIGN      = 17;
-	const T_VAR         = 18;
-	const T_OPEN_PAREN  = 19;
-	const T_CLOSE_PAREN = 20;
-	const T_COMMA       = 21;
-
+	/* token_description(token) {{{ */
 	function token_description(t) {
 		switch (t[0]) {
 		case T_IDENTIFIER:  return "an identifer (<tt>'"+t[1]+"'</tt>)";
@@ -525,7 +633,8 @@ var evaluate = function (s, prefix) {
 		default:            return "an unrecognized token ("+t+") :/";
 		}
 	}
-
+	/* }}} */
+	/* interp("...") {{{ */
 	var interp = (function () {
 		return function (s) {
 			var i = 0;
@@ -579,7 +688,8 @@ var evaluate = function (s, prefix) {
 			return parts;
 		};
 	})();
-
+	/* }}} */
+	/* lex() {{{ */
 	var lex = function() {
 		var j = 0;
 		if (i >= s.length) { return undefined; }
@@ -657,6 +767,82 @@ var evaluate = function (s, prefix) {
 		}
 		return [T_IDENTIFIER, tok];
 	}
+	/* }}} */
+
+	/* iskeyword(t, "keyword") {{{ */
+	var iskeyword = function (t, kw) {
+		return t[0] == T_IDENTIFIER && t[1] == kw;
+	}
+	/* }}} */
+	/* with_lineno("what failed...") {{{ */
+	function with_lineno(message) {
+		var j = i;
+		while (j >= 0 && s[j] != '\n') { j-- }; j++;
+		var k = i;
+		while (k+1 < s.length && s[k+1] != '\n') { k++; }
+
+		var pad = last.column > 1 ? last.column - 1 : 0;
+		return message+'<br><br>(on line '+last.line+', character '+last.column+')<br>'+
+				 '<xmp>'+s.substr(j,k).replace(/\t/g, ' ')+'\n'+
+				 ' '.repeat(pad) + '^^^</xmp>';
+	}
+	/* }}} */
+	/* unexpected_token("what you were doing", got, wanted) {{{ */
+	function unexpected_token(what, got, want) {
+		return with_lineno(
+			'I had trouble '+what+';<br/>'+
+			'I expected to find '+want+', but instead I found '+token_description(got));
+	}
+	/* }}} */
+	/* expect_open("what you were doing") {{{ */
+	function expect_open(what) {
+		t = expect_token(what); if (t[0] == T_OPEN) { return t; }
+		return unexpected_token(what, t, 'an opening curly brace, <tt>{</tt>');
+	}
+	/* }}} */
+	/* next() {{{ */
+	function next() {
+		while (true) {
+			t = lex();
+			if (!t) { return undefined; }
+
+			switch (t[0]) {
+			case T_OPEN_BCOM:
+				var depth = 1;
+				while (depth > 0) {
+					t = lex();
+					if (!t) {
+						throw with_lineno(
+							'I had trouble with a block comment (<tt>/* ... */</tt>)<br>'+
+							'I ran out of code to parse!');
+					}
+					switch (t[0]) {
+					case T_OPEN_BCOM:  depth++; break;
+					case T_CLOSE_BCOM: depth--; break;
+					}
+				}
+				break;
+
+			default:
+				if (iskeyword(t, "let")) {
+					parse_letvar(world);
+				} else {
+					return t;
+				}
+				break;
+			}
+		}
+	}
+	/* }}} */
+	/* expect_token("what you were doing") {{{ */
+	function expect_token(what) {
+		t = next();
+		if (t) { return t; }
+		throw with_lineno(
+			'I had trouble '+what+';<br>'+
+			'I ran out of code to parse!');
+	}
+	/* }}} */
 
 	/** OP_DECLARE {{{
 
@@ -725,7 +911,7 @@ var evaluate = function (s, prefix) {
 		}
 
 		/* evaluate the the function body */
-		eval1(world, world.funs[op[1]]);
+		world.eval(op[1]);
 
 		/* pop the scope */
 		world.leave();
@@ -875,12 +1061,12 @@ var evaluate = function (s, prefix) {
 		world.leave();
 	};
 	/* }}} */
-	/**
+	/** OP_TRULE {{{
 	 **/
 	var OP_TRULE = function (world, cmp, val, color) {
 		/* FIXME implement OP_TRULE */
 	};
-
+	/* }}} */
 	/** OP_SET {{{
 
 	    (set attr value)
@@ -925,70 +1111,6 @@ var evaluate = function (s, prefix) {
 		}
 	};
 	/* }}} */
-
-	var iskeyword = function (t, kw) {
-		return t[0] == T_IDENTIFIER && t[1] == kw;
-	}
-
-	function with_lineno(message) {
-		var j = i;
-		while (j >= 0 && s[j] != '\n') { j-- }; j++;
-		var k = i;
-		while (k+1 < s.length && s[k+1] != '\n') { k++; }
-
-		var pad = last.column > 1 ? last.column - 1 : 0;
-		return message+'<br><br>(on line '+last.line+', character '+last.column+')<br>'+
-				 '<xmp>'+s.substr(j,k).replace(/\t/g, ' ')+'\n'+
-				 ' '.repeat(pad) + '^^^</xmp>';
-	}
-	function unexpected_token(what, got, want) {
-		return with_lineno(
-			'I had trouble '+what+';<br/>'+
-			'I expected to find '+want+', but instead I found '+token_description(got));
-	}
-	function expect_open(what) {
-		t = expect_token(what); if (t[0] == T_OPEN) { return t; }
-		return unexpected_token(what, t, 'an opening curly brace, <tt>{</tt>');
-	}
-	function next() {
-		while (true) {
-			t = lex();
-			if (!t) { return undefined; }
-
-			switch (t[0]) {
-			case T_OPEN_BCOM:
-				var depth = 1;
-				while (depth > 0) {
-					t = lex();
-					if (!t) {
-						throw with_lineno(
-							'I had trouble with a block comment (<tt>/* ... */</tt>)<br>'+
-							'I ran out of code to parse!');
-					}
-					switch (t[0]) {
-					case T_OPEN_BCOM:  depth++; break;
-					case T_CLOSE_BCOM: depth--; break;
-					}
-				}
-				break;
-
-			default:
-				if (iskeyword(t, "let")) {
-					parse_letvar(world);
-				} else {
-					return t;
-				}
-				break;
-			}
-		}
-	}
-	function expect_token(what) {
-		t = next();
-		if (t) { return t; }
-		throw with_lineno(
-			'I had trouble '+what+';<br>'+
-			'I ran out of code to parse!');
-	}
 
 	/* `size' validation routine {{{ */
 	function validate_size(what, size) {
@@ -1059,8 +1181,7 @@ var evaluate = function (s, prefix) {
 
 		t = expect_token(ctx);
 		if (t[0] != T_IDENTIFIER) { throw unexpected_token(ctx, t, 'a function name'); }
-		var prev_ctx = world.ctx;
-		world.ctx = t[1];
+		var fn = t[1];
 
 		t = expect_token(ctx);
 		if (t[0] != T_OPEN_PAREN) { throw unexpected_token(ctx, t, 'an opening parenthesis, <tt>(</tt>'); }
@@ -1078,7 +1199,9 @@ var evaluate = function (s, prefix) {
 			if (t[0] == T_COMMA)       { continue; }
 			throw unexpected_token(ctx, t, 'a comma, or a closing parenthesis');
 		}
-		world.funs[world.ctx] = mkfun(world.ctx, formals);
+
+		var prev_ctx = world.ctx;
+		world.define(fn, formals); /* sets world.ctx */
 
 		// parse body of the function
 		expect_open(ctx);
@@ -1533,110 +1656,14 @@ var evaluate = function (s, prefix) {
 	}
 	/* }}} */
 
-	/*****  SEMANTIC ANALYSIS  ********************************/
-	var mkfun = function (name, formals) {
-		return {
-			args: formals,
-			ops:  [],
-		};
-	};
-	var world = {
-		env:   [],
-		scope: -1,
-
-		funs: { '': mkfun('', []) },
-		ctx:  '',
-	};
-	world.enter = function () {
-		world.env[++world.scope] = {
-			var:   {}, /* variable bindings */
-			thold: {}  /* defined thresholds */
-		};
-	};
-	world.leave = function () {
-		world.env[world.scope--] = undefined;
-	};
-	world.op = function () {
-		world.funs[world.ctx].ops.push(Array.prototype.slice.call(arguments));
-	};
-	world.get = function (type, id) {
-		if (!(type in {var:1,thold:1})) {
-			throw 'I seem to be having some internal issues.<br>'+
-			      'Called world.get() with type "'+type+'", which is invalid.<br>'+
-			      'Please file a bug report.';
-		}
-		for (var i = this.scope; i >= 0; i--) {
-			if (id in this.env[i][type]) {
-				return this.valueof(this.env[i][type][id]);
-			}
-		}
-		if (type == "var") {
-			throw 'I was unable to find the variable <tt>$'+id+'</tt><br>'+
-			      'Did you forget to declare it?';
-		}
-		throw 'No such '+type+' binding, <tt>'+id+'</tt>';
-	};
-	world.declare = function (type, id, value) {
-		if (!(type in {var:1,thold:1})) {
-			throw 'I seem to be having some internal issues.<br>'+
-			      'Called world.declare() with type "'+type+'", which is invalid.<br>'+
-			      'Please file a bug report.';
-		}
-		this.env[this.scope][type][id] = value;
-	};
-	world.bind = function (type, id, value) {
-		if (!(type in {var:1,thold:1})) {
-			throw 'I seem to be having some internal issues.<br>'+
-			      'Called world.bind() with type "'+type+'", which is invalid.<br>'+
-			      'Please file a bug report.';
-		}
-		for (var i = this.scope; i >= 0; i--) {
-			if (!(id in this.env[i][type])) { continue; }
-			this.env[i][type][id] = value;
-			return;
-		}
-
-		throw "No such "+type+" binding: <tt>"+id+"</tt>";
-	};
-	world.valueof = function (thing) {
-		switch (thing[0]) {
-		case T_NUMERIC:
-		case T_SIZE:
-		case T_IDENTIFIER:
-			return thing[1];
-
-		case T_STRING:
-			var s = '';
-			for (var i = 0; i < thing[1].length; i++) {
-				if (typeof(thing[1][i]) === 'string') {
-					s += thing[1][i];
-				} else {
-					s += world.get('var', thing[1][i].ref);
-				}
-			}
-			return s;
-
-		case T_VAR:
-			return world.get('var', thing[1]);
-		}
-	};
-
-	world.enter();
+	var world = new World();
 	parse_toplevel(world, 0);
+	console.log("returning %s", world);
+	return world;
+};
 
-	/***  EVALUATION  ***************************/
-  world.blocks = [];
-	world.board  = [];
-
-	var eval1 = function (world, fn) {
-		for (var i = 0; i < fn.ops.length; i++) {
-			fn.ops[i][0](world, fn.ops[i]);
-		}
-
-		return world.board;
-	};
-
-	return eval1(world, world.funs['']);
+var evaluate = function (world) {
+	return world.eval('main');
 };
 
 var Board = (function () {
@@ -1648,7 +1675,7 @@ var Board = (function () {
 		}
 
 		this.code = code;
-		this.blocks = evaluate(code);
+		this.blocks = evaluate(parse(code));
 		this.deleted = false;
 		this.id = 'board-'+ID.toString();
 
@@ -1661,7 +1688,7 @@ var Board = (function () {
 
 Board.prototype.update = function (link, name, code) {
 	this.code = code;
-	this.blocks = evaluate(code);
+	this.blocks = evaluate(parse(code));
 
 	this.name = name || 'Board '+ID.toString();
 	this.link = link || this.id;
