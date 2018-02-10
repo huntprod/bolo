@@ -667,7 +667,7 @@ var evaluate = function (s, prefix) {
 
 	 **/
 	var OP_DECLARE = function (world, op) {
-		world.env[world.scope][op[1]] = undefined;
+		world.declare('var', op[1], undefined);
 	};
 
 	/** OP_ASSIGN
@@ -682,13 +682,11 @@ var evaluate = function (s, prefix) {
 
 	 **/
 	var OP_ASSIGN = function (world, op) {
-		for (var i = world.scope; i >= 0; i--) {
-			if (!(op[1] in world.env[i])) { continue; }
-			world.env[i][op[1]] = op[2];
-			return
+		try {
+			world.bind('var', op[1], op[2]);
+		} catch (e) {
+			throw "Undefined variable <tt>$"+op[1]+"</tt>";
 		}
-
-		throw "Undefined variable <tt>$"+op[1]+"</tt>";
 	};
 
 	/** OP_CALL
@@ -701,7 +699,7 @@ var evaluate = function (s, prefix) {
 	 **/
 	var OP_CALL = function (world, op) {
 		/* implicit scope push */
-		world.env[++world.scope] = {};
+		world.enter();
 
 		var fn = world.funs[op[1]];
 		var args = op[2];
@@ -723,14 +721,14 @@ var evaluate = function (s, prefix) {
 
 		/* enrich the called environment */
 		for (var i = 0; i < args.length; i++) {
-			world.env[world.scope][fn.args[i]] = args[i];
+			world.declare('var', fn.args[i], args[i]);
 		}
 
 		/* evaluate the the function body */
 		eval1(world, world.funs[op[1]]);
 
 		/* pop the scope */
-		world.env[world.scope--] = {};
+		world.leave();
 	};
 
 	/** OP_START
@@ -743,7 +741,7 @@ var evaluate = function (s, prefix) {
 	 **/
 	var OP_START = function (world, op) {
 		/* implicit scope push */
-		world.env[++world.scope] = {};
+		world.enter();
 
 		var must_be_toplevel = function () {
 			if (world.blocks.length != 0) {
@@ -758,6 +756,13 @@ var evaluate = function (s, prefix) {
 		case 'break':
 			must_be_toplevel();
 			world.blocks.push(new Break());
+			break;
+
+		case 'threshold':
+			must_be_toplevel();
+			break;
+			world.current_thold = {rules: []};
+			world.declare('thold', op[1], world.current_thold);
 			break;
 
 		case 'metric':
@@ -867,7 +872,13 @@ var evaluate = function (s, prefix) {
 		}
 
 		/* pop the scope */
-		world.env[world.scope--] = {};
+		world.leave();
+	};
+
+	/**
+	 **/
+	var OP_TRULE = function (world, cmp, val, color) {
+		/* FIXME implement OP_TRULE */
 	};
 
 	var scalar = function (world, t) {
@@ -883,7 +894,7 @@ var evaluate = function (s, prefix) {
 				if (typeof(t[1][i]) === 'string') {
 					s += t[1][i];
 				} else {
-					s += getvar(world, t[1][i].ref);
+					s += world.get('var', t[1][i].ref);
 				}
 			}
 			return s;
@@ -891,16 +902,6 @@ var evaluate = function (s, prefix) {
 		case T_VAR:
 			return get_var(world, t[1]);
 		}
-	};
-
-	var getvar = function (world, name) {
-		for (var i = world.scope; i >= 0; i--) {
-			if (name in world.env[i]) {
-				return scalar(world, world.env[i][name]);
-			}
-		}
-		throw 'I was unable to find the variable <tt>$'+name+'</tt><br>'+
-			'Did you forget to declare it?';
 	};
 
 	/** OP_SET
@@ -935,14 +936,14 @@ var evaluate = function (s, prefix) {
 				if (typeof(op[2][1][i]) === 'string') {
 					s += op[2][1][i];
 				} else {
-					s += getvar(world, op[2][1][i].ref);
+					s += world.get('var', op[2][1][i].ref);
 				}
 			}
 			world.blocks[world.blocks.length - 1][op[1]] = s;
 			break;
 
 		case T_VAR:
-			world.blocks[world.blocks.length - 1][op[1]] = getvar(world, op[2][1]);
+			world.blocks[world.blocks.length - 1][op[1]] = world.get('var', op[2][1]);
 			break;
 		}
 	};
@@ -1188,7 +1189,7 @@ var evaluate = function (s, prefix) {
 			    iskeyword(t, 'label') ||
 			    iskeyword(t, 'graph') ||
 			    iskeyword(t, 'query') ||
-			    iskeyword(t, 'query')
+			    iskeyword(t, 'color')
 			) {
 				var val = expect_token(ctx);
 				world.op(OP_SET, t[1], val);
@@ -1481,7 +1482,7 @@ var evaluate = function (s, prefix) {
 				continue;
 			}
 			if (iskeyword(t, 'threshold')) {
-				parse_threshold();
+				parse_threshold(world);
 				continue;
 			}
 			if (iskeyword(t, 'html')) {
@@ -1539,24 +1540,69 @@ var evaluate = function (s, prefix) {
 		};
 	};
 	var world = {
+		env:   [],
+		scope: 0,
+
 		funs: { '': mkfun('', []) },
 		ctx:  '',
-	}
+	};
+	world.enter = function () {
+		world.env[++world.scope] = {
+			var:   {}, /* variable bindings */
+			thold: {}  /* defined thresholds */
+		};
+	};
+	world.leave = function () {
+		world.env[world.scope--] = undefined;
+	};
 	world.op = function () {
 		world.funs[world.ctx].ops.push(Array.prototype.slice.call(arguments));
+	};
+	world.get = function (type, id) {
+		if (!(type in {var:1,thold:1})) {
+			throw 'I seem to be having some internal issues.<br>'+
+			      'Called world.get() with type "'+type+'", which is invalid.<br>'+
+			      'Please file a bug report.';
+		}
+		for (var i = this.scope; i >= 0; i--) {
+			if (name in this.env[i][type]) {
+				return scalar(this, this.env[i][type][name]);
+			}
+		}
+		throw 'I was unable to find the variable <tt>$'+name+'</tt><br>'+
+		      'Did you forget to declare it?';
+	};
+	world.declare = function (type, id, value) {
+		if (!(type in {var:1,thold:1})) {
+			throw 'I seem to be having some internal issues.<br>'+
+			      'Called world.declare() with type "'+type+'", which is invalid.<br>'+
+			      'Please file a bug report.';
+		}
+		this.env[this.scope][type][id] = value;
+	};
+	world.bind = function (type, id, value) {
+		if (!(type in {var:1,thold:1})) {
+			throw 'I seem to be having some internal issues.<br>'+
+			      'Called world.bind() with type "'+type+'", which is invalid.<br>'+
+			      'Please file a bug report.';
+		}
+		for (var i = this.scope; i >= 0; i--) {
+			if (!(id in this.env[i][type])) { continue; }
+			this.env[i][type][id] = value;
+			return;
+		}
+
+		throw "No such "+type+" binding: <tt>"+id+"</tt>";
 	};
 	parse_toplevel(world, 0);
 
 	/***  EVALUATION  ***************************/
-	world.env = [{}];
-	world.scope = 0;
-	world.blocks = [];
+  world.blocks = [];
 	world.board  = [];
 
 	var eval1 = function (world, fn) {
 		for (var i = 0; i < fn.ops.length; i++) {
 			fn.ops[i][0](world, fn.ops[i]);
-			/* FIXME: handle application */
 		}
 
 		return world.board;
