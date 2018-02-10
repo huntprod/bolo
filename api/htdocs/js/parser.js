@@ -658,7 +658,7 @@ var evaluate = function (s, prefix) {
 		return [T_IDENTIFIER, tok];
 	}
 
-	/** OP_DECLARE
+	/** OP_DECLARE {{{
 
 	    (declare varname)
 
@@ -669,8 +669,8 @@ var evaluate = function (s, prefix) {
 	var OP_DECLARE = function (world, op) {
 		world.declare('var', op[1], undefined);
 	};
-
-	/** OP_ASSIGN
+	/* }}} */
+	/** OP_ASSIGN {{{
 
 	    (assign varname value)
 
@@ -688,8 +688,8 @@ var evaluate = function (s, prefix) {
 			throw "Undefined variable <tt>$"+op[1]+"</tt>";
 		}
 	};
-
-	/** OP_CALL
+	/* }}} */
+	/** OP_CALL {{{
 
 	    (call fn args)
 
@@ -730,8 +730,8 @@ var evaluate = function (s, prefix) {
 		/* pop the scope */
 		world.leave();
 	};
-
-	/** OP_START
+	/* }}} */
+	/** OP_START {{{
 
 	    (start type)
 
@@ -849,8 +849,8 @@ var evaluate = function (s, prefix) {
 			break;
 		}
 	};
-
-	/** OP_END
+	/* }}} */
+	/** OP_END {{{
 
 	    (end)
 
@@ -874,37 +874,14 @@ var evaluate = function (s, prefix) {
 		/* pop the scope */
 		world.leave();
 	};
-
+	/* }}} */
 	/**
 	 **/
 	var OP_TRULE = function (world, cmp, val, color) {
 		/* FIXME implement OP_TRULE */
 	};
 
-	var scalar = function (world, t) {
-		switch (t[0]) {
-		case T_NUMERIC:
-		case T_SIZE:
-		case T_IDENTIFIER:
-			return t[1];
-
-		case T_STRING:
-			var s = '';
-			for (var i = 0; i < t[1].length; i++) {
-				if (typeof(t[1][i]) === 'string') {
-					s += t[1][i];
-				} else {
-					s += world.get('var', t[1][i].ref);
-				}
-			}
-			return s;
-
-		case T_VAR:
-			return get_var(world, t[1]);
-		}
-	};
-
-	/** OP_SET
+	/** OP_SET {{{
 
 	    (set attr value)
 
@@ -947,6 +924,7 @@ var evaluate = function (s, prefix) {
 			break;
 		}
 	};
+	/* }}} */
 
 	var iskeyword = function (t, kw) {
 		return t[0] == T_IDENTIFIER && t[1] == kw;
@@ -1012,6 +990,7 @@ var evaluate = function (s, prefix) {
 			'I ran out of code to parse!');
 	}
 
+	/* `size' validation routine {{{ */
 	function validate_size(what, size) {
 		if (!size) {
 			throw 'I had issues '+what+';<br/>'+
@@ -1029,7 +1008,8 @@ var evaluate = function (s, prefix) {
 				  "It looks like you specified an invalid size of '<tt>"+size+"</tt>' (width cannot exceed '12')";
 		}
 	}
-
+	/* }}} */
+	/* `query' validation routine {{{ */
 	function validate_query(what, q) {
 		q = q.replace(/^\s+|\s+$/g, '');
 		if (!q) {
@@ -1037,7 +1017,9 @@ var evaluate = function (s, prefix) {
 				  'You seem to have forgotten to specify a query!';
 		}
 	}
+	/* }}} */
 
+	/* variable declaration parser routine {{{ */
 	var parse_letvar = function (world) {
 		var ctx = 'parsing a variable definition';
 		var t = expect_token(ctx);
@@ -1046,7 +1028,8 @@ var evaluate = function (s, prefix) {
 		world.op(OP_DECLARE, t[1]);
 		parse_setvar(world, t[1], ctx);
 	};
-
+	/* }}} */
+	/* variable assignment parser routine {{{ */
 	var parse_setvar = function (world, vname, ctx) {
 		var t;
 		var v = undefined;
@@ -1068,7 +1051,192 @@ var evaluate = function (s, prefix) {
 		}
 		throw unexpected_token(ctx, t, 'a scalar value (a string, number, or a size)');
 	};
+	/* }}} */
 
+	/* function definition parser routine {{{ */
+	var parse_def = function(world, depth) {
+		var t, ctx = 'parsing a function definition';
+
+		t = expect_token(ctx);
+		if (t[0] != T_IDENTIFIER) { throw unexpected_token(ctx, t, 'a function name'); }
+		var prev_ctx = world.ctx;
+		world.ctx = t[1];
+
+		t = expect_token(ctx);
+		if (t[0] != T_OPEN_PAREN) { throw unexpected_token(ctx, t, 'an opening parenthesis, <tt>(</tt>'); }
+
+		// parse argument list
+		var formals = [];
+		for (;;) {
+			t = expect_token(ctx);
+			if (t[0] == T_CLOSE_PAREN) { break; }
+			if (t[0] != T_VAR) { throw unexpected_token(ctx, t, 'a parameter name'); }
+			formals.push(t[1]);
+
+			t = expect_token(ctx);
+			if (t[0] == T_CLOSE_PAREN) { break;    }
+			if (t[0] == T_COMMA)       { continue; }
+			throw unexpected_token(ctx, t, 'a comma, or a closing parenthesis');
+		}
+		world.funs[world.ctx] = mkfun(world.ctx, formals);
+
+		// parse body of the function
+		expect_open(ctx);
+		parse_toplevel(world, depth+1);
+		world.ctx = prev_ctx;
+	}
+	/* }}} */
+	/* function call (application) parser routine {{{ */
+	var parse_call = function(world, fn) {
+		var t, ctx = 'parsing a functional call';
+		t = expect_token();
+		if (t[0] != T_OPEN_PAREN) { throw unexpected_token(ctx, t, 'an opening parenthesis, <tt>(</tt>'); }
+
+		var args = [];
+		for (;;) {
+			t = expect_token(ctx);
+			if (t[0] == T_CLOSE_PAREN) { break; }
+			switch (t[0]) {
+			default:
+				throw unexpected_token(ctx, t, 'a literal value, or a variable reference');
+
+			case T_VAR:
+			case T_STRING:
+			case T_NUMERIC:
+			case T_SIZE:
+			case T_IDENTIFIER:
+				args.push(t);
+				break;
+			}
+
+			t = expect_token(ctx);
+			if (t[0] == T_CLOSE_PAREN) { break;    }
+			if (t[0] == T_COMMA)       { continue; }
+			throw unexpected_token(ctx, t, 'a comma, or a closing parenthesis');
+		}
+
+		world.op(OP_CALL, fn, args);
+	}
+	/* }}} */
+
+	/* PLOT sub-block parser routine {{{ */
+	var parse_plot = function (world, field) {
+		var ctx = 'parsing a plot for a graph definition';
+		var t, o = {
+			type:    'plot',
+			as:      'area',
+			color:   'skyblue',
+			width:   '2',
+			opacity: 100.0
+		};
+		world.op(OP_START, 'plot');
+		world.op(OP_SET, 'field', field);
+		while ((t = expect_token(ctx)) !== undefined) {
+			if (iskeyword(t, 'as')    ||
+			    iskeyword(t, 'color')   ||
+			    iskeyword(t, 'opacity') ||
+			    iskeyword(t, 'width')
+			) {
+				var val = expect_token(ctx);
+				world.op(OP_SET, t[1], val);
+				continue;
+			}
+			if (t[0] == T_CLOSE) {
+				world.op(OP_END);
+				return;
+				/*
+				if (o.as != 'line' && o.as != 'area' && o.as != 'stack') {
+					throw 'I ran into problems '+ctx+';<br/>'+
+						  "You used an invalid value for the plot type ('<tt>"+o.as+"</tt>') -- it should be either 'line', 'area', or 'stack'";
+				}
+				return o;
+				*/
+			}
+			throw unexpected_token(ctx, t, 'a closing curly brace, <tt>}</tt>, or a parameter keyword');
+		}
+	}
+	/* }}} */
+	/* *AXIS field parser routine {{{ */
+	var parse_axis = function (world, lead) {
+		var ctx = 'parsing an axis formatter';
+		var t, val;
+
+		lead = lead.substr(0,1);
+
+		t = expect_token(ctx);
+		if (iskeyword(t, 'label')) {
+			if (lead == 'a') {
+				/* FIXME: do we have an error for semantic issues? */
+				throw unexpected_token(ctx, t, 'one of either <tt>on</tt>, or <tt>off</tt>');
+			}
+			val = expect_token(ctx);
+			world.op(OP_SET, lead+'-label', val);
+			return;
+		}
+
+		if (iskeyword(t, 'format')) {
+			var fmt = as_self;
+			val = expect_token(ctx);
+			world.op(OP_SET, lead+'-format', val);
+			return;
+		}
+
+		if (iskeyword(t, 'on') || iskeyword(t, 'yes')) {
+			world.op(OP_SET, lead+'-on', 1);
+			return;
+		}
+
+		if (iskeyword(t, 'off') || iskeyword(t, 'no')) {
+			world.op(OP_SET, lead+'-on', 0);
+			return;
+		}
+
+		throw unexpected_token(ctx, t, 'an axis sub-command keyword');
+	};
+	/* }}} */
+
+	/* generic content block parser routine {{{ */
+	var parse_content = function (world, ctx) {
+		t = expect_token(ctx);
+		switch (t[0]) {
+		default:
+			throw unexpected_token(ctx, t, 'a size, variable reference, or a quoted string literal');
+
+		case T_SIZE:
+			world.op(OP_SET, 'size', t);
+
+			t = expect_token(ctx);
+			switch (t[0]) {
+			default:
+				throw unexpected_token(ctx, t, 'a variable reference or a quoted string literal');
+
+			case T_STRING:
+			case T_VAR:
+				world.op(OP_SET, 'content', t);
+			}
+			break;
+
+		case T_STRING:
+		case T_VAR:
+			world.op(OP_SET, 'content', t);
+		}
+	}
+	/* }}} */
+	/* HTML block parser routine {{{ */
+	var parse_html = function (world) {
+		world.op(OP_START, 'html');
+		parse_content(world, 'parsing an html content block');
+		world.op(OP_END);
+	};
+	/* }}} */
+	/* TEXT block parser routine {{{ */
+	var parse_text = function (world) {
+		world.op(OP_START, 'text');
+		parse_content(world, 'parsing a text content block');
+		world.op(OP_END);
+	};
+	/* }}} */
+	/* THRESHOLD block parser routine {{{ */
 	var parse_threshold = function(world) {
 		var ctx = 'parsing a threshold name', t, rules = 0;
 
@@ -1140,45 +1308,8 @@ var evaluate = function (s, prefix) {
 			throw unexpected_token(ctx, t, 'a closing curly brace, <tt>}</tt>, or another threshold rule');
 		}
 	}
-
-	var parse_content = function (world, ctx) {
-		t = expect_token(ctx);
-		switch (t[0]) {
-		default:
-			throw unexpected_token(ctx, t, 'a size, variable reference, or a quoted string literal');
-
-		case T_SIZE:
-			world.op(OP_SET, 'size', t);
-
-			t = expect_token(ctx);
-			switch (t[0]) {
-			default:
-				throw unexpected_token(ctx, t, 'a variable reference or a quoted string literal');
-
-			case T_STRING:
-			case T_VAR:
-				world.op(OP_SET, 'content', t);
-			}
-			break;
-
-		case T_STRING:
-		case T_VAR:
-			world.op(OP_SET, 'content', t);
-		}
-	}
-
-	var parse_html = function (world) {
-		world.op(OP_START, 'html');
-		parse_content(world, 'parsing an html content block');
-		world.op(OP_END);
-	};
-
-	var parse_text = function (world) {
-		world.op(OP_START, 'text');
-		parse_content(world, 'parsing a text content block');
-		world.op(OP_END);
-	};
-
+	/* }}} */
+	/* METRIC block parser routine {{{ */
 	var parse_metric = function(world) {
 		var t, ctx = 'parsing a metric definition';
 		expect_open(ctx);
@@ -1204,70 +1335,8 @@ var evaluate = function (s, prefix) {
 			throw unexpected_token(ctx, t, 'a closing curly brace, <tt>}</tt>, or a parameter keyword');
 		}
 	}
-
-	var parse_def = function(world, depth) {
-		var t, ctx = 'parsing a function definition';
-
-		t = expect_token(ctx);
-		if (t[0] != T_IDENTIFIER) { throw unexpected_token(ctx, t, 'a function name'); }
-		var prev_ctx = world.ctx;
-		world.ctx = t[1];
-
-		t = expect_token(ctx);
-		if (t[0] != T_OPEN_PAREN) { throw unexpected_token(ctx, t, 'an opening parenthesis, <tt>(</tt>'); }
-
-		// parse argument list
-		var formals = [];
-		for (;;) {
-			t = expect_token(ctx);
-			if (t[0] == T_CLOSE_PAREN) { break; }
-			if (t[0] != T_VAR) { throw unexpected_token(ctx, t, 'a parameter name'); }
-			formals.push(t[1]);
-
-			t = expect_token(ctx);
-			if (t[0] == T_CLOSE_PAREN) { break;    }
-			if (t[0] == T_COMMA)       { continue; }
-			throw unexpected_token(ctx, t, 'a comma, or a closing parenthesis');
-		}
-		world.funs[world.ctx] = mkfun(world.ctx, formals);
-
-		// parse body of the function
-		expect_open(ctx);
-		parse_toplevel(world, depth+1);
-		world.ctx = prev_ctx;
-	}
-
-	var parse_call = function(world, fn) {
-		var t, ctx = 'parsing a functional call';
-		t = expect_token();
-		if (t[0] != T_OPEN_PAREN) { throw unexpected_token(ctx, t, 'an opening parenthesis, <tt>(</tt>'); }
-
-		var args = [];
-		for (;;) {
-			t = expect_token(ctx);
-			if (t[0] == T_CLOSE_PAREN) { break; }
-			switch (t[0]) {
-			default:
-				throw unexpected_token(ctx, t, 'a literal value, or a variable reference');
-
-			case T_VAR:
-			case T_STRING:
-			case T_NUMERIC:
-			case T_SIZE:
-			case T_IDENTIFIER:
-				args.push(t);
-				break;
-			}
-
-			t = expect_token(ctx);
-			if (t[0] == T_CLOSE_PAREN) { break;    }
-			if (t[0] == T_COMMA)       { continue; }
-			throw unexpected_token(ctx, t, 'a comma, or a closing parenthesis');
-		}
-
-		world.op(OP_CALL, fn, args);
-	}
-
+	/* }}} */
+	/* SPARKLINE block parser routine {{{ */
 	var parse_sparkline = function(world) {
 		var t, ctx = 'parsing a sparkline definition';
 		expect_open(ctx);
@@ -1292,80 +1361,8 @@ var evaluate = function (s, prefix) {
 			throw unexpected_token(ctx, t, 'a closing curly brace, <tt>}</tt>, or a parameter keyword');
 		}
 	}
-
-	var parse_plot = function (world, field) {
-		var ctx = 'parsing a plot for a graph definition';
-		var t, o = {
-			type:    'plot',
-			as:      'area',
-			color:   'skyblue',
-			width:   '2',
-			opacity: 100.0
-		};
-		world.op(OP_START, 'plot');
-		world.op(OP_SET, 'field', field);
-		while ((t = expect_token(ctx)) !== undefined) {
-			if (iskeyword(t, 'as')    ||
-			    iskeyword(t, 'color')   ||
-			    iskeyword(t, 'opacity') ||
-			    iskeyword(t, 'width')
-			) {
-				var val = expect_token(ctx);
-				world.op(OP_SET, t[1], val);
-				continue;
-			}
-			if (t[0] == T_CLOSE) {
-				world.op(OP_END);
-				return;
-				/*
-				if (o.as != 'line' && o.as != 'area' && o.as != 'stack') {
-					throw 'I ran into problems '+ctx+';<br/>'+
-						  "You used an invalid value for the plot type ('<tt>"+o.as+"</tt>') -- it should be either 'line', 'area', or 'stack'";
-				}
-				return o;
-				*/
-			}
-			throw unexpected_token(ctx, t, 'a closing curly brace, <tt>}</tt>, or a parameter keyword');
-		}
-	}
-
-	var parse_axis = function (world, lead) {
-		var ctx = 'parsing an axis formatter';
-		var t, val;
-
-		lead = lead.substr(0,1);
-
-		t = expect_token(ctx);
-		if (iskeyword(t, 'label')) {
-			if (lead == 'a') {
-				/* FIXME: do we have an error for semantic issues? */
-				throw unexpected_token(ctx, t, 'one of either <tt>on</tt>, or <tt>off</tt>');
-			}
-			val = expect_token(ctx);
-			world.op(OP_SET, lead+'-label', val);
-			return;
-		}
-
-		if (iskeyword(t, 'format')) {
-			var fmt = as_self;
-			val = expect_token(ctx);
-			world.op(OP_SET, lead+'-format', val);
-			return;
-		}
-
-		if (iskeyword(t, 'on') || iskeyword(t, 'yes')) {
-			world.op(OP_SET, lead+'-on', 1);
-			return;
-		}
-
-		if (iskeyword(t, 'off') || iskeyword(t, 'no')) {
-			world.op(OP_SET, lead+'-on', 0);
-			return;
-		}
-
-		throw unexpected_token(ctx, t, 'an axis sub-command keyword');
-	};
-
+	/* }}} */
+	/* GRAPH block parser routine {{{ */
 	var parse_graph = function (world) {
 		var t, ctx = 'parsing a graph definition';
 		expect_open(ctx);
@@ -1406,7 +1403,8 @@ var evaluate = function (s, prefix) {
 			throw unexpected_token(ctx, t, 'a closing curly brace, <tt>}</tt>, or a parameter keyword');
 		}
 	}
-
+	/* }}} */
+	/* SCATTERPLOT block parser routine {{{ */
 	var parse_scatterplot = function (world) {
 		var t, ctx = 'parsing a scatterplot definition';
 		expect_open(ctx);
@@ -1439,7 +1437,8 @@ var evaluate = function (s, prefix) {
 			throw unexpected_token(ctx, t, 'a closing curly brace, <tt>}</tt>, or a parameter keyword');
 		}
 	}
-
+	/* }}} */
+	/* PLACEHOLDER parser routine {{{ */
 	var parse_placeholder = function(world) {
 		var t, ctx = 'parsing a placeholder definition';
 		expect_open(ctx);
@@ -1461,7 +1460,8 @@ var evaluate = function (s, prefix) {
 			throw unexpected_token(ctx, t, 'either a closing brace, <tt>}</tt>, or a parameter keyword (i.e. text, size, color)');
 		}
 	}
-
+	/* }}} */
+	/* MAIN PARSER ROUTINE {{{ */
 	var parse_toplevel = function (world, depth) {
 		while (typeof(t = next()) !== 'undefined') {
 			if (iskeyword(t, 'def')) {
@@ -1531,6 +1531,7 @@ var evaluate = function (s, prefix) {
 			throw unexpected_token('parsing your board', t, "a block keyword (like '<tt>metric</tt>' or '<tt>graph</tt>')");
 		}
 	}
+	/* }}} */
 
 	/*****  SEMANTIC ANALYSIS  ********************************/
 	var mkfun = function (name, formals) {
@@ -1541,7 +1542,7 @@ var evaluate = function (s, prefix) {
 	};
 	var world = {
 		env:   [],
-		scope: 0,
+		scope: -1,
 
 		funs: { '': mkfun('', []) },
 		ctx:  '',
@@ -1565,12 +1566,15 @@ var evaluate = function (s, prefix) {
 			      'Please file a bug report.';
 		}
 		for (var i = this.scope; i >= 0; i--) {
-			if (name in this.env[i][type]) {
-				return scalar(this, this.env[i][type][name]);
+			if (id in this.env[i][type]) {
+				return this.valueof(this.env[i][type][id]);
 			}
 		}
-		throw 'I was unable to find the variable <tt>$'+name+'</tt><br>'+
-		      'Did you forget to declare it?';
+		if (type == "var") {
+			throw 'I was unable to find the variable <tt>$'+id+'</tt><br>'+
+			      'Did you forget to declare it?';
+		}
+		throw 'No such '+type+' binding, <tt>'+id+'</tt>';
 	};
 	world.declare = function (type, id, value) {
 		if (!(type in {var:1,thold:1})) {
@@ -1594,6 +1598,30 @@ var evaluate = function (s, prefix) {
 
 		throw "No such "+type+" binding: <tt>"+id+"</tt>";
 	};
+	world.valueof = function (thing) {
+		switch (thing[0]) {
+		case T_NUMERIC:
+		case T_SIZE:
+		case T_IDENTIFIER:
+			return thing[1];
+
+		case T_STRING:
+			var s = '';
+			for (var i = 0; i < thing[1].length; i++) {
+				if (typeof(thing[1][i]) === 'string') {
+					s += thing[1][i];
+				} else {
+					s += world.get('var', thing[1][i].ref);
+				}
+			}
+			return s;
+
+		case T_VAR:
+			return world.get('var', thing[1]);
+		}
+	};
+
+	world.enter();
 	parse_toplevel(world, 0);
 
 	/***  EVALUATION  ***************************/

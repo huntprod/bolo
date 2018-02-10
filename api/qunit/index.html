@@ -45,6 +45,18 @@
         query [SELECT MEDIAN(get.latency) WHERE site = "bolo.cloud"]
       }
     </div>
+    <div class="valid-board" assertion="Metric blocks with thresholds should work">
+      threshold "ms" {
+        default: white/navy
+      }
+      metric {
+        unit "ms"
+        label "average latency"
+        color @ms
+        query [SELECT metric WHERE some-tag = value]
+        graph on
+      }
+    </div>
     <div class="valid-board" assertion="Sparkline blocks should work">
       sparkline {
         size    12x1
@@ -99,6 +111,13 @@
         x-axis label "Time"
         y-axis label "Containers"
       }
+    </div>
+
+    <div class="valid-board" assertion="Variable dereferencing works">
+      let text := "coming soon!"
+      placeholder { text $text }
+      placeholder { text "$text" }
+      placeholder { text "no really, $text" }
     </div>
 
     <div id="unknown-block-1">
