@@ -932,9 +932,6 @@ var World = function () {
 
 		 **/
 		var OP_START = function (world, op) {
-			/* implicit scope push */
-			world.enter();
-
 			var must_be_toplevel = function () {
 				if (world.blocks.length != 0) {
 					throw "Illegal nesting of a '"+op[1]+"' block inside of another block";
@@ -952,9 +949,8 @@ var World = function () {
 
 			case 'threshold':
 				must_be_toplevel();
-				break;
 				world.current_thold = {rules: []};
-				world.declare('thold', op[1], world.current_thold);
+				world.declare('thold', op[2], world.current_thold);
 				break;
 
 			case 'metric':
@@ -1040,6 +1036,9 @@ var World = function () {
 				}));
 				break;
 			}
+
+			/* implicit scope push */
+			world.enter();
 		};
 		/* }}} */
 		/** OP_END {{{
@@ -1055,6 +1054,13 @@ var World = function () {
 
 		 **/
 		var OP_END = function (world, op) {
+			if (world.current_thold) {
+				world.current_thold = undefined;
+				/* pop the scope */
+				world.leave();
+				return;
+			}
+
 			var block = world.blocks.pop();
 
 			if (world.blocks.length == 0) {
@@ -1070,7 +1076,11 @@ var World = function () {
 		/** OP_TRULE {{{
 		 **/
 		var OP_TRULE = function (world, cmp, val, color) {
-			/* FIXME implement OP_TRULE */
+			world.current_thold.rules.push({
+				eval:    cmp,
+				against: val,
+				color:   color
+			});
 		};
 		/* }}} */
 		/** OP_SET {{{
@@ -1092,6 +1102,14 @@ var World = function () {
 			default:
 				throw 'I found a '+token_description(op[2])+' where I expected to find a number, a quoted string literal, or a variable reference';
 				// FIXME line no?
+
+			case T_REF:
+				if (op[1] != "color") {
+					throw 'I found a '+token_description(op[2])+' for the '+op[1]+' property.<br>Only the <tt>color</tt> property can accept those.';
+					// FIXME line no?
+				}
+				world.blocks[world.blocks.length - 1][op[1]] = world.get('thold', op[2][1]);
+				break;
 
 			case T_NUMERIC:
 			case T_SIZE:
@@ -1399,7 +1417,7 @@ var World = function () {
 
 			ctx = 'parsing a threshold definition';
 			expect_open(ctx);
-			world.op(OP_START, 'threshold', t[1]);
+			world.op(OP_START, 'threshold', t[1][0]);
 
 			while ((t = expect_token(ctx)) !== undefined) {
 				if (iskeyword(t, 'log')) {
