@@ -746,8 +746,8 @@
 			}
 
 			block = board.blocks[0];
-			$(ex).html(block.html());
 			try {
+				$(ex).html(block.html());
 				block.update(data);
 			} catch (e) {
 				if (e.toString().match(/more than one metric/i)) {
