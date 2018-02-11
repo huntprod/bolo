@@ -10,11 +10,13 @@
   <div id="qunit"></div>
   <div id="qunit-fixture"></div>
   <script src="https://code.jquery.com/qunit/qunit-2.5.0.js"></script>
+
   <script type="text/javascript" src="/htdocs/js/jq.js"></script>
   <script type="text/javascript" src="/htdocs/js/d3.js"></script>
-  <script type="text/javascript" src="/htdocs/js/color.js"></script>
-  <script type="text/javascript" src="/htdocs/js/parser.js"></script>
-  <script type="text/javascript" src="/htdocs/js/bolo.js"></script>
+  <script type="text/javascript" src="/htdocs/js/color.js" data-cover></script>
+  <script type="text/javascript" src="/htdocs/js/parser.js" data-cover></script>
+  <script type="text/javascript" src="/htdocs/js/bolo.js" data-cover></script>
+  <script type="text/javascript" src="blanket.min.js"></script>
 
   <script type="text/javascript" src="tests.js"></script>
 
@@ -52,7 +54,7 @@
       metric {
         unit "ms"
         label "average latency"
-        color @ms
+        %color @ms
         query [SELECT metric WHERE some-tag = value]
         graph on
       }
@@ -126,6 +128,194 @@
       }
       brk()
     </div>
+
+
+    <div class="log-test" assertion="Simple logging works"
+                          should-log="this is a test message">
+      log "this is a test message"
+    </div>
+
+    <div class="log-test" assertion="Interpolating a single variable works"
+                          should-log="var1 is 'hello'">
+      let var1 := "hello"
+      log "var1 is '$var1'"
+    </div>
+
+    <div class="log-test" assertion="Interpolating multiple variables works"
+                          should-log="hello, world!">
+      let x := "hello"
+      let y := "world"
+      log "$x, $y!"
+    </div>
+
+    <div class="log-test" assertion="Interpolating bracketed variables"
+                          should-log="interpolated">
+      let erpo := "erpo"
+      log "int${erpo}lated"
+    </div>
+
+    <div class="log-test" assertion="Interpolation variable reference styles can mingle"
+                          should-log="hello, interpolation">
+      let int   := "int"
+      let hello := "hello"
+      log "$hello, ${int}erpolation"
+    </div>
+
+    <div class="log-test" assertion="Functions can take zero arguments"
+                          should-log="no args">
+      def foo() { log "no args" }
+      foo()
+    </div>
+
+    <div class="log-test" assertion="Functions can take a single argument"
+                          should-log="((argument))">
+      def foo($what) { log "(($what))" }
+      foo("argument")
+    </div>
+
+    <div class="log-test" assertion="Functions can take multiple arguments"
+                          should-log="foo:bar">
+      def foo($x,$y) { log "$x:$y" }
+      foo("foo", "bar")
+    </div>
+
+    <div class="log-test" assertion="Line comments are ignored"
+                          should-log="this gets logged">
+      %log "this doesn't get logged"
+      log "this gets logged"
+    </div>
+
+    <div class="log-test" assertion="Block comments are ignored"
+                          should-log="this gets logged">
+      /*
+      log "this doesn't get logged"
+      */
+      /*log "neither does this"*/
+      log "this gets logged"
+    </div>
+
+    <div class="log-test" assertion="Block comments can be nested"
+                          should-log="this gets logged">
+      /*
+      log "this doesn't get logged"
+        /* log "neither does this" */
+      */
+      log "this gets logged"
+    </div>
+
+    <div class="log-test" assertion="Variable assignment takes precedence"
+                          should-log="var1 is 'overwritten'">
+      let var1 := "untouched"
+      $var1 := "overwritten"
+      log "var1 is '$var1'"
+    </div>
+
+    <div class="log-test" assertion="Numeric literals are accepted"
+                          should-log="answer = 42">
+      let x := 42
+      log "answer = $x"
+    </div>
+
+    <div class="log-test" assertion="Function application can occur more than once"
+                          should-log="pizzapizza">
+      def foo() {
+        log "pizza"
+      }
+      foo()
+      foo()
+    </div>
+
+    <div class="log-test" assertion="Function execution introduces a shadowing scope"
+                          should-log="outer.inner.outer.">
+      let x := "outer"
+      def foo($x) {
+        log "$x."
+      }
+      log "$x."
+      foo("inner")
+      log "$x."
+    </div>
+
+    <div class="log-test" assertion="Blocks introduce shadowing scope"
+                          should-log="abra.ca.d.abra.">
+      let x := "abra"
+
+      log "$x."
+      placeholder {
+        let x := "ca"
+        log "$x."
+      }
+      placeholder {
+        let x := "d"
+        log "$x."
+      }
+      log "$x."
+    </div>
+
+    <div class="log-test" assertion="All block types can embed log primitives"
+                          should-log="metric,sparkline,graph,plot,scatterplot,placeholder">
+      metric {
+        log "metric,"
+      }
+      sparkline {
+        log "sparkline,"
+      }
+      graph {
+        log "graph,"
+        plot "x" {
+          log "plot,"
+        }
+      }
+      scatterplot {
+        log "scatterplot,"
+      }
+      placeholder {
+        log "placeholder"
+      }
+    </div>
+
+    <div class="log-test" assertion="All block types can declare vars"
+                          should-log="metric,sparkline,graph,plot,scatterplot,placeholder">
+      let x := "OUTER"
+      metric {
+        let x := "metric"
+        log "$x,"
+      }
+      sparkline {
+        let x := "sparkline"
+        log "$x,"
+      }
+      graph {
+        let x := "graph"
+        log "$x,"
+        plot "x" {
+          let x := "plot"
+          log "$x,"
+        }
+      }
+      scatterplot {
+        let x := "scatterplot"
+        log "$x,"
+      }
+      placeholder {
+        let x := "placeholder"
+        log "$x"
+      }
+    </div>
+
+
+    <div class="log-test" assertion="Functions can call other functions"
+                          should-log="foobar">
+      def bar() {
+        log "bar"
+      }
+      def foo() {
+        log "foo"
+        bar()
+      }
+      foo()
+    </div>
+
 
     <div id="unknown-block-1">
       unknown {}
