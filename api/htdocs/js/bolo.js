@@ -242,7 +242,7 @@
 		activate(want);
 	}
 
-	const NODATA = undefined;
+	var NODATA = undefined;
 	function api(request, data, options) {
 		p = request.split(' ');
 		if (data) { options.data = JSON.stringify(data) }

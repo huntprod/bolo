@@ -203,7 +203,7 @@ window.color = {
 		var min = Math.min(r, g, b);
 		var max = Math.max(r, g, b);
 
-		var v = max;
+		var h, s, v = max;
 		var delta = max - min;
 
 		/* calculate saturation */
@@ -289,55 +289,6 @@ window.color = {
 		}
 		return { fg: '#fff', bg: c[0] };
 	},
-
-	test: function (n,ep) {
-		if (typeof(n) === 'undefined') {
-			n = 1000;
-		}
-		if (typeof(ep) === 'undefined') {
-			ep = 8;
-		}
-		var close = function(x,y) {
-			return Math.abs(x - y) <= ep;
-		};
-		var check = function(r,g,b,h,s,v,msg) {
-			var rgb = {r:r, g:g, b:b};
-			var hsv = color.rgb2hsv(rgb);
-			var back = color.hsv2rgb(hsv);
-			if (!close(hsv.h, h) || !close(hsv.s, s) || !close(hsv.v, v)) {
-				console.log('FAIL (',msg,'): rgb2hsv(',r,',',g,',',b,') != (',h,',',s,',',v,'); got ', hsv);
-			} else {
-				console.log('OK ',msg,'; ',rgb,' -> ',hsv,' -> ',back);
-			}
-		}
-		check(185, 81,226,  200,164,226, 'spot check');
-		check(242,127,128,  255,121,242, 'NaN case');
-		check(206, 94, 95,  255,139,206, 'H=255 case');
-
-		var randrgb = function() {
-			return {
-				r: parseInt(Math.random() * 255.0 + 0.5),
-				g: parseInt(Math.random() * 255.0 + 0.5),
-				b: parseInt(Math.random() * 255.0 + 0.5)
-			};
-		};
-		var fails = 0;
-		for (var i = 0; i < n; i++) {
-			var rgb = randrgb();
-			var hsv = color.rgb2hsv(rgb);
-			var got = color.hsv2rgb(hsv);
-			if (got == undefined) {
-				console.log('FAIL: hsv2rgb(rgb2hsv(x)) is UNDEFINED');
-			} else if (!close(rgb.r, got.r) || !close(rgb.g, got.g) || !close(rgb.b, got.b)) {
-				console.log('FAIL: ',rgb,' -> ',hsv,' -> ',got);
-				fails++;
-			}
-		}
-		if (fails == 0) {
-			return "ALL "+n.toString()+" TESTS PASSED";
-		}
-		return fails.toString()+"/"+n.toString()+" tests failed";
-	}
 };
 
 })(document,window);
