@@ -1,6 +1,12 @@
 Notes
 =====
 
+This file just contains some notes.  These should eventually make it into a
+README of some sort.
+
+Running Tests
+-------------
+
 To test the SHA512 and HMAC-SHA512 implementation:
 
     CPPFLAGS=-DTEST make sha && ./sha
@@ -9,3 +15,47 @@ The complicated Javascript (like the BoardCode parser / evaluator) is all
 tested via QUnit, which can be found in api/qunit.  We use blanket.js to
 instrument each source javascript with counters, for gathering code
 coverage statistics.
+
+Running The System
+------------------
+
+The easiest way to run right now is probbly docker.
+
+To build the images locally, run:
+
+    make docker
+
+That should create the following images:
+
+    REPOSITORY    TAG      IMAGE ID        CREATED         SIZE
+    bolo/web      latest   1b9916f1bc1e    10 hours ago    15.6MB
+    bolo/core     latest   34cf06a8d71d    2 days ago      2.39MB
+
+Your image IDs and creation dates will vary.
+
+To spin these images without losing data, you'll need a volume, which you
+can create with the `docker volume` commands:
+
+    docker volume create -d local bolodb
+    docker volume ls
+
+(You may have lots of other volumes, especially if you've done a lot of work
+with docker-compose and, like me, haven't cleaned up after yourself in a
+while.)
+
+The main bolo daemon is in the `bolo/core` image, which you really ought to
+give a volume mount to:
+
+    docker run -it -v bolodb:/db bolo/core
+
+The bolo core listens on port TCP/2001 (for metric submission), and TCP/2002
+(for web UI queries).
+
+The web interface is in `bolo/web`.  It also needs a persistent volume
+mount, as well as the `$BOLO_ENDPOINT` environment variable.  Here, my bolo
+core is spinning on 172.17.0.2, default ports:
+
+    docker run -it -e BOLO_CORE=172.17.0.2:2001 -v bolodb:/db bolo/web
+
+Both `bolo/core` and `bolo/web` can share a mount; the former stores data in
+`/db/main.db` and the latter in `/db/web.db`.
