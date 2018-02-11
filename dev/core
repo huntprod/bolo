@@ -1,0 +1,12 @@
+#!/bin/bash
+set -eu
+
+OPTS="$@"
+if [[ -z "$OPTS" ]]; then
+  OPTS="-it"
+fi
+
+docker volume ls | grep q bolo-dev || docker volume create bolo-dev
+docker stop bolo_core || true
+docker rm   bolo_core || true
+exec docker run $OPTS -v bolo-dev:/db -p 2001-2002:2001-2002 --name bolo_core bolo/core

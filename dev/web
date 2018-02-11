@@ -1,0 +1,12 @@
+#!/bin/bash
+set -eu
+
+OPTS="$@"
+if [[ -z "$OPTS" ]]; then
+  OPTS="-it"
+fi
+
+docker volume ls | grep q bolo-dev || docker volume create bolo-dev
+docker stop bolo_web || true
+docker rm   bolo_web || true
+exec docker run $OPTS -v bolo-dev:/db -p 80:80 -e BOLO_CORE=172.17.0.2:2001 --name bolo_web bolo/web

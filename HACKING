@@ -59,3 +59,12 @@ core is spinning on 172.17.0.2, default ports:
 
 Both `bolo/core` and `bolo/web` can share a mount; the former stores data in
 `/db/main.db` and the latter in `/db/web.db`.
+
+To make life a bit easier, you can just do this:
+
+    ./dev/core
+    ./dev/web
+    ./dev/agent
+
+Assuming you have no other containers running, and core comes up on
+172.17.0.2, this Just Works (TM).
