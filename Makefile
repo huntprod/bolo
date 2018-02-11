@@ -28,13 +28,16 @@ COLLECTORS += process
 process: collectors/process
 	cp $+ $@
 
-all: bolo $(COLLECTORS)
+all: bolo $(COLLECTORS) api/api
 bolo: bolo.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o \
       btree.o tags.o query.o rsv.o bql/bql.a bqip.o net.o fdpoll.o ingest.o cfg.o \
       \
       bolo-help.o bolo-version.o bolo-core.o bolo-dbinfo.o bolo-idxinfo.o bolo-slabinfo.o \
       bolo-import.o bolo-parse.o bolo-query.o bolo-init.o bolo-agent.o
 	$(CC) $(LDFLAGS) -o $@ $+ $(LDLIBS)
+
+api/api:
+	cd api && go build .
 
 clean:
 	rm -f bolo $(COLLECTORS)
@@ -111,7 +114,7 @@ docker-core: bolo reexec
 	docker/build libs  docker/bolo/core bolo reexec
 	docker/build clean docker/bolo/core
 	docker build -t bolo/core:latest docker/bolo/core
-docker-web: bolo reexec
+docker-web: api/api reexec
 	docker/build setup docker/bolo/web
 	docker/build copy  docker/bolo/web reexec api/api api/htdocs docker/bolo/web/addon/*
 	docker/build libs  docker/bolo/web reexec api
