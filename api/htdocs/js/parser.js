@@ -497,6 +497,8 @@ var World = function () {
 		this.funs = {};
 		this.ctx = '';
 
+		this.imports = {};
+
 		this.blocks = [];
 		this.board  = [];
 
@@ -586,22 +588,350 @@ var World = function () {
 		}
 	};
 
-	$w.prototype.eval = function (id) {
-		var fn = this.funs[id];
-		for (var i = 0; i < fn.ops.length; i++) {
-			fn.ops[i][0](this, fn.ops[i]);
+	/** OP_DECLARE {{{
+
+			(declare varname)
+
+			Declare a variable slot in the current scope,
+			without initializing it.  (OP_ASSIGN will do that)
+
+	 **/
+	var OP_DECLARE = function (world, op) {
+		world.declare('var', op[1], undefined);
+	};
+	/* }}} */
+	/** OP_ASSIGN {{{
+
+			(assign varname value)
+
+			Assign a value to the named variable slot closest
+			to our current scope.
+
+			It is an error to assign to a variable that has not
+			been previously declared via OP_DECLARE.
+
+	 **/
+	var OP_ASSIGN = function (world, op) {
+		try {
+			world.bind('var', op[1], op[2]);
+		} catch (e) {
+			throw "Undefined variable <tt>$"+op[1]+"</tt>";
+		}
+	};
+	/* }}} */
+	/** OP_CALL {{{
+
+			(call fn args)
+
+			Applies a function to a set of arguments, evaluating for side
+			effects.  The functional evaluation occurs in a new dynamic
+			scope to limit damage to the calling environment.
+	 **/
+	var OP_CALL = function (world, op) {
+		var fn = world.fn(op[1]);
+		if (!fn) {
+			throw 'I couldn\'t figure out how to call "'+op[1]+'";<br>Are you sure that\'s a defined or imported function?';
+		}
+
+		/* implicit scope push */
+		fn[0].enter();
+
+		var args = op[2];
+		/* check arity at runtime */
+		if (args.length != fn[1].args.length) {
+			switch (fn[1].args.length) {
+			case 0:
+				throw "Arity mismatch in call to "+op[1]+"();<br/>"+
+							"The "+op[1]+" function does not take any arguments, but "+args.length+" were given.";
+			case 1:
+				throw "Arity mistmatch in call to "+op[1]+"(...);<br/>"+
+							"The "+op[1]+" function takes one argument, but was given "+args.length;
+			default:
+				throw "Arity mistmatch in call to "+op[1]+"(...);<br/>"+
+							"The "+op[1]+" function takes "+fn[1].args.length+" arguments, but was given "+args.length;
+			}
+		}
+
+		/* enrich the called environment */
+		for (var i = 0; i < args.length; i++) {
+			fn[0].declare('var', fn[1].args[i], args[i]);
+		}
+
+		/* evaluate the the function body */
+		fn[0].eval(fn[1].ops);
+
+		/* pop the scope */
+		fn[0].leave();
+	};
+	/* }}} */
+	/** OP_START {{{
+
+			(start type)
+
+			Opens a new object, of the given type, for modification.
+			This operator also implicitly pushes new scope.
+
+	 **/
+	var OP_START = function (world, op) {
+		var must_be_toplevel = function () {
+			if (world.blocks.length != 0) {
+				throw "Illegal nesting of a '"+op[1]+"' block inside of another block";
+			}
+		};
+
+		switch (op[1]) {
+		default:
+			throw "Unrecognized block type: '"+op[1]+"'";
+
+		case 'break':
+			must_be_toplevel();
+			world.blocks.push(new Break());
+			break;
+
+		case 'threshold':
+			must_be_toplevel();
+			world.current_thold = {rules: []};
+			world.declare('thold', op[2], world.current_thold);
+			break;
+
+		case 'metric':
+			must_be_toplevel();
+			world.blocks.push(new MetricBlock({
+				size:  '3x3',
+				unit:  '',
+				label: '',
+				color: ''
+			}));
+			break;
+
+		case 'sparkline':
+			must_be_toplevel();
+			world.blocks.push(new SparklineBlock({
+				label: 'My Unnamed Sparkline',
+				size:  '12x1',
+				color: 'black'
+			}));
+			break;
+
+		case 'graph':
+			must_be_toplevel();
+			world.blocks.push(new GraphBlock({
+				size:  '4x3',
+				label: '',
+				plots: [],
+				axis: {
+					x: { on: true, label: '' },
+					y: { on: true, label: '' }
+				}
+			}));
+			break;
+
+		case 'scatterplot':
+			must_be_toplevel();
+			world.blocks.push(new ScatterPlotBlock({
+				size:  '4x3',
+				label: '',
+				color: '#000',
+				axis: {
+					x: { on: true, label: '' },
+					y: { on: true, label: '' }
+				}
+			}));
+			break;
+
+		case 'plot':
+			if (world.blocks.length != 1) {
+				throw "Illegal placement of 'plot' block";
+			}
+			world.blocks.push({
+				type:    'plot',
+				as:      'area',
+				color:   'skyblue',
+				width:   '2',
+				opacity: 100.0
+			});
+			break;
+
+		case 'placeholder':
+			must_be_toplevel();
+			world.blocks.push(new PlaceholderBlock({
+				size:  '3x3',
+				text:  'placeholder',
+				color: '#ccc'
+			}));
+			break;
+
+		case 'html':
+			must_be_toplevel();
+			world.blocks.push(new HTMLContentBlock({
+				size:    '12x1',
+				content: ''
+			}));
+			break;
+
+		case 'text':
+			must_be_toplevel();
+			world.blocks.push(new TextContentBlock({
+				size:    '12x1',
+				content: ''
+			}));
+			break;
+		}
+
+		/* implicit scope push */
+		world.enter();
+	};
+	/* }}} */
+	/** OP_END {{{
+
+			(end)
+
+			Closes the open block and appends it to the list of
+			defined blocks, after invoking some validation logic
+			against it (type-sensitive).
+
+			This operator also implicitly pops the scope that was
+			pushed by its (start ...) counterpart.
+
+	 **/
+	var OP_END = function (world, op) {
+		if (world.current_thold) {
+			world.current_thold = undefined;
+			/* pop the scope */
+			world.leave();
+			return;
+		}
+
+		var block = world.blocks.pop();
+
+		if (world.blocks.length == 0) {
+			world.board.push(block);
+		} else {
+			world.blocks[world.blocks.length - 1].plots.push(block);
+		}
+
+		/* pop the scope */
+		world.leave();
+	};
+	/* }}} */
+	/** OP_TRULE {{{
+	 **/
+	var OP_TRULE = function (world, cmp, val, color) {
+		world.current_thold.rules.push({
+			eval:    cmp,
+			against: val,
+			color:   color
+		});
+	};
+	/* }}} */
+	/** OP_SET {{{
+
+			(set attr value)
+
+			Sets an attribute on the currently open block, possibly
+			by interrogating the environment (T_VARs) or interpolating
+			a string (T_STRING).
+
+	 **/
+	var OP_SET = function (world, op) {
+		if (typeof(op[2]) !== 'object') {
+			world.blocks[world.blocks.length - 1][op[1]] = op[2];
+			return;
+		}
+
+		switch (op[2][0]) {
+		default:
+			throw 'I found a '+token_description(op[2])+' where I expected to find a number, a quoted string literal, or a variable reference';
+			// FIXME line no?
+
+		case T_REF:
+			if (op[1] != "color") {
+				throw 'I found a '+token_description(op[2])+' for the '+op[1]+' property.<br>Only the <tt>color</tt> property can accept those.';
+				// FIXME line no?
+			}
+			world.blocks[world.blocks.length - 1][op[1]] = world.get('thold', op[2][1]);
+			break;
+
+		case T_NUMERIC:
+		case T_SIZE:
+		case T_IDENTIFIER:
+			world.blocks[world.blocks.length - 1][op[1]] = op[2][1];
+			break;
+
+		case T_STRING:
+			var s = '';
+			for (var i = 0; i < op[2][1].length; i++) {
+				if (typeof(op[2][1][i]) === 'string') {
+					s += op[2][1][i];
+				} else {
+					s += world.get('var', op[2][1][i].ref);
+				}
+			}
+			world.blocks[world.blocks.length - 1][op[1]] = s;
+			break;
+
+		case T_VAR:
+			world.blocks[world.blocks.length - 1][op[1]] = world.get('var', op[2][1]);
+			break;
+		}
+	};
+	/* }}} */
+	/** OP_LOG {{{
+
+			(log message)
+
+			Logs a message to the browser console.
+			Useful for debugging
+
+	 **/
+	var OP_LOG = function (world, op) {
+		console.log(world.valueof(op[1]));
+	};
+	/* }}} */
+
+	$w.prototype.fn = function (name) {
+		var m = name.match(/^(.+)\.([^.]+)$/);
+		if (m) {
+			if (m[1] in this.imports
+		   && m[2] in this.imports[m[1]].funs) {
+				return [
+					this.imports[m[1]],           /* execute in the import world */
+					this.imports[m[1]].funs[m[2]] /* execute the imported function */
+				];
+			}
+		} else {
+			return [
+				this,           /* execute in THIS world */
+				this.funs[name] /* execute the defined function */
+			];
+		}
+	};
+
+	$w.prototype.run = function (name) {
+		var fn = this.funs[name];
+		if (!fn) {
+			throw 'Undefined function "'+name+'"';
+		}
+		return this.eval(fn.ops);
+	};
+	$w.prototype.eval = function (ops) {
+		for (var i = 0; i < ops.length; i++) {
+			ops[i][0](this, ops[i]);
 		}
 		return this.board;
 	};
 
-	$w.prototype.parse = function (s) {
+	$w.prototype.parse = function (s, importer) {
 		if (typeof(s) === 'undefined') { s = ''; }
+		if (typeof(importer) !== 'undefined') {
+			this.importer = importer;
+		}
 
 		var i    = 0, line = 1, column = 0,
 		    last =  { line : 1, column : 0 },
 		    isspace = ' \f\n\r\t\v\u00A0\u2028\u2029',
-		    isalnum = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_@/#-',
-		    isvar   = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-',
+		    isalnum = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_@/#-.',
+		    isvar   = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-.',
 		    t,
 		    self = this;
 
@@ -806,8 +1136,14 @@ var World = function () {
 			return unexpected_token(what, t, 'an opening curly brace, <tt>{</tt>');
 		}
 		/* }}} */
+
+		var tokenstack = [];
 		/* next() {{{ */
 		function next() {
+			if (tokenstack.length > 0) {
+				t = tokenstack.pop();
+				return t;
+			}
 			while (true) {
 				t = lex();
 				if (!t) { return undefined; }
@@ -840,6 +1176,19 @@ var World = function () {
 			}
 		}
 		/* }}} */
+		/* peek_token() {{{ */
+		function peek_token() {
+			t = next();
+			if (!t) { return undefined; } /* that's ok */
+			tokenstack.push(t);
+			return t;
+		}
+		/* }}} */
+		/* pop_token() {{{ */
+		function pop_token() {
+			tokenstack.pop();
+		}
+		/* }}} */
 		/* expect_token("what you were doing") {{{ */
 		function expect_token(what) {
 			t = next();
@@ -848,304 +1197,6 @@ var World = function () {
 				'I had trouble '+what+';<br>'+
 				'I ran out of code to parse!');
 		}
-		/* }}} */
-
-		/** OP_DECLARE {{{
-
-				(declare varname)
-
-				Declare a variable slot in the current scope,
-				without initializing it.  (OP_ASSIGN will do that)
-
-		 **/
-		var OP_DECLARE = function (world, op) {
-			world.declare('var', op[1], undefined);
-		};
-		/* }}} */
-		/** OP_ASSIGN {{{
-
-				(assign varname value)
-
-				Assign a value to the named variable slot closest
-				to our current scope.
-
-				It is an error to assign to a variable that has not
-				been previously declared via OP_DECLARE.
-
-		 **/
-		var OP_ASSIGN = function (world, op) {
-			try {
-				world.bind('var', op[1], op[2]);
-			} catch (e) {
-				throw "Undefined variable <tt>$"+op[1]+"</tt>";
-			}
-		};
-		/* }}} */
-		/** OP_CALL {{{
-
-				(call fn args)
-
-				Applies a function to a set of arguments, evaluating for side
-				effects.  The functional evaluation occurs in a new dynamic
-				scope to limit damage to the calling environment.
-		 **/
-		var OP_CALL = function (world, op) {
-			/* implicit scope push */
-			world.enter();
-
-			var fn = world.funs[op[1]];
-			var args = op[2];
-
-			/* check arity at runtime */
-			if (args.length != fn.args.length) {
-				switch (fn.args.length) {
-				case 0:
-					throw "Arity mismatch in call to "+op[1]+"();<br/>"+
-								"The "+op[1]+" function does not take any arguments, but "+args.length+" were given.";
-				case 1:
-					throw "Arity mistmatch in call to "+op[1]+"(...);<br/>"+
-								"The "+op[1]+" function takes one argument, but was given "+args.length;
-				default:
-					throw "Arity mistmatch in call to "+op[1]+"(...);<br/>"+
-								"The "+op[1]+" function takes "+fn.args.length+" arguments, but was given "+args.length;
-				}
-			}
-
-			/* enrich the called environment */
-			for (var i = 0; i < args.length; i++) {
-				world.declare('var', fn.args[i], args[i]);
-			}
-
-			/* evaluate the the function body */
-			world.eval(op[1]);
-
-			/* pop the scope */
-			world.leave();
-		};
-		/* }}} */
-		/** OP_START {{{
-
-				(start type)
-
-				Opens a new object, of the given type, for modification.
-				This operator also implicitly pushes new scope.
-
-		 **/
-		var OP_START = function (world, op) {
-			var must_be_toplevel = function () {
-				if (world.blocks.length != 0) {
-					throw "Illegal nesting of a '"+op[1]+"' block inside of another block";
-				}
-			};
-
-			switch (op[1]) {
-			default:
-				throw "Unrecognized block type: '"+op[1]+"'";
-
-			case 'break':
-				must_be_toplevel();
-				world.blocks.push(new Break());
-				break;
-
-			case 'threshold':
-				must_be_toplevel();
-				world.current_thold = {rules: []};
-				world.declare('thold', op[2], world.current_thold);
-				break;
-
-			case 'metric':
-				must_be_toplevel();
-				world.blocks.push(new MetricBlock({
-					size:  '3x3',
-					unit:  '',
-					label: '',
-					color: ''
-				}));
-				break;
-
-			case 'sparkline':
-				must_be_toplevel();
-				world.blocks.push(new SparklineBlock({
-					label: 'My Unnamed Sparkline',
-					size:  '12x1',
-					color: 'black'
-				}));
-				break;
-
-			case 'graph':
-				must_be_toplevel();
-				world.blocks.push(new GraphBlock({
-					size:  '4x3',
-					label: '',
-					plots: [],
-					axis: {
-						x: { on: true, label: '' },
-						y: { on: true, label: '' }
-					}
-				}));
-				break;
-
-			case 'scatterplot':
-				must_be_toplevel();
-				world.blocks.push(new ScatterPlotBlock({
-					size:  '4x3',
-					label: '',
-					color: '#000',
-					axis: {
-						x: { on: true, label: '' },
-						y: { on: true, label: '' }
-					}
-				}));
-				break;
-
-			case 'plot':
-				if (world.blocks.length != 1) {
-					throw "Illegal placement of 'plot' block";
-				}
-				world.blocks.push({
-					type:    'plot',
-					as:      'area',
-					color:   'skyblue',
-					width:   '2',
-					opacity: 100.0
-				});
-				break;
-
-			case 'placeholder':
-				must_be_toplevel();
-				world.blocks.push(new PlaceholderBlock({
-					size:  '3x3',
-					text:  'placeholder',
-					color: '#ccc'
-				}));
-				break;
-
-			case 'html':
-				must_be_toplevel();
-				world.blocks.push(new HTMLContentBlock({
-					size:    '12x1',
-					content: ''
-				}));
-				break;
-
-			case 'text':
-				must_be_toplevel();
-				world.blocks.push(new TextContentBlock({
-					size:    '12x1',
-					content: ''
-				}));
-				break;
-			}
-
-			/* implicit scope push */
-			world.enter();
-		};
-		/* }}} */
-		/** OP_END {{{
-
-				(end)
-
-				Closes the open block and appends it to the list of
-				defined blocks, after invoking some validation logic
-				against it (type-sensitive).
-
-				This operator also implicitly pops the scope that was
-				pushed by its (start ...) counterpart.
-
-		 **/
-		var OP_END = function (world, op) {
-			if (world.current_thold) {
-				world.current_thold = undefined;
-				/* pop the scope */
-				world.leave();
-				return;
-			}
-
-			var block = world.blocks.pop();
-
-			if (world.blocks.length == 0) {
-				world.board.push(block);
-			} else {
-				world.blocks[world.blocks.length - 1].plots.push(block);
-			}
-
-			/* pop the scope */
-			world.leave();
-		};
-		/* }}} */
-		/** OP_TRULE {{{
-		 **/
-		var OP_TRULE = function (world, cmp, val, color) {
-			world.current_thold.rules.push({
-				eval:    cmp,
-				against: val,
-				color:   color
-			});
-		};
-		/* }}} */
-		/** OP_SET {{{
-
-				(set attr value)
-
-				Sets an attribute on the currently open block, possibly
-				by interrogating the environment (T_VARs) or interpolating
-				a string (T_STRING).
-
-		 **/
-		var OP_SET = function (world, op) {
-			if (typeof(op[2]) !== 'object') {
-				world.blocks[world.blocks.length - 1][op[1]] = op[2];
-				return;
-			}
-
-			switch (op[2][0]) {
-			default:
-				throw 'I found a '+token_description(op[2])+' where I expected to find a number, a quoted string literal, or a variable reference';
-				// FIXME line no?
-
-			case T_REF:
-				if (op[1] != "color") {
-					throw 'I found a '+token_description(op[2])+' for the '+op[1]+' property.<br>Only the <tt>color</tt> property can accept those.';
-					// FIXME line no?
-				}
-				world.blocks[world.blocks.length - 1][op[1]] = world.get('thold', op[2][1]);
-				break;
-
-			case T_NUMERIC:
-			case T_SIZE:
-			case T_IDENTIFIER:
-				world.blocks[world.blocks.length - 1][op[1]] = op[2][1];
-				break;
-
-			case T_STRING:
-				var s = '';
-				for (var i = 0; i < op[2][1].length; i++) {
-					if (typeof(op[2][1][i]) === 'string') {
-						s += op[2][1][i];
-					} else {
-						s += world.get('var', op[2][1][i].ref);
-					}
-				}
-				world.blocks[world.blocks.length - 1][op[1]] = s;
-				break;
-
-			case T_VAR:
-				world.blocks[world.blocks.length - 1][op[1]] = world.get('var', op[2][1]);
-				break;
-			}
-		};
-		/* }}} */
-		/** OP_LOG {{{
-
-				(log message)
-
-				Logs a message to the browser console.
-				Useful for debugging
-
-		 **/
-		var OP_LOG = function (world, op) {
-			console.log(world.valueof(op[1]));
-		};
 		/* }}} */
 
 		/* `size' validation routine {{{ */
@@ -1219,7 +1270,30 @@ var World = function () {
 			world.op(OP_LOG, t);
 		};
 		/* }}} */
+		/* import parser routine {{{ */
+		var parse_import = function(world, depth) {
+			var t, ctx = 'parsing an import directive';
 
+			t = expect_token(ctx);
+			if (t[0] != T_IDENTIFIER) { throw unexpected_token(ctx, t, 'a module identifier, like <tt>std.graphs</tt>'); }
+			var mod = t[1],
+			    alias = t[1];
+
+			t = peek_token(ctx);
+			if (t && iskeyword(t, 'as')) {
+				pop_token();
+				t = expect_token(ctx);
+				if (t[0] != T_IDENTIFIER) { throw unepected_token(ctx, t, 'a module alias identifier, ike <tt>stuff</tt>'); }
+				alias = t[1];
+			}
+
+			var code = world.importer(mod);
+			if (typeof(code) === 'undefined') {
+				throw 'I couldn\'t find the module "'+mod+'" to import it.';
+			}
+			world.imports[alias] = new World().parse(code, world.importer).import(mod);
+		}
+		/* }}} */
 		/* function definition parser routine {{{ */
 		var parse_def = function(world, depth) {
 			var t, ctx = 'parsing a function definition';
@@ -1660,11 +1734,20 @@ var World = function () {
 		/* MAIN PARSER ROUTINE {{{ */
 		var parse_toplevel = function (world, depth) {
 			while (typeof(t = next()) !== 'undefined') {
+				if (iskeyword(t, 'import')) {
+					if (depth > 0) {
+						throw with_lineno(
+								'I found a nested import<br />'+
+								'But BoardCode doesn\'t currently support imports outside the global scope');
+					}
+					parse_import(world);
+					continue;
+				}
 				if (iskeyword(t, 'def')) {
 					if (depth > 0) {
 						throw with_lineno(
-							'I found a nested function definition<br/>'+
-							'But BoardCode doesn\'t currently supported functions outside the global scope');
+							'I found a nested function definition<br />'+
+							'But BoardCode doesn\'t currently support functions outside the global scope');
 					}
 					parse_def(world, depth);
 					continue;
@@ -1719,7 +1802,7 @@ var World = function () {
 					continue;
 				}
 				if (t[0] == T_IDENTIFIER) {
-					if (t[1] in world.funs) {
+					if (world.fn(t[1])) {
 						parse_call(world, t[1]);
 						continue;
 					}
@@ -1734,6 +1817,43 @@ var World = function () {
 		/* }}} */
 
 		parse_toplevel(this, 0);
+		return this;
+	};
+
+	$w.prototype.importer = function (name) {
+		/* the default importer doesn't do anything useful.
+		   board code integrators MUST define their own. */
+		return undefined;
+	};
+
+	$w.prototype.import = function (ns) {
+		this.namespace = ns;
+		var ops = this.funs.main.ops,
+		    clean = [],
+		    skip = 0;
+
+		for (var i = 0; i < ops.length; i++) {
+			if (skip) {
+				if (ops[i][0] == OP_END) { skip--; }
+				continue;
+			}
+			if (ops[i][0] == OP_START) {
+				skip++;
+				continue;
+			}
+
+			switch (ops[i][0]) {
+			case OP_DECLARE:
+			case OP_ASSIGN:
+				clean.push(ops[i]);
+				break;
+			}
+		}
+
+		this.funs.main.ops = clean;
+		this.run('main');
+		delete this.funs.main;
+
 		return this;
 	};
 
@@ -1760,12 +1880,12 @@ var Board = (function () {
 	};
 })();
 
-Board.parse = function (s) {
-	return new World().parse(s);
+Board.parse = function (code, importer) {
+	return new World().parse(code, importer);
 };
 
 Board.evaluate = function (world) {
-	return world.eval('main');
+	return world.run('main');
 };
 
 

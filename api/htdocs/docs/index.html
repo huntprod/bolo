@@ -268,6 +268,42 @@ after:   global is overridden; local is local...</code></pre>
 		any functions you define.</p>
 
 
+		<a id="imports"></a>
+		<h2 toc="*">Importing the World</h2>
+
+		<p>If you want, you can build every single board up from scratch,
+		using nothing but the features of BoardCode.  The rest of this document
+		is for you, and covers the nitty-gritty details of boards, blocks, and
+		more.</p>
+
+		<p>However, the Bolo team has spent a lot of time staring at metrics,
+		and we've learned a trick or three that may help speed up the process.
+		All of this hard-won experience has been packaged up in a set of standard
+		<em>modules</em> that you can import into your boards:</p>
+
+		<pre><code>import sys.mem
+import sys.cpu
+
+let timeframe := "AFTER 4H AGO"
+sys.cpu.graph("host.tld", $timeframe)
+sys.mem.graph("host.tld", $timeframe)</code></pre>
+
+		<p>All of the functions defined in the imported module will be available
+		to you, as long as you prefix the call with <tt><i>module.name.</i></tt>.
+		In the above example, the first function call gets dispatched to the <tt>graph()</tt>
+		function in the <tt>sys.cpu</tt> module.</p>
+
+		<p>If you don't want to type all of that stuff, you can alias the module
+		when you import, using the <tt>as</tt> keyword:</p>
+
+		<pre><code>import sys.mem as m
+import sys.cpu as c
+
+let timeframe := "AFTER 4H AGO"
+c.graph("host.tld", $timeframe)
+m.graph("host.tld", $timeframe)</code></pre>
+
+
 		<a id="grid"></a>
 		<h2 toc="*">Life On The Grid</h2>
 

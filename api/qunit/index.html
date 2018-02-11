@@ -226,30 +226,30 @@
     </div>
 
     <div class="log-test" assertion="Function execution introduces a shadowing scope"
-                          should-log="outer.inner.outer.">
+                          should-log="outer:inner:outer:">
       let x := "outer"
       def foo($x) {
-        log "$x."
+        log "$x:"
       }
-      log "$x."
+      log "$x:"
       foo("inner")
-      log "$x."
+      log "$x:"
     </div>
 
     <div class="log-test" assertion="Blocks introduce shadowing scope"
-                          should-log="abra.ca.d.abra.">
+                          should-log="abra:ca:d:abra:">
       let x := "abra"
 
-      log "$x."
+      log "$x:"
       placeholder {
         let x := "ca"
-        log "$x."
+        log "$x:"
       }
       placeholder {
         let x := "d"
-        log "$x."
+        log "$x:"
       }
-      log "$x."
+      log "$x:"
     </div>
 
     <div class="log-test" assertion="All block types can embed log primitives"
@@ -314,6 +314,55 @@
         bar()
       }
       foo()
+    </div>
+
+
+    <div class="import" name="test.simple">
+      def hello($name) {
+        log "hello, $name"
+      }
+    </div>
+    <div class="import-test" assertion="Imports work"
+                             should-log="hello, world">
+      import test.simple
+      test.simple.hello("world")
+    </div>
+
+    <div class="import" name="bad.behavior">
+      log "uh-oh; that log entry didn't get stripped out..."
+
+      def hello($name) {
+        log "hello, $name"
+      }
+    </div>
+    <div class="import-test" assertion="Imports ignore definitional ops in imported module"
+                             should-log="hello, world">
+      import bad.behavior
+      bad.behavior.hello("world")
+    </div>
+
+    <div class="import" name="lex.vars">
+      let v := "secret"
+      def what($who) {
+        log "it's a ${v} to ${who}"
+      }
+    </div>
+    <div class="import-test" assertion="Imported modules retain their lexical variables"
+                             should-log="it's a secret to everyone">
+      import lex.vars
+      let v := "mystery" % red herring
+      lex.vars.what("everyone")
+    </div>
+
+    <div class="import" name="really.long.name.yo">
+      def bar() {
+        log "FOO!"
+      }
+    </div>
+    <div class="import-test" assertion="Modules can be imported with local namespace aliases"
+                             should-log="FOO!">
+      import really.long.name.yo as foo
+      foo.bar()
     </div>
 
 

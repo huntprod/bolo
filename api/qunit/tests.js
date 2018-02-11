@@ -1,24 +1,36 @@
 QUnit.module("BoardCode");
-QUnit.test("log-based validation", function (Ω) {
-  var orig = window.console;
-  window.console = {
-    messages: [],
-    log: function (m) {
+var logger = {
+  saved: window.console.log,
+  start: function () {
+    logger.reset();
+    window.console.log = function (m) {
       window.console.messages.push(m);
-    }
-  };
+    };
+  },
+  stop: function () {
+    window.console.log = logger.saved;
+  },
+  reset: function () {
+    window.console.messages = [];
+  },
+  buffer: function () {
+    return window.console.messages.join("");
+  }
+};
+QUnit.test("log-based validation", function (Ω) {
+  logger.start();
   $('.log-test').each(function (i, board) {
     try {
-      window.console.messages = [];
+      logger.reset();
       new Board($(board).text());
-      Ω.equal(window.console.messages.join(""),
+      Ω.equal(logger.buffer(),
               $(board).attr('should-log'),
               $(board).attr('assertion'));
     } catch (e) {
       Ω.ok(false, $(board).attr('assertion') + ": threw '"+e.toString()+"'");
     }
   });
-  window.console = orig;
+  logger.stop();
 });
 
 
@@ -79,6 +91,28 @@ QUnit.test("runtime error detection", function (Ω) {
   "attempting to set a var that has not been let-bound should fail");
 });
 
+
+
+QUnit.test("imports", function (Ω) {
+  var importer = function (name) {
+    var lib = $('.import[name="'+name+'"]');
+    if (lib.length != 1) { return undefined; }
+    return lib.text();
+  };
+  logger.start();
+  $('.import-test').each(function (i, board) {
+    try {
+      logger.reset();
+      Board.evaluate(Board.parse($(board).text(), importer));
+      Ω.equal(logger.buffer(),
+              $(board).attr('should-log'),
+              $(board).attr('assertion'));
+    } catch (e) {
+      Ω.ok(false, $(board).attr('assertion') + ": threw '"+e.toString()+"'");
+    }
+  });
+  logger.stop();
+});
 
 
 
