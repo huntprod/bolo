@@ -5,3 +5,7 @@ To test the SHA512 and HMAC-SHA512 implementation:
 
     CPPFLAGS=-DTEST make sha && ./sha
 
+The complicated Javascript (like the BoardCode parser / evaluator) is all
+tested via QUnit, which can be found in api/qunit.  We use blanket.js to
+instrument each source javascript with counters, for gathering code
+coverage statistics.
