@@ -123,6 +123,8 @@ do_query(int argc, char **argv)
 		fprintf(stderr, "invalid query.\n");
 
 	} else if (query_plan(query, db) != 0) {
+		fprintf(stderr, "query `%s` failed:\n", argv[optind+2]);
+		fprintf(stderr, "  %s (%s)\n", query_strerror(query), query->err_data);
 		bail("failed to plan query...");
 
 	} else if (query_exec(query, db, &ctx) != 0) {

@@ -117,25 +117,18 @@ qcond_check(struct qcond *qc, struct idx *idx)
 	}
 }
 
-int
-query_plan(struct query *q, struct db *db)
+static int
+s_qexpr_plan(struct query *q, struct qexpr *expr, struct db *db)
 {
-	struct qexpr *expr;
 	struct multidx *set, *full, *tmp;
 
-	/* compile conditions into the subset of
-	   applicable index subsets for each clause */
-	if (q->where)
-		qcond_plan(q->where, db);
-
-	/* compile field specifications into
-	   the index subsets they reference. */
-	for (expr = q->select; expr; expr = expr->next) {
-		if (expr->type != EXPR_REF)
+	switch (expr->type) {
+	case EXPR_REF:
+		if (hash_get(db->metrics, &full, expr->a) != 0) {
+			q->err_num = QERR_NOSUCHREF;
+			q->err_data = strdup(expr->a);
 			return -1;
-
-		if (hash_get(db->metrics, &full, expr->a) != 0)
-			return -1;
+		}
 
 		expr->set = NULL;
 		for (tmp = full; tmp; tmp = tmp->next) {
@@ -146,6 +139,36 @@ query_plan(struct query *q, struct db *db)
 				expr->set = set;
 			}
 		}
+		break;
+
+	case EXPR_ADD:
+	case EXPR_SUB:
+	case EXPR_MULT:
+	case EXPR_DIV:
+		if (s_qexpr_plan(q, expr->a, db) != 0
+		 || s_qexpr_plan(q, expr->b, db) != 0)
+			return -1;
+		break;
+	}
+
+	return 0;
+}
+
+int
+query_plan(struct query *q, struct db *db)
+{
+	struct qexpr *expr;
+
+	/* compile conditions into the subset of
+	   applicable index subsets for each clause */
+	if (q->where)
+		qcond_plan(q->where, db);
+
+	/* compile field specifications into
+	   the index subsets they reference. */
+	for (expr = q->select; expr; expr = expr->next) {
+		if (s_qexpr_plan(q, expr, db) != 0)
+			return -1;
 	}
 
 	return 0;
@@ -226,6 +249,7 @@ query_free(struct query *q)
 	if (!q) return;
 	qcond_free(q->where);
 	qexpr_free(q->select);
+	free(q->err_data);
 	free(q);
 }
 
@@ -308,6 +332,18 @@ query_exec(struct query *q, struct db *db, struct query_ctx *ctx)
 		}
 	}
 	return 0;
+}
+
+static const char * QERR_strings[] = {
+	"(no error)",
+	"No such metric",
+};
+const char *
+query_strerror(struct query *q)
+{
+	if (q->err_num < 1 || q->err_num > QERR__TOP)
+		return QERR_strings[0];
+	return QERR_strings[q->err_num];
 }
 
 #ifdef TEST

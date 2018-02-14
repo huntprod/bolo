@@ -620,12 +620,18 @@ struct qexpr {
 	struct resultset *result;
 };
 
+#define QERR_NOSUCHREF 1
+#define QERR__TOP      1
+
 struct query {
 	struct qexpr *select;
 	int           aggr;
 	struct qcond *where;
 	int           from;
 	int           until;
+
+	int   err_num;
+	char *err_data;
 };
 
 struct query_ctx {
@@ -639,6 +645,8 @@ void query_free(struct query *q);
 
 int query_plan(struct query *q, struct db *db);
 int query_exec(struct query *q, struct db *db, struct query_ctx *ctx);
+
+const char * query_strerror(struct query *q);
 
 
 #endif
