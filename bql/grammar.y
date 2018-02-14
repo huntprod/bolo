@@ -32,6 +32,15 @@ qexpr(int type, void *a, void *b)
 {
 	struct qexpr *e;
 
+	if (type == EXPR_NUM) {
+		/* a is a double*, b is unused.
+		   we need to allocate a reference */
+		b = malloc(sizeof(double));
+		if (!b)
+			bail("malloc failed in bql_parse");
+		*(double *)b = *(double *)a;
+	}
+
 	e = calloc(1, sizeof(*e));
 	if (!e)
 		bail("malloc failed in bql_parse");
@@ -128,6 +137,7 @@ exprs: expr            { $$ = $1; }
      ;
 
 expr: T_BAREWORD              { $$ = qexpr(EXPR_REF,   $1, NULL); }
+    | T_NUMBER                { $$ = qexpr(EXPR_NUM,  &$1, NULL); }
     | expr T_AS T_BAREWORD    { $$ = qexpr(EXPR_ALIAS, $1, $3); }
     | '(' expr ')'            { $$ = $2; }
     | expr '+' expr           { $$ = qexpr(EXPR_ADD,   $1, $3); }

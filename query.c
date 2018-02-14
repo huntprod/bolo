@@ -200,6 +200,7 @@ qexpr_free(struct qexpr *qexpr)
 			break;
 
 		case EXPR_REF:
+		case EXPR_NUM:
 			free(qexpr->a);
 			break;
 		}

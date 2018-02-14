@@ -593,6 +593,7 @@ struct qcond {
 #define EXPR_MULT  5
 #define EXPR_DIV   6
 #define EXPR_FUNC  7
+#define EXPR_NUM   8
 
 struct result {
 	bolo_msec_t start;
