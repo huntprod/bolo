@@ -586,15 +586,6 @@ struct qcond {
 };
 
 
-#define EXPR_REF   1
-#define EXPR_ALIAS 2
-#define EXPR_ADD   3
-#define EXPR_SUB   4
-#define EXPR_MULT  5
-#define EXPR_DIV   6
-#define EXPR_FUNC  7
-#define EXPR_NUM   8
-
 struct result {
 	bolo_msec_t start;
 	bolo_msec_t finish;
@@ -609,26 +600,50 @@ struct resultset {
 	struct result results[]; /* list of `len` result (ts,value) tuples */
 };
 
-struct qexpr {
-	int type;
-	void *a;
-	void *b;
+/* NOTE: it is vital to the correctness of the implementation
+         that the *C math operators are exactly one greater
+         than their metric-only counterparts. */
+#define QOP_PUSH  1
+#define QOP_ADD   2
+#define QOP_ADDC  3
+#define QOP_SUB   4
+#define QOP_SUBC  5
+#define QOP_MUL   6
+#define QOP_MULC  7
+#define QOP_DIV   8
+#define QOP_DIVC  9
+#define QOP_RETURN 100
 
-	struct qexpr   *next;
-	struct multidx *set;
-
-	struct resultset *result;
+struct qop {
+	int code;
+	union {
+		double  imm;
+		struct {
+			char             *metric;
+			struct resultset *rset;
+			struct multidx   *set;
+		} push;
+	} data;
 };
 
 #define QERR_NOSUCHREF 1
 #define QERR__TOP      1
 
+struct qfield {
+	struct qfield    *next;
+
+	char             *name;
+	struct qop       *ops;
+
+	struct resultset *result;
+};
+
 struct query {
-	struct qexpr *select;
-	int           aggr;
-	struct qcond *where;
-	int           from;
-	int           until;
+	struct qfield *select;
+	int            aggr;
+	struct qcond  *where;
+	int            from;
+	int            until;
 
 	int   err_num;
 	char *err_data;

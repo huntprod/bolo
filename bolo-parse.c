@@ -7,9 +7,10 @@ do_parse(int argc, char **argv)
 	struct query *query;
 	char buf[501], datetime[100];
 	size_t len;
-	int i;
+	int i, j;
 	struct tm from, until;
 	time_t now;
+	struct qfield *f;
 
 	if (argc < 3) {
 		fprintf(stderr, "USAGE: bolo parse 'QUERY ...'\n");
@@ -59,7 +60,29 @@ do_parse(int argc, char **argv)
 		}
 		fprintf(stdout, "\n");
 
-		// print details about select
+		fprintf(stdout, "  select clause details:\n");
+		for (f = query->select; f; f = f->next) {
+			fprintf(stdout, "    - %s\n", f->name);
+			for (j = 0; ; j++) {
+				switch (f->ops[j].code) {
+				default:         fprintf(stdout, "        ; unknown op [%#02x]\n", f->ops[j].code); break;
+				case QOP_RETURN: fprintf(stdout, "        RETURN\n"); break;
+				case QOP_PUSH:   fprintf(stdout, "        PUSH   %s\n", f->ops[j].data.push.metric); break;
+				case QOP_ADD:    fprintf(stderr, "        ADD\n"); break;
+				case QOP_SUB:    fprintf(stderr, "        SUB\n"); break;
+				case QOP_MUL:    fprintf(stderr, "        MUL\n"); break;
+				case QOP_DIV:    fprintf(stderr, "        DIV\n"); break;
+
+				case QOP_ADDC:   fprintf(stderr, "        ADDC   %e\n", f->ops[j].data.imm); break;
+				case QOP_SUBC:   fprintf(stderr, "        SUBC   %e\n", f->ops[j].data.imm); break;
+				case QOP_MULC:   fprintf(stderr, "        MULC   %e\n", f->ops[j].data.imm); break;
+				case QOP_DIVC:   fprintf(stderr, "        DIVC   %e\n", f->ops[j].data.imm); break;
+				}
+				if (f->ops[j].code == QOP_RETURN)
+					break;
+			}
+			fprintf(stdout, "\n");
+		}
 		// print details about where
 	}
 

@@ -1,26 +1,26 @@
 %{
 #include "bql.h"
 
-static struct query *
-query(void)
-{
-	struct query *q;
+#define EXPR_REF   1
+#define EXPR_ADD   2
+#define EXPR_SUB   3
+#define EXPR_MULT  4
+#define EXPR_DIV   5
+#define EXPR_FUNC  6
+#define EXPR_NUM   7
 
-	q = calloc(1, sizeof(*q));
-	if (!q)
-		bail("malloc failed in bql_parse");
-
-	return q;
-}
+struct qexpr {
+	struct qexpr *next;
+	int           type;
+	void         *a, *b;
+};
 
 static struct qcond *
 cond(int op, void *a, void *b)
 {
 	struct qcond *c;
 
-	c = malloc(sizeof(*c));
-	if (!c)
-		bail("malloc failed in bql_parse");
+	c = xmalloc(sizeof(*c));
 	c->op = op;
 	c->a  = a;
 	c->b  = b;
@@ -35,27 +35,184 @@ qexpr(int type, void *a, void *b)
 	if (type == EXPR_NUM) {
 		/* a is a double*, b is unused.
 		   we need to allocate a reference */
-		b = malloc(sizeof(double));
-		if (!b)
-			bail("malloc failed in bql_parse");
+		b = xmalloc(sizeof(double));
 		*(double *)b = *(double *)a;
+		a = b; b = NULL;
 	}
 
-	e = calloc(1, sizeof(*e));
-	if (!e)
-		bail("malloc failed in bql_parse");
+	e = xcalloc(1, sizeof(*e));
 	e->type = type;
 	e->a    = a;
 	e->b    = b;
 	return e;
 }
 
-static struct qexpr *
-pushex(struct qexpr *lst, struct qexpr *node)
+static void
+qexpr_free(struct qexpr *qexpr)
+{
+	struct qexpr *next_qexpr;
+
+	while (qexpr) {
+		switch (qexpr->type) {
+		case EXPR_ADD:
+		case EXPR_SUB:
+		case EXPR_MULT:
+		case EXPR_DIV:
+			qexpr_free(qexpr->b);
+			qexpr_free(qexpr->a);
+			break;
+
+		case EXPR_FUNC:
+			free(qexpr->a);
+			qexpr_free(qexpr->b);
+			break;
+
+		case EXPR_REF:
+		case EXPR_NUM:
+			free(qexpr->a);
+			break;
+		}
+
+		next_qexpr = qexpr->next;
+		free(qexpr);
+		qexpr = next_qexpr;
+	}
+}
+
+static void
+simplify(struct qexpr *qx)
+{
+	double *a, b; /* for (NUM op NUM) simplification */
+
+	if (!qx) return;
+	switch (qx->type) {
+	case EXPR_ADD:
+	case EXPR_SUB:
+	case EXPR_MULT:
+	case EXPR_DIV:
+		simplify(qx->a);
+		simplify(qx->b);
+
+		/* math on two constants; simplify to static computation result */
+		if (qx->a && ((struct qexpr *)(qx->a))->type == EXPR_NUM
+		 && qx->b && ((struct qexpr *)(qx->b))->type == EXPR_NUM) {
+
+			a = xmalloc(sizeof(double));
+			b = *(double *)((struct qexpr *)(qx->b))->a;
+
+			memcpy(a, ((struct qexpr *)(qx->a))->a, sizeof(double));
+			switch (qx->type) {
+			case EXPR_ADD:  *a += b; break;
+			case EXPR_SUB:  *a -= b; break;
+			case EXPR_MULT: *a *= b; break;
+			case EXPR_DIV:  *a /= b; break; /* FIXME: DIV/0 */
+			default: return;
+			}
+
+			free(((struct qexpr *)(qx->a))->a); free(qx->a);
+			free(((struct qexpr *)(qx->b))->a); free(qx->b);
+			qx->type = EXPR_NUM;
+			qx->a    = a;
+			qx->b    = NULL;
+			return;
+		}
+		break;
+	}
+}
+
+static int
+opcodes(struct qexpr *qx)
+{
+	switch (qx->type) {
+	default:         return 0;
+
+	case EXPR_ADD:
+	case EXPR_SUB:
+	case EXPR_MULT:
+	case EXPR_DIV:   return opcodes(qx->a)
+	                      + opcodes(qx->b)
+	                      + 1;
+
+	case EXPR_REF:
+	case EXPR_FUNC:  return 1;
+	}
+}
+
+static struct qop *
+opify(struct qexpr *qx, struct qop *next)
+{
+	int a, b;
+
+	switch (qx->type) {
+	default: return next;
+
+	case EXPR_REF:
+		next->code = QOP_PUSH;
+		next->data.push.metric = strdup((char *)(qx->a));
+		return next+1;
+
+	case EXPR_ADD:
+	case EXPR_SUB:
+	case EXPR_MULT:
+	case EXPR_DIV:
+		next = opify(qx->a, next);
+		next = opify(qx->b, next);
+		switch (qx->type) {
+		case EXPR_ADD:  next->code = QOP_ADD; break;
+		case EXPR_SUB:  next->code = QOP_SUB; break;
+		case EXPR_MULT: next->code = QOP_MUL; break;
+		case EXPR_DIV:  next->code = QOP_DIV; break;
+		}
+
+		a = ((struct qexpr *)(qx->a))->type;
+		b = ((struct qexpr *)(qx->b))->type;
+		CHECK(!(a == EXPR_NUM && b == EXPR_NUM),
+			"asked to opify a( NUM op NUM), which we should never see");
+		if (a == EXPR_NUM) {
+			/* NUM op METRIC */
+			next->code++; /* ADD -> ADDC */
+			next->data.imm = *(double *)((struct qexpr *)(qx->a))->a;
+		}
+		if (b == EXPR_NUM) {
+			/* METRIC op NUM */
+			next->code++; /* ADD -> ADDC */
+			next->data.imm = *(double *)((struct qexpr *)(qx->b))->a;
+		}
+		return next+1;
+	}
+}
+
+static struct qfield *
+pushf(struct qfield *lst, struct qfield *node)
 {
 	/* FIXME: this is reversed... */
 	node->next = lst;
 	return node;
+}
+
+
+static struct qfield *
+qfield(struct qexpr *e, char *name)
+{
+	int n;
+	struct qfield *f;
+
+	simplify(e);
+
+	/* auto-alias simple REF fields */
+	if (!name && e->type == EXPR_REF)
+		name = strdup((char *)(e->a));
+
+	f = xmalloc(sizeof(struct qfield));
+	f->name = name;
+
+	n = opcodes(e) + 1; /* append QOP_RETURN */
+	f->ops = xcalloc(n, sizeof(struct qop));
+	opify(e, f->ops);
+	f->ops[n-1].code = QOP_RETURN;
+
+	qexpr_free(e);
+	return f;
 }
 
 %}
@@ -109,8 +266,10 @@ pushex(struct qexpr *lst, struct qexpr *node)
 %type <qcond> where_clause
 %type <qcond> cond
 
-%type <qexprs> select_clause
-%type <qexprs> exprs
+%type <qfield> select_clause
+%type <qfield> fields
+%type <qfield> field
+
 %type <qexpr>  expr
 
 %type <query> query
@@ -121,30 +280,33 @@ pushex(struct qexpr *lst, struct qexpr *node)
 
 %%
 
-query :                     { $$ = QUERY = query(); }
-      | query select_clause { $$->select = $2; }
-      | query where_clause  { $$->where  = $2; }
-      | query aggr_clause   { $$->aggr   = $2; }
-      | query when_clause   { $$->from   = $2.from;
-                              $$->until  = $2.until; }
+query :                     { $$ = QUERY  = xmalloc(sizeof(struct query)); }
+      | query select_clause { $$->select  = $2; }
+      | query where_clause  { $$->where   = $2; }
+      | query aggr_clause   { $$->aggr    = $2; }
+      | query when_clause   { $$->from    = $2.from;
+                              $$->until   = $2.until; }
       ;
 
-select_clause: T_SELECT exprs { $$ = $2; }
+select_clause: T_SELECT fields { $$ = $2; }
              ;
 
-exprs: expr            { $$ = $1; }
-     | exprs ',' expr  { $$ = pushex($1, $3); }
+fields: field            { $$ = $1; }
+      | fields ',' field { $$ = pushf($1, $3); }
+      ;
+
+field: expr                 { $$ = qfield($1, NULL); }
+     | expr T_AS T_BAREWORD { $$ = qfield($1, $3);   }
      ;
 
-expr: T_BAREWORD              { $$ = qexpr(EXPR_REF,   $1, NULL); }
-    | T_NUMBER                { $$ = qexpr(EXPR_NUM,  &$1, NULL); }
-    | expr T_AS T_BAREWORD    { $$ = qexpr(EXPR_ALIAS, $1, $3); }
+expr: T_BAREWORD              { $$ = qexpr(EXPR_REF,  $1, NULL); }
+    | T_NUMBER                { $$ = qexpr(EXPR_NUM, &$1, NULL); }
     | '(' expr ')'            { $$ = $2; }
-    | expr '+' expr           { $$ = qexpr(EXPR_ADD,   $1, $3); }
-    | expr '-' expr           { $$ = qexpr(EXPR_SUB,   $1, $3); }
-    | expr '*' expr           { $$ = qexpr(EXPR_MULT,  $1, $3); }
-    | expr '/' expr           { $$ = qexpr(EXPR_DIV,   $1, $3); }
-    | T_BAREWORD '(' expr ')' { $$ = qexpr(EXPR_FUNC,  $1, $3); }
+    | expr '+' expr           { $$ = qexpr(EXPR_ADD,  $1, $3); }
+    | expr '-' expr           { $$ = qexpr(EXPR_SUB,  $1, $3); }
+    | expr '*' expr           { $$ = qexpr(EXPR_MULT, $1, $3); }
+    | expr '/' expr           { $$ = qexpr(EXPR_DIV,  $1, $3); }
+    | T_BAREWORD '(' expr ')' { $$ = qexpr(EXPR_FUNC, $1, $3); }
     ;
 
 where_clause: T_WHERE cond { $$ = $2; }

@@ -21,8 +21,8 @@ typedef union {
 	} range;
 
 	int aggrwin;
-	struct qexpr *qexprs;
-	struct qexpr *qexpr;
+	struct qfield *qfield;
+	struct qexpr  *qexpr;
 
 	struct qcond *qcond;
 

@@ -131,14 +131,36 @@ do_query(int argc, char **argv)
 		bail("failed to execute query...");
 
 	} else {
-		struct qexpr *qx;
+		struct qfield *f;
 
-		fprintf(stderr, "fields:\n");
-		for (qx = query->select; qx; qx = qx->next) {
+		fprintf(stderr, "PLAN:\n");
+		for (f = query->select; f; f = f->next) {
+			int i;
 			struct multidx *set;
-			fprintf(stderr, "  found matching series '%s':\n", (char *)qx->a);
-			for (set = qx->set; set; set = set->next)
-				fprintf(stderr, "    - [%#06lx] %p\n", set->idx->number, (void *)set->idx);
+
+			fprintf(stderr, "  field `%s`:\n", f->name);
+			for (i = 0; ; i++) {
+				switch (f->ops[i].code) {
+				case QOP_RETURN: fprintf(stderr, "    % 3d: RET\n", i); break;
+				case QOP_ADD:    fprintf(stderr, "    % 3d: ADD\n", i); break;
+				case QOP_SUB:    fprintf(stderr, "    % 3d: SUB\n", i); break;
+				case QOP_MUL:    fprintf(stderr, "    % 3d: MUL\n", i); break;
+				case QOP_DIV:    fprintf(stderr, "    % 3d: DIV\n", i); break;
+				case QOP_ADDC:   fprintf(stderr, "    % 3d: ADDC %e\n", i, f->ops[i].data.imm); break;
+				case QOP_SUBC:   fprintf(stderr, "    % 3d: SUBC %e\n", i, f->ops[i].data.imm); break;
+				case QOP_MULC:   fprintf(stderr, "    % 3d: MULC %e\n", i, f->ops[i].data.imm); break;
+				case QOP_DIVC:   fprintf(stderr, "    % 3d: DIVC %e\n", i, f->ops[i].data.imm); break;
+
+				case QOP_PUSH:
+					fprintf(stderr, "    % 3d: PUSH '%s'\n", i, f->ops[i].data.push.metric);
+					fprintf(stderr, "          ; found matching series:\n");
+					for (set = f->ops[i].data.push.set; set; set = set->next)
+						fprintf(stderr, "          ; - [%#06lx] %p\n", set->idx->number, (void *)set->idx);
+					break;
+				}
+				if (f->ops[i].code == QOP_RETURN)
+					break;
+			}
 			fprintf(stderr, "\n");
 		}
 		fprintf(stderr, "\n");
@@ -151,15 +173,15 @@ do_query(int argc, char **argv)
 			fprintf(stderr, "\n");
 		}
 
-		for (qx = query->select; qx; qx = qx->next) {
+		for (f = query->select; f; f = f->next) {
 			int i;
 
-			fprintf(stderr, "%s:\n", qx->result->key);
-			for (i = 0; (unsigned)i < qx->result->len; i++)
+			fprintf(stderr, "%s:\n", f->name);
+			for (i = 0; (unsigned)i < f->result->len; i++)
 				fprintf(stderr, "  - {ts: %lu, value: %lf, n: %i}\n",
-					qx->result->results[i].start,
-					qx->result->results[i].value,
-					qx->result->results[i].n);
+					f->result->results[i].start,
+					f->result->results[i].value,
+					f->result->results[i].n);
 		}
 
 		fprintf(stderr, "...\n");

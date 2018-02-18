@@ -39,7 +39,7 @@ query_handler(int fd, void *_u)
 	size_t i;
 	struct bqip *bqip;
 	struct query *q;
-	struct qexpr *qx;
+	struct qfield *f;
 
 	bqip = (struct bqip *)_u;
 	rc = bqip_read(bqip);
@@ -68,12 +68,12 @@ query_handler(int fd, void *_u)
 		pthread_mutex_unlock(&db_lock);
 
 		bqip_send0(bqip, "R");
-		for (qx = q->select; qx; qx = qx->next) {
+		for (f = q->select; f; f = f->next) {
 			bqip_send0(bqip, "|");
-			bqip_send0(bqip, qx->result->key);
+			bqip_send0(bqip, f->name);
 			bqip_send0(bqip, "=");
-			for (i = 0; i < qx->result->len; i++)
-				bqip_send_tuple(bqip, &qx->result->results[i]);
+			for (i = 0; i < f->result->len; i++)
+				bqip_send_tuple(bqip, &f->result->results[i]);
 		}
 		break;
 
@@ -89,9 +89,9 @@ query_handler(int fd, void *_u)
 		pthread_mutex_unlock(&db_lock);
 
 		bqip_send0(bqip, "R");
-		for (qx = q->select; qx; qx = qx->next) {
+		for (f = q->select; f; f = f->next) {
 			bqip_send0(bqip, "|");
-			bqip_send0(bqip, qx->a); /* FIXME: this ONLY works for refs */
+			bqip_send0(bqip, f->name);
 		}
 		break;
 	}

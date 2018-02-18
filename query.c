@@ -38,7 +38,9 @@ free_resultset(struct resultset *rset)
 struct query *
 query_parse(const char *q)
 {
+	int n;
 	struct query *query;
+	struct qfield *f;
 
 	query = bql_parse(q);
 	if (!query) return NULL;
@@ -46,6 +48,11 @@ query_parse(const char *q)
 	/* the SELECT clause is required */
 	if (!query->select)
 		goto fail;
+
+	/* fill in default names */
+	for (n = 1, f = query->select; f; f = f->next)
+		if (!f->name)
+			asprintf(&f->name, "metric_%d", n++);
 
 	/* fill in default timeframe */
 	if (query->until == 0 && query->from == 0)
@@ -118,58 +125,54 @@ qcond_check(struct qcond *qc, struct idx *idx)
 }
 
 static int
-s_qexpr_plan(struct query *q, struct qexpr *expr, struct db *db)
+s_qfield_plan(struct query *q, struct db *db, struct qfield *f)
 {
-	struct multidx *set, *full, *tmp;
+	int i;
+	struct multidx *set, *tmp, *full;
 
-	switch (expr->type) {
-	case EXPR_REF:
-		if (hash_get(db->metrics, &full, expr->a) != 0) {
-			q->err_num = QERR_NOSUCHREF;
-			q->err_data = strdup(expr->a);
-			return -1;
-		}
+	CHECK(q  != NULL, "s_qfield_plan() given a nil query");
+	CHECK(db != NULL, "s_qfield_plan() given a nil database");
+	CHECK(f  != NULL, "s_qfield_plan() given a nil query field");
 
-		expr->set = NULL;
-		for (tmp = full; tmp; tmp = tmp->next) {
-			if (qcond_check(q->where, tmp->idx) == 0) {
-				set = xmalloc(sizeof(*set));
-				set->next = expr->set;
-				set->idx  = tmp->idx;
-				expr->set = set;
+	for (i = 0; f->ops[i].code != QOP_RETURN; i++) {
+		switch (f->ops[i].code) {
+		case QOP_PUSH:
+			if (hash_get(db->metrics, &full, f->ops[i].data.push.metric) != 0) {
+				q->err_num = QERR_NOSUCHREF;
+				q->err_data = strdup(f->ops[i].data.push.metric);
+				return -1;
 			}
+
+			f->ops[i].data.push.set = NULL;
+			for (tmp = full; tmp; tmp = tmp->next) {
+				if (qcond_check(q->where, tmp->idx) == 0) {
+					set = xmalloc(sizeof(*set));
+					set->next = f->ops[i].data.push.set;
+					set->idx  = tmp->idx;
+					f->ops[i].data.push.set = set;
+				}
+			}
+			break;
 		}
-		break;
-
-	case EXPR_ADD:
-	case EXPR_SUB:
-	case EXPR_MULT:
-	case EXPR_DIV:
-		if (s_qexpr_plan(q, expr->a, db) != 0
-		 || s_qexpr_plan(q, expr->b, db) != 0)
-			return -1;
-		break;
 	}
-
 	return 0;
 }
 
 int
 query_plan(struct query *q, struct db *db)
 {
-	struct qexpr *expr;
+	struct qfield *f;
 
 	/* compile conditions into the subset of
 	   applicable index subsets for each clause */
 	if (q->where)
 		qcond_plan(q->where, db);
 
-	/* compile field specifications into
+	/* compile metric references (PUSH) into
 	   the index subsets they reference. */
-	for (expr = q->select; expr; expr = expr->next) {
-		if (s_qexpr_plan(q, expr, db) != 0)
-			return -1;
-	}
+	if (q->select)
+		for (f = q->select; f; f = f->next)
+			s_qfield_plan(q, db, f);
 
 	return 0;
 }
@@ -196,68 +199,225 @@ qcond_free(struct qcond *qcond)
 	free(qcond);
 }
 
-static void
-qexpr_free(struct qexpr *qexpr)
-{
-	struct qexpr *next_qexpr;
-	struct multidx *set, *next_set;
-
-	while (qexpr) {
-		switch (qexpr->type) {
-		case EXPR_ADD:
-		case EXPR_SUB:
-		case EXPR_MULT:
-		case EXPR_DIV:
-			qexpr_free(qexpr->b);
-			qexpr_free(qexpr->a);
-			break;
-
-		case EXPR_FUNC:
-			free(qexpr->a);
-			qexpr_free(qexpr->b);
-			break;
-
-		case EXPR_ALIAS:
-			qexpr_free(qexpr->a);
-			free(qexpr->b);
-			break;
-
-		case EXPR_REF:
-		case EXPR_NUM:
-			free(qexpr->a);
-			break;
-		}
-
-		free_resultset(qexpr->result);
-		set = qexpr->set;
-		while (set) {
-			next_set = set->next;
-			free(set);
-			set = next_set;
-		}
-		qexpr->set = NULL;
-
-		next_qexpr = qexpr->next;
-		free(qexpr);
-		qexpr = next_qexpr;
-	}
-}
-
 void
 query_free(struct query *q)
 {
+	int i;
+	struct qfield *f, *_f;
+	struct multidx *set, *_set;
+
 	if (!q) return;
 	qcond_free(q->where);
-	qexpr_free(q->select);
+
+	f = q->select;
+	while (f) {
+		for (i = 0; f->ops[i].code != QOP_RETURN; i++) {
+			switch (f->ops[i].code) {
+			case QOP_PUSH:
+				free(f->ops[i].data.push.metric);
+				for (set = f->ops[i].data.push.set; set; ) {
+					_set = set->next;
+					free(set);
+					set = _set;
+				}
+				break;
+			}
+		}
+		free(f->ops);
+		free(f->name);
+		free(f->result);
+
+		_f = f->next;
+		free(f);
+		f = _f;
+	}
+
 	free(q->err_data);
 	free(q);
 }
 
+#define QOPS_STACK_MAX 64
+
+static int
+s_qfield_exec(struct query *q, struct db *db, struct query_ctx *ctx, struct qfield *f)
+{
+	int i, j, top;
+	struct resultset *stack[QOPS_STACK_MAX];
+	struct rsv *rsv;
+	struct multidx *set;
+
+	/* allocate a shared reservoir for sampling */
+	rsv = rsv_new(ctx->rsv_depth);
+
+	top = -1;
+	for (i = 0; ; i++) {
+		switch (f->ops[i].code) {
+		case QOP_RETURN:
+			if (top < 0) bail("query eval: stack underflow in return");
+			if (top > 0) bail("query eval: leftover stack in return");
+			f->result = stack[top];
+			rsv_free(rsv);
+			return 0;
+
+		case QOP_PUSH:
+			/* push a new resultset onto the stack */
+			top++;
+			if (top == QOPS_STACK_MAX)
+				bail("query eval: stack depth exceeded"); /* FIXME */
+			stack[top] = new_resultset(q->aggr,
+			                           ctx->now / 1000 + q->from,
+			                           ctx->now / 1000 + q->until);
+			stack[top]->key = f->ops[i].data.push.metric;
+
+			/* retrieve a reservoir-sampled resultset */
+			for (j = 0; (unsigned)j < stack[top]->len; j++) {
+				rsv_reset(rsv);
+				for (set = f->ops[i].data.push.set; set; set = set->next) {
+					struct tblock *block;
+					uint64_t blkid;
+
+					if (btree_find(set->idx->btree, &blkid, stack[top]->results[j].start) != 0) {
+						fprintf(stderr, "failed to btree_find on metric %s\n", f->ops[i].data.push.metric);
+						rsv_free(rsv);
+						free_resultset(stack[top]);
+						return -1;
+					}
+
+					block = db_findblock(db, blkid);
+					while (block) {
+						int k;
+						bolo_msec_t ts;
+
+						for (k = 0; k < block->cells; k++) {
+							ts = tblock_ts(block, k);
+							if (ts >= stack[top]->results[j].start && ts <= stack[top]->results[j].finish)
+								rsv_sample(rsv, tblock_value(block, k));
+						}
+
+						block = db_findblock(db, block->next);
+					}
+				}
+				stack[top]->results[j].value = rsv_median(rsv);
+				stack[top]->results[j].n     = rsv->n;
+			}
+			break;
+
+		case QOP_ADD:
+			/* sanity check: we should always have at least two rsets on stack */
+			if (top < 1)
+				bail("query eval: insufficient stack for ADD op");
+
+			for (j = 0; (unsigned)j < stack[top]->len; j++) {
+				if ((unsigned)j >= stack[top-1]->len) break; /* just in case... */
+				stack[top-1]->results[j].value += stack[top]->results[j].value;
+			}
+			free(stack[top]);
+			stack[top--] = NULL;
+			break;
+
+		case QOP_ADDC:
+			/* sanity check: we should always have at least one rset on stack */
+			if (top < 0)
+				bail("query eval: insufficient stack for ADDC op");
+
+			for (j = 0; (unsigned)j < stack[top]->len; j++) {
+				stack[top]->results[j].value += f->ops[i].data.imm;
+			}
+			break;
+
+		case QOP_SUB:
+			/* sanity check: we should always have at least two rsets on stack */
+			if (top < 1)
+				bail("query eval: insufficient stack for SUB op");
+
+			for (j = 0; (unsigned)j < stack[top]->len; j++) {
+				if ((unsigned)j >= stack[top-1]->len) break; /* just in case... */
+				stack[top-1]->results[j].value -= stack[top]->results[j].value;
+			}
+			free(stack[top]);
+			stack[top--] = NULL;
+			break;
+
+		case QOP_SUBC:
+			/* sanity check: we should always have at least one rset on stack */
+			if (top < 0)
+				bail("query eval: insufficient stack for SUBC op");
+
+			for (j = 0; (unsigned)j < stack[top]->len; j++) {
+				stack[top]->results[j].value -= f->ops[i].data.imm;
+			}
+			break;
+
+		case QOP_MUL:
+			/* sanity check: we should always have at least two rsets on stack */
+			if (top < 1)
+				bail("query eval: insufficient stack for MUL op");
+
+			for (j = 0; (unsigned)j < stack[top]->len; j++) {
+				if ((unsigned)j >= stack[top-1]->len) break; /* just in case... */
+				stack[top-1]->results[j].value *= stack[top]->results[j].value;
+			}
+			free(stack[top]);
+			stack[top--] = NULL;
+			break;
+
+		case QOP_MULC:
+			/* sanity check: we should always have at least one rset on stack */
+			if (top < 0)
+				bail("query eval: insufficient stack for MULC op");
+
+			for (j = 0; (unsigned)j < stack[top]->len; j++) {
+				stack[top]->results[j].value *= f->ops[i].data.imm;
+			}
+			break;
+
+		case QOP_DIV:
+			/* sanity check: we should always have at least two rsets on stack */
+			if (top < 1)
+				bail("query eval: insufficient stack for DIV op");
+
+			for (j = 0; (unsigned)j < stack[top]->len; j++) {
+				if ((unsigned)j >= stack[top-1]->len) break; /* just in case... */
+
+				/* handle division by zero */
+				if (stack[top]->results[j].value == 0.0) {
+					stack[top-1]->results[j].value = NAN;
+				} else {
+					stack[top-1]->results[j].value /= stack[top]->results[j].value;
+				}
+			}
+			free(stack[top]);
+			stack[top--] = NULL;
+			break;
+
+		case QOP_DIVC:
+			/* sanity check: we should always have at least one rset on stack */
+			if (top < 0)
+				bail("query eval: insufficient stack for DIVC op");
+
+			/* handle division by zero */
+			if (f->ops[i].data.imm == 0.0) {
+				for (j = 0; (unsigned)j < stack[top]->len; j++) {
+					stack[top]->results[j].value = NAN;
+				}
+			} else {
+				for (j = 0; (unsigned)j < stack[top]->len; j++) {
+					stack[top]->results[j].value /= f->ops[i].data.imm;
+				}
+			}
+			break;
+		}
+	}
+
+	return 0;
+}
 
 int
 query_exec(struct query *q, struct db *db, struct query_ctx *ctx)
 {
+	struct qfield *f;
 	struct query_ctx default_ctx;
+
 	if (!ctx) {
 		ctx = &default_ctx;
 		memset(ctx, 0, sizeof(*ctx));
@@ -269,68 +429,11 @@ query_exec(struct query *q, struct db *db, struct query_ctx *ctx)
 	if (ctx->now == 0)
 		ctx->now = time(NULL) * 1000;
 
-	{
-		struct qexpr *qx;
+	/* evaluate every selected field */
+	for (f = q->select; f; f = f->next)
+		if (s_qfield_exec(q, db, ctx, f) != 0)
+			return -1;
 
-		for (qx = q->select; qx; qx = qx->next) {
-			if (qx->type != EXPR_REF) {
-				fprintf(stderr, "unable to handle complex select clauses at this time.\n");
-				return 1;
-			}
-		}
-
-		/* for each field, allocate a result series,
-		   and retrieve the data for the given time
-		   frame from the tblocks. */
-		for (qx = q->select; qx; qx = qx->next) {
-			struct multidx *set;
-			struct rsv *rsv;
-			struct resultset *rset;
-			int i;
-
-			rsv = rsv_new(ctx->rsv_depth);
-			rset = new_resultset(q->aggr,
-			                     ctx->now / 1000 + q->from,
-			                     ctx->now / 1000 + q->until);
-			rset->key = qx->a;
-
-			for (i = 0; (unsigned)i < rset->len; i++) {
-				rsv_reset(rsv);
-
-				for (set = qx->set; set; set = set->next) {
-					struct tblock *block;
-					uint64_t blkid;
-
-					if (btree_find(set->idx->btree, &blkid, rset->results[i].start) != 0) {
-						fprintf(stderr, "failed to btree_find on metric %s\n", (char *)qx->a);
-						rsv_free(rsv);
-						free_resultset(rset);
-						return 1;
-					}
-
-					block = db_findblock(db, blkid);
-					while (block) {
-						int j;
-						bolo_msec_t ts;
-
-						for (j = 0; j < block->cells; j++) {
-							ts = tblock_ts(block, j);
-							if (ts >= rset->results[i].start && ts <= rset->results[i].finish)
-								rsv_sample(rsv, tblock_value(block, j));
-						}
-
-						block = db_findblock(db, block->next);
-					}
-
-					rset->results[i].value = rsv_median(rsv);
-					rset->results[i].n     = rsv->n;
-				}
-			}
-
-			qx->result = rset;
-			rsv_free(rsv);
-		}
-	}
 	return 0;
 }
 
@@ -440,6 +543,10 @@ TESTS {
 			/* math is a thing we can do */
 			"select mem.used + mem.free as mem.total",
 			"select cpu.total / cpu.count as cpu.each",
+			"select one.less + 1 as one",
+			"select 1 + one.less as one",
+			"select 1 + 1 + two.less as one",
+			"select ((1 * 2) + ((3) * 4)) / what.ever as metric",
 
 			/* functions too */
 			"select max(mem.used), max(mem.free) aggregate 5m",
@@ -692,6 +799,230 @@ TESTS {
 		is_unsigned(rs->results[0].n, 60,
 				"data point #1 has 60 minutely (1h worth) of samples");
 		is_within(rs->results[0].value, 4871.035, 0.1,
+				"data point #1 (median) value is correct");
+
+		query_free(q);
+
+
+
+		query = "select cpu * 2 where host=web1 and env=prod after 1h ago aggregate 1h";
+		q = query_parse(query);
+		isnt_null(q, "`%s` should be semantically valid BQL", query);
+		ok(query_plan(q, db) == 0, "planning `%s` against database should succeed", query);
+		ok(query_exec(q, db, &ctx) == 0, "executing `%s` against database should succeed", query);
+
+		isnt_null(q->select, "`%s` has at least one selected series", query);
+		is_null(q->select->next, "`%s` has only one selected series", query);
+
+		rs = q->select->result;
+		isnt_null(rs, "executed query has a resultset");
+		is_string(rs->key, "cpu", "resultset is for cpu metric");
+		is_unsigned(rs->len, 1, "resultset has approprate number of data points");
+
+		/* check the actual values */
+		is_unsigned(rs->results[0].start, ctx.now - (1 * 3600000),
+				"data point #1 starts on time");
+		is_unsigned(rs->results[0].finish, ctx.now - (0 * 3600000) - 1,
+				"data point #1 finishes on time");
+		is_unsigned(rs->results[0].n, 60,
+				"data point #1 has 60 minutely (1h worth) of samples");
+		is_within(rs->results[0].value, 2 * 4871.035, 0.1,
+				"data point #1 (median) value is correct");
+
+		query_free(q);
+
+
+
+		query = "select (cpu / 2) where host=web1 and env=prod after 1h ago aggregate 1h";
+		q = query_parse(query);
+		isnt_null(q, "`%s` should be semantically valid BQL", query);
+		ok(query_plan(q, db) == 0, "planning `%s` against database should succeed", query);
+		ok(query_exec(q, db, &ctx) == 0, "executing `%s` against database should succeed", query);
+
+		isnt_null(q->select, "`%s` has at least one selected series", query);
+		is_null(q->select->next, "`%s` has only one selected series", query);
+
+		rs = q->select->result;
+		isnt_null(rs, "executed query has a resultset");
+		is_string(rs->key, "cpu", "resultset is for cpu metric");
+		is_unsigned(rs->len, 1, "resultset has approprate number of data points");
+
+		/* check the actual values */
+		is_unsigned(rs->results[0].start, ctx.now - (1 * 3600000),
+				"data point #1 starts on time");
+		is_unsigned(rs->results[0].finish, ctx.now - (0 * 3600000) - 1,
+				"data point #1 finishes on time");
+		is_unsigned(rs->results[0].n, 60,
+				"data point #1 has 60 minutely (1h worth) of samples");
+		is_within(rs->results[0].value, 4871.035 / 2.0, 0.1,
+				"data point #1 (median) value is correct");
+
+		query_free(q);
+
+
+
+		query = "select cpu - 1000 where host=web1 and env=prod after 1h ago aggregate 1h";
+		q = query_parse(query);
+		isnt_null(q, "`%s` should be semantically valid BQL", query);
+		ok(query_plan(q, db) == 0, "planning `%s` against database should succeed", query);
+		ok(query_exec(q, db, &ctx) == 0, "executing `%s` against database should succeed", query);
+
+		isnt_null(q->select, "`%s` has at least one selected series", query);
+		is_null(q->select->next, "`%s` has only one selected series", query);
+
+		rs = q->select->result;
+		isnt_null(rs, "executed query has a resultset");
+		is_string(rs->key, "cpu", "resultset is for cpu metric");
+		is_unsigned(rs->len, 1, "resultset has approprate number of data points");
+
+		/* check the actual values */
+		is_unsigned(rs->results[0].start, ctx.now - (1 * 3600000),
+				"data point #1 starts on time");
+		is_unsigned(rs->results[0].finish, ctx.now - (0 * 3600000) - 1,
+				"data point #1 finishes on time");
+		is_unsigned(rs->results[0].n, 60,
+				"data point #1 has 60 minutely (1h worth) of samples");
+		is_within(rs->results[0].value, 4871.035 - 1000, 0.1,
+				"data point #1 (median) value is correct");
+
+		query_free(q);
+
+
+
+		query = "select cpu + 1000 where host=web1 and env=prod after 1h ago aggregate 1h";
+		q = query_parse(query);
+		isnt_null(q, "`%s` should be semantically valid BQL", query);
+		ok(query_plan(q, db) == 0, "planning `%s` against database should succeed", query);
+		ok(query_exec(q, db, &ctx) == 0, "executing `%s` against database should succeed", query);
+
+		isnt_null(q->select, "`%s` has at least one selected series", query);
+		is_null(q->select->next, "`%s` has only one selected series", query);
+
+		rs = q->select->result;
+		isnt_null(rs, "executed query has a resultset");
+		is_string(rs->key, "cpu", "resultset is for cpu metric");
+		is_unsigned(rs->len, 1, "resultset has approprate number of data points");
+
+		/* check the actual values */
+		is_unsigned(rs->results[0].start, ctx.now - (1 * 3600000),
+				"data point #1 starts on time");
+		is_unsigned(rs->results[0].finish, ctx.now - (0 * 3600000) - 1,
+				"data point #1 finishes on time");
+		is_unsigned(rs->results[0].n, 60,
+				"data point #1 has 60 minutely (1h worth) of samples");
+		is_within(rs->results[0].value, 4871.035 + 1000, 0.1,
+				"data point #1 (median) value is correct");
+
+		query_free(q);
+
+
+
+		query = "select cpu + cpu where host=web1 and env=prod after 1h ago aggregate 1h";
+		q = query_parse(query);
+		isnt_null(q, "`%s` should be semantically valid BQL", query);
+		ok(query_plan(q, db) == 0, "planning `%s` against database should succeed", query);
+		ok(query_exec(q, db, &ctx) == 0, "executing `%s` against database should succeed", query);
+
+		isnt_null(q->select, "`%s` has at least one selected series", query);
+		is_null(q->select->next, "`%s` has only one selected series", query);
+
+		rs = q->select->result;
+		isnt_null(rs, "executed query has a resultset");
+		is_string(rs->key, "cpu", "resultset is for cpu metric");
+		is_unsigned(rs->len, 1, "resultset has approprate number of data points");
+
+		/* check the actual values */
+		is_unsigned(rs->results[0].start, ctx.now - (1 * 3600000),
+				"data point #1 starts on time");
+		is_unsigned(rs->results[0].finish, ctx.now - (0 * 3600000) - 1,
+				"data point #1 finishes on time");
+		is_unsigned(rs->results[0].n, 60,
+				"data point #1 has 60 minutely (1h worth) of samples");
+		is_within(rs->results[0].value, 4871.035 * 2, 0.1,
+				"data point #1 (median) value is correct");
+
+		query_free(q);
+
+
+
+		query = "select cpu - cpu where host=web1 and env=prod after 1h ago aggregate 1h";
+		q = query_parse(query);
+		isnt_null(q, "`%s` should be semantically valid BQL", query);
+		ok(query_plan(q, db) == 0, "planning `%s` against database should succeed", query);
+		ok(query_exec(q, db, &ctx) == 0, "executing `%s` against database should succeed", query);
+
+		isnt_null(q->select, "`%s` has at least one selected series", query);
+		is_null(q->select->next, "`%s` has only one selected series", query);
+
+		rs = q->select->result;
+		isnt_null(rs, "executed query has a resultset");
+		is_string(rs->key, "cpu", "resultset is for cpu metric");
+		is_unsigned(rs->len, 1, "resultset has approprate number of data points");
+
+		/* check the actual values */
+		is_unsigned(rs->results[0].start, ctx.now - (1 * 3600000),
+				"data point #1 starts on time");
+		is_unsigned(rs->results[0].finish, ctx.now - (0 * 3600000) - 1,
+				"data point #1 finishes on time");
+		is_unsigned(rs->results[0].n, 60,
+				"data point #1 has 60 minutely (1h worth) of samples");
+		is_within(rs->results[0].value, 0, 0.1,
+				"data point #1 (median) value is correct");
+
+		query_free(q);
+
+
+
+		query = "select cpu / cpu where host=web1 and env=prod after 1h ago aggregate 1h";
+		q = query_parse(query);
+		isnt_null(q, "`%s` should be semantically valid BQL", query);
+		ok(query_plan(q, db) == 0, "planning `%s` against database should succeed", query);
+		ok(query_exec(q, db, &ctx) == 0, "executing `%s` against database should succeed", query);
+
+		isnt_null(q->select, "`%s` has at least one selected series", query);
+		is_null(q->select->next, "`%s` has only one selected series", query);
+
+		rs = q->select->result;
+		isnt_null(rs, "executed query has a resultset");
+		is_string(rs->key, "cpu", "resultset is for cpu metric");
+		is_unsigned(rs->len, 1, "resultset has approprate number of data points");
+
+		/* check the actual values */
+		is_unsigned(rs->results[0].start, ctx.now - (1 * 3600000),
+				"data point #1 starts on time");
+		is_unsigned(rs->results[0].finish, ctx.now - (0 * 3600000) - 1,
+				"data point #1 finishes on time");
+		is_unsigned(rs->results[0].n, 60,
+				"data point #1 has 60 minutely (1h worth) of samples");
+		is_within(rs->results[0].value, 1.0, 0.1,
+				"data point #1 (median) value is correct");
+
+		query_free(q);
+
+
+
+		query = "select cpu * cpu where host=web1 and env=prod after 1h ago aggregate 1h";
+		q = query_parse(query);
+		isnt_null(q, "`%s` should be semantically valid BQL", query);
+		ok(query_plan(q, db) == 0, "planning `%s` against database should succeed", query);
+		ok(query_exec(q, db, &ctx) == 0, "executing `%s` against database should succeed", query);
+
+		isnt_null(q->select, "`%s` has at least one selected series", query);
+		is_null(q->select->next, "`%s` has only one selected series", query);
+
+		rs = q->select->result;
+		isnt_null(rs, "executed query has a resultset");
+		is_string(rs->key, "cpu", "resultset is for cpu metric");
+		is_unsigned(rs->len, 1, "resultset has approprate number of data points");
+
+		/* check the actual values */
+		is_unsigned(rs->results[0].start, ctx.now - (1 * 3600000),
+				"data point #1 starts on time");
+		is_unsigned(rs->results[0].finish, ctx.now - (0 * 3600000) - 1,
+				"data point #1 finishes on time");
+		is_unsigned(rs->results[0].n, 60,
+				"data point #1 has 60 minutely (1h worth) of samples");
+		is_within(rs->results[0].value, 4871.035 * 4871.035, 100.0,
 				"data point #1 (median) value is correct");
 
 		query_free(q);
