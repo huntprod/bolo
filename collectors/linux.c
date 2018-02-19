@@ -415,11 +415,11 @@ int collect_stat(void)
 int collect_procs(void)
 {
 	struct {
+		uint16_t total;
 		uint16_t running;
 		uint16_t sleeping;
 		uint16_t zombies;
 		uint16_t stopped;
-		uint16_t paging;
 		uint16_t blocked;
 		uint16_t unknown;
 	} P = {0};
@@ -460,23 +460,24 @@ int collect_procs(void)
 		while (*a && !isspace(*a)) a++;
 		while (*a &&  isspace(*a)) a++;
 
+		P.total++;
 		switch (*a) {
 		case 'R': P.running++;  break;
 		case 'S': P.sleeping++; break;
 		case 'D': P.blocked++;  break;
 		case 'Z': P.zombies++;  break;
+		case 't':
 		case 'T': P.stopped++;  break;
-		case 'W': P.paging++;   break;
 		default:  P.unknown++;  break;
 		}
 	}
 
+	printf("procs.total %s %lu %i\n",    tags, ts, P.total);
 	printf("procs.running %s %lu %i\n",  tags, ts, P.running);
 	printf("procs.sleeping %s %lu %i\n", tags, ts, P.sleeping);
 	printf("procs.blocked %s %lu %i\n",  tags, ts, P.blocked);
 	printf("procs.zombies %s %lu %i\n",  tags, ts, P.zombies);
 	printf("procs.stopped %s %lu %i\n",  tags, ts, P.stopped);
-	printf("procs.paging %s %lu %i\n",   tags, ts, P.paging);
 	printf("procs.unknown %s %lu %i\n",  tags, ts, P.unknown);
 	return 0;
 }
@@ -504,7 +505,9 @@ int collect_openfiles(void)
 	/* free file descriptors */
 	while (*a &&  isspace(*a)) a++; b = a;
 	while (*b && !isspace(*b)) b++; *b++ = '\0';
-	printf("openfiles.free %s %lu %s\n", tags, ts, a && *a ? a : "0");
+	/* no point in reporting this value; it's always 0
+	   on Linux 2.6+.  Since Linux 2.4 is ancient at this
+	   point, we just omit it. */
 
 	a = b;
 	/* max file descriptors */
