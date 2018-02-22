@@ -291,15 +291,9 @@ sub pidstats
 	my $data = {};
 	$data->{processes} = 1;
 
-	my $of;
-	opendir $of, "/proc/$pid/fd" and do {
-		$data->{openfiles} = scalar(grep { ! /^\./ } readdir $of);
-		close $of;
-	};
-
 	for (SLURP "/proc/$pid/status") {
-		if (m/^(VmPeak|VmSize|VmRSS|VmHWM):\s+(\d+)/) {
-			$data->{lc($1)} = $2 * 1024;
+		if (m/^Vm(Peak|Size|RSS|HWM):\s+(\d+)/) {
+			$data->{'vm.'.lc($1)} = $2 * 1024;
 		}
 		if (m/^Threads:\s+(\d+)/) {
 			$data->{threads} = $1;
@@ -347,32 +341,33 @@ sub pidstats
 		$io{$1} = $2 if m/^(.*):\s+(\d+)/;
 	}
 	if (%io) {
-		$data->{io_reads}   = $io{syscr};
-		$data->{io_writes}  = $io{syscw};
-		$data->{io_all_rd}  = $io{rchar};
-		$data->{io_all_wr}  = $io{wchar};
-		$data->{io_disk_rd} = $io{read_bytes};
-		$data->{io_disk_wr} = $io{write_bytes} - $io{cancelled_write_bytes};
+		$data->{'io.reads'}   = $io{syscr};
+		$data->{'io.writes'}  = $io{syscw};
+
+		$data->{'io.all.bytes_read'}     = $io{rchar};
+		$data->{'io.all.bytes_written'}  = $io{wchar};
+		$data->{'io.disk.bytes_read'}    = $io{read_bytes};
+		$data->{'io.disk.bytes_written'} = $io{write_bytes} - $io{cancelled_write_bytes};
 	}
 
 	my $smaps = smaps("/proc/$pid/smaps");
 	for (qw(heap anon stack libs mmap)) {
 		my $h;
-		$data->{"mem_$_"} = 0;
-		$data->{"swp_$_"} = 0;
+		$data->{"mem.$_"} = 0;
+		$data->{"swap.$_"} = 0;
 		if ($h = $smaps->{"[$_]"}{usage}) {
-			$data->{"mem_$_"} += $h->{private_clean} + $h->{private_dirty};
-			$data->{"mem_$_"} += $h->{shared_clean}  + $h->{shared_dirty}
+			$data->{"mem.$_"} += $h->{private_clean} + $h->{private_dirty};
+			$data->{"mem.$_"} += $h->{shared_clean}  + $h->{shared_dirty}
 				unless $is_child;
-			$data->{"swp_$_"} = $h->{swap};
+			$data->{"swap.$_"} = $h->{swap};
 		}
 	}
 
 	my @pidstat = split / /, SLURP "/proc/$pid/stat";
-	$data->{utime}      = $pidstat[13] / CLOCKS_PER_SEC * 1000;
-	$data->{stime}      = $pidstat[14] / CLOCKS_PER_SEC * 1000;
-	$data->{guest_time} = $pidstat[42] / CLOCKS_PER_SEC * 1000;
-	$data->{iowait}     = $pidstat[41] / CLOCKS_PER_SEC * 1000;
+	$data->{'cpu.utime'}  = $pidstat[13] / CLOCKS_PER_SEC * 1000;
+	$data->{'cpu.stime'}  = $pidstat[14] / CLOCKS_PER_SEC * 1000;
+	$data->{'cpu.guest'}  = $pidstat[42] / CLOCKS_PER_SEC * 1000;
+	$data->{'cpu.iowait'} = $pidstat[41] / CLOCKS_PER_SEC * 1000;
 
 	return $data;
 }
