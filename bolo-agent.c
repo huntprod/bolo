@@ -97,6 +97,16 @@ s_exec(struct runner *r)
 	r->outfd = pfd[0];
 }
 
+static void
+s_connect(struct context *ctx, int isinit)
+{
+	debugf("%sconnecting to bolo core at `%s`", (isinit ? "" : "re"), ctx->config.bolo_endpoint);
+	ctx->bolo.fd = net_connect(ctx->config.bolo_endpoint);
+	if (ctx->bolo.fd < 0)
+		bail("unable to connect to bolo core");
+	ctx->bolo.watched = 0; /* don't start watching until we have data */
+}
+
 static int
 runner_handler(int fd, void *_u)
 {
@@ -228,7 +238,11 @@ relay_handler(int fd, void *_u)
 		if (nwrit < 0) {
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
 				break;
-			return -1; /* FIXME: recover? */
+			if (errno == EPIPE) {
+				s_connect(ctx, 0);
+				continue;
+			}
+			return -1;
 		}
 
 		debugf("relay: sent %d/%d octets from sendbuf %p", nwrit, buf->len - buf->off, buf);
@@ -362,12 +376,8 @@ do_agent(int argc, char **argv)
 	fdpoll_timeout(ctx.poll, 250, scheduler, &ctx);
 	fdpoll_every(ctx.poll, scheduler, &ctx);
 
-	debugf("connecting to bolo core at `%s`", ctx.config.bolo_endpoint);
-	ctx.bolo.fd = net_connect(ctx.config.bolo_endpoint);
-	if (ctx.bolo.fd < 0)
-		bail("unable to connect to bolo core");
-	ctx.bolo.watched = 0; /* don't start watching until we have data */
-
+	signal(SIGPIPE, SIG_IGN);
+	s_connect(&ctx, 1);
 	fdpoll(ctx.poll);
 	return 0;
 }
