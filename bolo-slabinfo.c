@@ -7,7 +7,9 @@ do_slabinfo(int argc, char **argv)
 	struct tslab slab;
 	const char *path;
 	int i, j, k, rc, fd;
-	int nvalid;
+	int tcells, nvalid;
+	double full, bitsper;
+	char unit;
 
 	if (argc < 3) {
 		fprintf(stderr, "USAGE: bolo slabinfo FILE\n");
@@ -28,7 +30,7 @@ do_slabinfo(int argc, char **argv)
 			continue;
 		}
 
-		nvalid = 0;
+		tcells = nvalid = 0;
 		for (j = 0; j < TBLOCKS_PER_TSLAB; j++) {
 			if (!slab.blocks[j].valid)
 				break;
@@ -39,9 +41,8 @@ do_slabinfo(int argc, char **argv)
 		fprintf(stdout, "slab %lu (%#016lx) %dk %d/%d blocks present\n",
 			slab.number, slab.number, slab.block_size / 1024, nvalid, TBLOCKS_PER_TSLAB);
 		for (j = 0; j < TBLOCKS_PER_TSLAB; j++) {
-			double full, bitsper;
 			uint32_t span, tmp;
-			char unit, date[64];
+			char date[64];
 			struct tm tm;
 			time_t ts;
 			unsigned d, h, m, s, ms;
@@ -49,6 +50,7 @@ do_slabinfo(int argc, char **argv)
 			if (!slab.blocks[j].valid)
 				break;
 
+			tcells += slab.blocks[j].cells;
 			full = 100.0 * slab.blocks[j].cells / TCELLS_PER_TBLOCK;
 
 			unit = 'b';
@@ -76,7 +78,7 @@ do_slabinfo(int argc, char **argv)
 				strftime(date, 64, "%a, %d %b %Y %H:%M:%S%z", &tm);
 
 			fprintf(stdout, "    @%lu (%#016lx) ts %lu [%s] % 6i measurements;"
-			                   " %6.2lf%% full, spanning %ud %02u:%02u:%02u.%04u;"
+			                   " %6.2lf%% full, spanning % 2ud %02u:%02u:%02u.%04u;"
 			                   " %7.2lf%c/measurement\n",
 				slab.blocks[j].number, slab.blocks[j].number,
 				slab.blocks[j].base, date,
@@ -84,6 +86,18 @@ do_slabinfo(int argc, char **argv)
 				full, d, h, m, s, ms,
 				bitsper, unit);
 		}
+
+		/* totals */
+		full = 100.0 * tcells / (TCELLS_PER_TBLOCK * nvalid);
+
+		unit = 'b';
+		bitsper = (nvalid * TBLOCK_SIZE * 8.0) / tcells;
+		if (bitsper > 1024.0) {
+			bitsper /= 1024.0;
+			unit = 'k';
+		}
+		fprintf(stdout, "  total %i measurements (%6.2lf%% full)\n", tcells, full);
+		fprintf(stdout, "  average %0.2lf%c/measurement\n", bitsper, unit);
 
 		if (tslab_unmap(&slab) != 0)
 			fprintf(stderr, "failed to unmap %s...\n", path);
