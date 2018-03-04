@@ -1,6 +1,23 @@
 #include "bolo.h"
 #include <time.h>
 
+static const char *
+cfname(int cf)
+{
+	static const char * names[] = {
+		"(unknown-cf)",
+		"min",
+		"max",
+		"sum",
+		"mean",
+		"median",
+		"stdev",
+		"var",
+		"delta",
+	};
+	return names[cf < CF_DELTA ? cf : 0];
+}
+
 int
 do_parse(int argc, char **argv)
 {
@@ -77,6 +94,8 @@ do_parse(int argc, char **argv)
 				case QOP_SUBC:   fprintf(stderr, "        SUBC   %e\n", f->ops[j].data.imm); break;
 				case QOP_MULC:   fprintf(stderr, "        MULC   %e\n", f->ops[j].data.imm); break;
 				case QOP_DIVC:   fprintf(stderr, "        DIVC   %e\n", f->ops[j].data.imm); break;
+
+				case QOP_AGGR:   fprintf(stdout, "        AGGR   %s\n", cfname(f->ops[j].data.aggr.cf)); break;
 				}
 				if (f->ops[j].code == QOP_RETURN)
 					break;

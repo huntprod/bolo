@@ -12,7 +12,7 @@ ifeq ($(PROF),yes)
 endif
 
 TESTS := bits util
-TESTS += rsv cfg
+TESTS += cf cfg
 TESTS += hash page btree
 TESTS += sha time
 TESTS += tags query db
@@ -30,7 +30,7 @@ process: collectors/process
 
 all: bolo $(COLLECTORS) api/api
 bolo: bolo.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o \
-      btree.o tags.o query.o rsv.o bql/bql.a bqip.o net.o fdpoll.o ingest.o cfg.o \
+      btree.o tags.o query.o cf.o bql/bql.a bqip.o net.o fdpoll.o ingest.o cfg.o \
       \
       bolo-help.o bolo-version.o bolo-core.o bolo-dbinfo.o bolo-idxinfo.o bolo-slabinfo.o \
       bolo-import.o bolo-parse.o bolo-query.o bolo-init.o bolo-agent.o
@@ -54,10 +54,10 @@ distclean: realclean
 	rm -f bql/grammar.c bql/lexer.c
 
 test: check
-check: testdata util.o page.o btree.o hash.o rsv.o sha.o tblock.o tslab.o tags.o bql/bql.a
+check: testdata util.o page.o btree.o hash.o cf.o sha.o tblock.o tslab.o tags.o bql/bql.a
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o bits  bits.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o util  util.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o rsv   rsv.c    util.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o cf    cf.c     util.o -lm
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o cfg   cfg.c    hash.o util.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o hash  hash.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o page  page.c   util.o
@@ -65,7 +65,7 @@ check: testdata util.o page.o btree.o hash.o rsv.o sha.o tblock.o tslab.o tags.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o sha   sha.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o time  time.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o tags  tags.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o query query.c  hash.o util.o bql/bql.a rsv.o btree.o page.o db.o sha.o tblock.o tslab.o tags.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o query query.c  hash.o util.o bql/bql.a cf.o btree.o page.o db.o sha.o tblock.o tslab.o tags.o -lm
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o db    db.c     btree.o page.o util.o hash.o sha.o tblock.o tslab.o tags.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o bqip  bqip.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o ingest ingest.c util.o tags.o

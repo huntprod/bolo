@@ -51,7 +51,7 @@ do_query(int argc, char **argv)
 	struct query_ctx ctx;
 
 	{
-		char *key_str;
+		char *key_str = NULL;
 		int idx = 0;
 		char c, *shorts = "hDk:";
 		struct option longs[] = {
@@ -178,10 +178,9 @@ do_query(int argc, char **argv)
 
 			fprintf(stderr, "%s:\n", f->name);
 			for (i = 0; (unsigned)i < f->result->len; i++)
-				fprintf(stderr, "  - {ts: %lu, value: %lf, n: %i}\n",
+				fprintf(stderr, "  - {ts: %lu, value: %lf}\n",
 					f->result->results[i].start,
-					f->result->results[i].value,
-					f->result->results[i].n);
+					f->result->results[i].value);
 		}
 
 		fprintf(stderr, "...\n");

@@ -525,26 +525,32 @@ int tags_canonicalize(char *tags);
 char * tags_next(char *tags, char **tag, char **val);
 
 
-/*****************************************************  reservoir sampling  ***/
+/***************************************************  bucket consolidation  ***/
 
-struct rsv {
-	size_t len;
-	size_t cap;
-	size_t n;
-	double items[];
+#define CF_MIN     1
+#define CF_MAX     2
+#define CF_SUM     3
+#define CF_MEAN    4
+#define CF_MEDIAN  5
+#define CF_STDEV   6
+#define CF_VAR     7
+#define CF_DELTA   8
+
+struct cf {
+	int    type;   /* what type of consolidation is this? (one of CF_*) */
+	size_t slots;  /* how many slots total are in rsv[] */
+	size_t used;   /* how many slots are in used in rsv[] */
+	size_t i;      /* what slot should the next sample go into */
+	size_t n;      /* how many samples have been seen total */
+	double rsv[];  /* reservoir sample for lossy consolidation */
 };
 
-struct rsv *rsv_new(size_t cap);
-void rsv_free(struct rsv *rsv);
+struct cf *cf_new(int type, size_t n);
+void cf_free(struct cf *cf);
 
-void rsv_reset(struct rsv *rsv);
-void rsv_sample(struct rsv *rsv, double v);
-
-double rsv_median(struct rsv *rsv);
-double rsv_average(struct rsv *rsv);
-double rsv_sum(struct rsv *rsv);
-double rsv_min(struct rsv *rsv);
-double rsv_max(struct rsv *rsv);
+void cf_reset(struct cf *cf);
+void cf_sample(struct cf *cf, double v);
+double cf_value(struct cf *cf);
 
 
 /*****************************************************  ingestion protocol  ***/
@@ -590,13 +596,10 @@ struct result {
 	bolo_msec_t start;
 	bolo_msec_t finish;
 	double      value;
-	int n;
 };
 
 struct resultset {
-	char   *key;             /* identifier for this set */
-	size_t  len;             /* how many (ts,value) tuples are there? */
-
+	size_t        len;       /* how many (ts,value) tuples are there? */
 	struct result results[]; /* list of `len` result (ts,value) tuples */
 };
 
@@ -612,6 +615,7 @@ struct resultset {
 #define QOP_MULC  7
 #define QOP_DIV   8
 #define QOP_DIVC  9
+#define QOP_AGGR  10
 #define QOP_RETURN 100
 
 struct qop {
@@ -623,6 +627,9 @@ struct qop {
 			struct resultset *rset;
 			struct multidx   *set;
 		} push;
+		struct {
+			int cf;
+		} aggr;
 	} data;
 };
 
@@ -645,13 +652,16 @@ struct query {
 	int            from;
 	int            until;
 
+	int samples;
+	int stride;
+	int cf;
+
 	int   err_num;
 	char *err_data;
 };
 
 struct query_ctx {
 	bolo_msec_t now;
-	int         rsv_depth;
 };
 
 struct query * bql_parse(const char *q);

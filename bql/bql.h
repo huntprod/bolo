@@ -20,6 +20,12 @@ typedef union {
 		int until;
 	} range;
 
+	struct {
+		int samples;
+		int stride;
+		int cf;
+	} bucket;
+
 	int aggrwin;
 	struct qfield *qfield;
 	struct qexpr  *qexpr;

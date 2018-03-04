@@ -1,6 +1,32 @@
 %{
 #include "bql.h"
 
+static struct {
+	char *name;
+	int   cf;
+} cftab[] = {
+	{  "min",       CF_MIN     },
+	{  "max",       CF_MAX     },
+	{  "sum",       CF_SUM     },
+	{  "mean",      CF_MEAN    },
+	{  "median",    CF_MEDIAN  },
+	{  "stdev",     CF_STDEV   },
+	{  "variance",  CF_VAR     },
+	{  "delta",     CF_DELTA   },
+	{ 0, 0 }
+};
+
+static int
+cf(const char *name)
+{
+	int i;
+	for (i = 0; cftab[i].name; i++)
+		if (strcasecmp(name, cftab[i].name) == 0)
+			return cftab[i].cf;
+
+	return 0;
+}
+
 #define EXPR_REF   1
 #define EXPR_ADD   2
 #define EXPR_SUB   3
@@ -79,6 +105,60 @@ qexpr_free(struct qexpr *qexpr)
 	}
 }
 
+#define NO_GRANULARITY        0
+#define BUCKET_GRANULARITY    1
+#define AGGREGATE_GRANULARITY 2
+
+static int
+granularity(struct qexpr *qx)
+{
+	int a, b;
+
+	switch (qx->type) {
+	case EXPR_ADD:
+	case EXPR_SUB:
+	case EXPR_MULT:
+	case EXPR_DIV:
+		a = granularity(qx->a);
+		b = granularity(qx->b);
+		if (a != NO_GRANULARITY && b != NO_GRANULARITY && a != b)
+			return -1;
+		return a == NO_GRANULARITY ? b : a;
+
+	case EXPR_REF:  return BUCKET_GRANULARITY;
+	case EXPR_NUM:  return NO_GRANULARITY;
+	case EXPR_FUNC: return granularity(qx->b);
+	}
+}
+
+static int
+aggregates(struct qexpr *qx, int seen)
+{
+	switch (qx->type) {
+	case EXPR_FUNC:
+		if (seen) return -1;
+		return aggregates(qx->b, 1);
+
+	case EXPR_ADD:
+	case EXPR_SUB:
+	case EXPR_MULT:
+	case EXPR_DIV:
+		if (aggregates(qx->a, seen) < 0) return -1;
+		if (aggregates(qx->b, seen) < 0) return -1;
+		return 0;
+	}
+
+	return 0;
+}
+
+static int
+verify(struct qexpr *qx)
+{
+	if (granularity(qx)   < 0) return -1;
+	if (aggregates(qx, 0) < 0) return -1;
+	return 0;
+}
+
 static void
 simplify(struct qexpr *qx)
 {
@@ -133,8 +213,10 @@ opcodes(struct qexpr *qx)
 	                      + opcodes(qx->b)
 	                      + 1;
 
-	case EXPR_REF:
-	case EXPR_FUNC:  return 1;
+	case EXPR_FUNC:  return opcodes(qx->b)
+	                      + 1;
+
+	case EXPR_REF:   return 1;
 	}
 }
 
@@ -149,6 +231,12 @@ opify(struct qexpr *qx, struct qop *next)
 	case EXPR_REF:
 		next->code = QOP_PUSH;
 		next->data.push.metric = strdup((char *)(qx->a));
+		return next+1;
+
+	case EXPR_FUNC:
+		next = opify(qx->b, next);
+		next->code = QOP_AGGR;
+		next->data.aggr.cf = cf((char *)(qx->a));
 		return next+1;
 
 	case EXPR_ADD:
@@ -206,10 +294,15 @@ qfield(struct qexpr *e, char *name)
 	f = xmalloc(sizeof(struct qfield));
 	f->name = name;
 
-	n = opcodes(e) + 1; /* append QOP_RETURN */
-	f->ops = xcalloc(n, sizeof(struct qop));
-	opify(e, f->ops);
-	f->ops[n-1].code = QOP_RETURN;
+	if (verify(e) != 0) {
+		f->ops = NULL;
+
+	} else {
+		n = opcodes(e) + 1; /* append QOP_RETURN */
+		f->ops = xcalloc(n, sizeof(struct qop));
+		opify(e, f->ops);
+		f->ops[n-1].code = QOP_RETURN;
+	}
 
 	qexpr_free(e);
 	return f;
@@ -224,6 +317,7 @@ qfield(struct qexpr *e, char *name)
 %token T_AS
 %token T_BEFORE
 %token T_BETWEEN
+%token T_BUCKET
 %token T_DAILY
 %token T_DAYS
 %token T_DOES
@@ -237,10 +331,13 @@ qfield(struct qexpr *e, char *name)
 %token T_NOT
 %token T_NOW
 %token T_OR
+%token T_OVER
 %token T_PER
+%token T_SAMPLES
 %token T_SECONDLY
 %token T_SECONDS
 %token T_SELECT
+%token T_USING
 %token T_WHERE
 
 %token <number> T_NUMBER
@@ -262,6 +359,11 @@ qfield(struct qexpr *e, char *name)
 %type <range> when_after
 
 %type <aggrwin> aggr_clause
+
+%type <bucket> bucket_clause
+%type <bucket> bucket_subclauses
+%type <bucket> bucket_subclause
+%type <bucket> bucket_cf
 
 %type <qcond> where_clause
 %type <qcond> cond
@@ -286,6 +388,9 @@ query :                     { $$ = QUERY  = xmalloc(sizeof(struct query)); }
       | query aggr_clause   { $$->aggr    = $2; }
       | query when_clause   { $$->from    = $2.from;
                               $$->until   = $2.until; }
+      | query bucket_clause { if ($2.samples > 0) $$->samples = $2.samples;
+                              if ($2.stride  > 0) $$->stride  = $2.stride;
+                              if ($2.cf)          $$->cf      = $2.cf; }
       ;
 
 select_clause: T_SELECT fields { $$ = $2; }
@@ -352,6 +457,28 @@ unit: T_DAYS     { $$ = 86400; }
     | T_MINUTES  { $$ = 60;    }
     | T_SECONDS  { $$ = 1;     }
     ;
+
+bucket_clause: T_BUCKET bucket_subclause bucket_subclauses {
+                 $$.samples = $3.samples ? $3.samples : $2.samples;
+                 $$.stride  = $3.stride  ? $3.stride  : $2.stride;
+                 $$.cf      = $3.cf      ? $3.cf      : $2.cf;
+               }
+             ;
+
+bucket_subclauses: { memset(&($$), 0, sizeof($$)); }
+                 | bucket_subclauses bucket_subclause {
+                     $$.samples = $2.samples ? $2.samples : $1.samples;
+                     $$.stride  = $2.stride  ? $2.stride  : $1.stride;
+                     $$.cf      = $2.cf      ? $2.cf      : $1.cf;
+                   }
+                 ;
+
+bucket_subclause: T_USING T_NUMBER T_SAMPLES { $$.samples = $2; }
+                | bucket_cf T_OVER timespan  { $$.cf      = $1.cf;
+                                               $$.stride  = $3; }
+                ;
+
+bucket_cf: T_BAREWORD { $$.cf = cf($1); free($1); }
 
 when_clause: when_after                    { $$.from = $1.from; $$.until = 0; }
            | when_after  T_AND when_before { $$.from = $1.from; $$.until = $3.until; }
