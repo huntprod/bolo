@@ -634,8 +634,9 @@ struct qop {
 	} data;
 };
 
-#define QERR_NOSUCHREF 1
-#define QERR__TOP      1
+#define QERR_NOSUCHREF   1
+#define QERR_MISSINGCOND 2
+#define QERR__TOP        2
 
 struct qfield {
 	struct qfield    *next;

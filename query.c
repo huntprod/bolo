@@ -160,7 +160,7 @@ s_qfield_plan(struct query *q, struct db *db, struct qfield *f)
 
 			f->ops[i].data.push.set = NULL;
 			for (tmp = full; tmp; tmp = tmp->next) {
-				if (qcond_check(q->where, tmp->idx) == 0) {
+				if (q->where && qcond_check(q->where, tmp->idx) == 0) {
 					set = xmalloc(sizeof(*set));
 					set->next = f->ops[i].data.push.set;
 					set->idx  = tmp->idx;
@@ -553,6 +553,12 @@ query_exec(struct query *q, struct db *db, struct query_ctx *ctx)
 	struct qfield *f;
 	struct query_ctx default_ctx;
 
+	if (!q->where) {
+		q->err_num = QERR_MISSINGCOND;
+		free(q->err_data); q->err_data = NULL;
+		return -1;
+	}
+
 	if (!ctx) {
 		ctx = &default_ctx;
 		memset(ctx, 0, sizeof(*ctx));
@@ -572,6 +578,7 @@ query_exec(struct query *q, struct db *db, struct query_ctx *ctx)
 static const char * QERR_strings[] = {
 	"(no error)",
 	"No such metric",
+	"Missing WHERE clause",
 };
 const char *
 query_strerror(struct query *q)
