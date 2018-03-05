@@ -623,6 +623,7 @@ struct qop {
 	union {
 		double  imm;
 		struct {
+			int               raw;
 			char             *metric;
 			struct resultset *rset;
 			struct multidx   *set;

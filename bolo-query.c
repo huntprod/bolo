@@ -152,7 +152,7 @@ do_query(int argc, char **argv)
 				case QOP_DIVC:   fprintf(stderr, "    % 3d: DIVC %e\n", i, f->ops[i].data.imm); break;
 
 				case QOP_PUSH:
-					fprintf(stderr, "    % 3d: PUSH '%s'\n", i, f->ops[i].data.push.metric);
+					fprintf(stderr, "    % 3d: PUSH '%s'%s\n", i, f->ops[i].data.push.metric, f->ops[i].data.push.raw ? " (raw)" : "");
 					fprintf(stderr, "          ; found matching series:\n");
 					for (set = f->ops[i].data.push.set; set; set = set->next)
 						fprintf(stderr, "          ; - [%#06lx] %p\n", set->idx->number, (void *)set->idx);

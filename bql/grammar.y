@@ -43,6 +43,7 @@ cf(const char *name)
 #define EXPR_DIV   5
 #define EXPR_FUNC  6
 #define EXPR_NUM   7
+#define EXPR_RAW   8
 
 struct qexpr {
 	struct qexpr *next;
@@ -102,6 +103,7 @@ qexpr_free(struct qexpr *qexpr)
 			qexpr_free(qexpr->b);
 			break;
 
+		case EXPR_RAW:
 		case EXPR_REF:
 		case EXPR_NUM:
 			free(qexpr->a);
@@ -227,6 +229,7 @@ opcodes(struct qexpr *qx)
 	case EXPR_FUNC:  return opcodes(qx->b)
 	                      + 1;
 
+	case EXPR_RAW:
 	case EXPR_REF:   return 1;
 	}
 }
@@ -239,8 +242,10 @@ opify(struct qexpr *qx, struct qop *next)
 	switch (qx->type) {
 	default: return next;
 
+	case EXPR_RAW:
 	case EXPR_REF:
 		next->code = QOP_PUSH;
+		next->data.push.raw = (qx->type == EXPR_RAW);
 		next->data.push.metric = strdup((char *)(qx->a));
 		return next+1;
 
@@ -349,6 +354,7 @@ qfield(struct qexpr *e, char *name)
 %token T_SECONDLY
 %token T_SECONDS
 %token T_SELECT
+%token T_RAW
 %token T_USING
 %token T_WHERE
 
@@ -383,6 +389,8 @@ qfield(struct qexpr *e, char *name)
 %type <qcond> cond
 
 %type <qfield> select_clause
+%type <qfield> raw_fields
+%type <qfield> raw_field
 %type <qfield> fields
 %type <qfield> field
 
@@ -404,9 +412,19 @@ query :                     { $$ = QUERY  = xmalloc(sizeof(struct query)); }
       | query aggr_clause   { mergeb($$->aggr,   $2, $$->aggr);   }
       | query bucket_clause { mergeb($$->bucket, $2, $$->bucket); }
       ;
+;
 
-select_clause: T_SELECT fields { $$ = $2; }
+select_clause: T_SELECT fields           { $$ = $2; }
+             | T_SELECT T_RAW raw_fields { $$ = $3; }
              ;
+
+raw_fields: raw_field                { $$ = $1; }
+          | raw_fields ',' raw_field { $$ = pushf($1, $3); }
+          ;
+
+raw_field: T_BAREWORD                 { $$ = qfield(qexpr(EXPR_RAW, $1, NULL), NULL); }
+         | T_BAREWORD T_AS T_BAREWORD { $$ = qfield(qexpr(EXPR_RAW, $1, NULL), $3);   }
+         ;
 
 fields: field            { $$ = $1; }
       | fields ',' field { $$ = pushf($1, $3); }

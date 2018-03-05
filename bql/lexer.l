@@ -44,6 +44,7 @@ struct {
 	{  "seconds",    T_SECONDS    },
 	{  "second",     T_SECONDS    },
 	{  "select",     T_SELECT     },
+	{  "raw",        T_RAW        },
 	{  "using",      T_USING      },
 	{  "where",      T_WHERE      },
 	{ 0, 0 },

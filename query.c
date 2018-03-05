@@ -338,25 +338,27 @@ s_qfield_exec(struct query *q, struct db *db, struct query_ctx *ctx, struct qfie
 			return 0;
 
 		case QOP_PUSH:
-			/* scale and push a new resultset onto the stack */
+			/* retrieve a resultset and push it on the stack */
 			top++;
 			if (top == QOPS_STACK_MAX)
 				bail("query eval: stack depth exceeded"); /* FIXME */
-			stack[top] = new_resultset(q->bucket.stride,
-			                           ctx->now / 1000 + q->from,
-			                           ctx->now / 1000 + q->until);
 
-			/* consolidate the sample set on bucketing parameters */
-			for (j = 0; (unsigned)j < stack[top]->len; j++) {
-				cf_reset(bkt);
+			if (f->ops[i].data.push.raw) {
+				/* raw retrieves are just pulled in as-is, without bucketing */
+				int n;
+				bolo_msec_t from, until;
+
+				from  = ctx->now + 1000 * q->from;
+				until = ctx->now + 1000 * q->until;
+
+				/* see how many results there are */
+				n = 0;
 				for (set = f->ops[i].data.push.set; set; set = set->next) {
 					struct tblock *block;
 					uint64_t blkid;
 
-					if (btree_find(set->idx->btree, &blkid, stack[top]->results[j].start) != 0) {
+					if (btree_find(set->idx->btree, &blkid, from) != 0) {
 						fprintf(stderr, "failed to btree_find on metric %s\n", f->ops[i].data.push.metric);
-						cf_free(bkt);
-						free_resultset(stack[top]);
 						return -1;
 					}
 
@@ -367,14 +369,80 @@ s_qfield_exec(struct query *q, struct db *db, struct query_ctx *ctx, struct qfie
 
 						for (k = 0; k < block->cells; k++) {
 							ts = tblock_ts(block, k);
-							if (ts >= stack[top]->results[j].start && ts <= stack[top]->results[j].finish)
-								cf_sample(bkt, tblock_value(block, k));
+							if (ts >= from && ts <= until)
+								n++;
 						}
 
 						block = db_findblock(db, block->next);
 					}
 				}
-				stack[top]->results[j].value = cf_value(bkt);
+				/* allocate a resultset */
+				tmp = xalloc(1, sizeof(*tmp) + sizeof(struct result) * n);
+				tmp->len = n; n = 0;
+				for (set = f->ops[i].data.push.set; set; set = set->next) {
+					struct tblock *block;
+					uint64_t blkid;
+
+					if (btree_find(set->idx->btree, &blkid, from) != 0) {
+						fprintf(stderr, "failed to btree_find on metric %s\n", f->ops[i].data.push.metric);
+						return -1;
+					}
+
+					block = db_findblock(db, blkid);
+					while (block) {
+						int k;
+						for (k = 0; k < block->cells; k++) {
+							bolo_msec_t ts;
+
+							ts = tblock_ts(block, k);
+							if (ts >= from && ts <= until) {
+								tmp->results[n].finish = tmp->results[n].start = ts;
+								tmp->results[n].value = tblock_value(block, k);
+								n++;
+							}
+						}
+						block = db_findblock(db, block->next);
+					}
+				}
+				stack[top] = tmp;
+
+			} else {
+				/* regular retrieves are bucketed to ensure a common frame of reference
+				   for metric expressions and calculations */
+				stack[top] = new_resultset(q->bucket.stride,
+				                           ctx->now / 1000 + q->from,
+				                           ctx->now / 1000 + q->until);
+
+				/* consolidate the sample set on bucketing parameters */
+				for (j = 0; (unsigned)j < stack[top]->len; j++) {
+					cf_reset(bkt);
+					for (set = f->ops[i].data.push.set; set; set = set->next) {
+						struct tblock *block;
+						uint64_t blkid;
+
+						if (btree_find(set->idx->btree, &blkid, stack[top]->results[j].start) != 0) {
+							fprintf(stderr, "failed to btree_find on metric %s\n", f->ops[i].data.push.metric);
+							cf_free(bkt);
+							free_resultset(stack[top]);
+							return -1;
+						}
+
+						block = db_findblock(db, blkid);
+						while (block) {
+							int k;
+							bolo_msec_t ts;
+
+							for (k = 0; k < block->cells; k++) {
+								ts = tblock_ts(block, k);
+								if (ts >= stack[top]->results[j].start && ts <= stack[top]->results[j].finish)
+									cf_sample(bkt, tblock_value(block, k));
+							}
+
+							block = db_findblock(db, block->next);
+						}
+					}
+					stack[top]->results[j].value = cf_value(bkt);
+				}
 			}
 			break;
 
@@ -772,6 +840,59 @@ TESTS {
 
 		if (!(db = db_mount("t/data/db/1", key = read_key("decafbad"))))
 			BAIL_OUT("failed to mount database at t/data/db/1 successfully");
+
+		/* i.e. `BOLO_NOW='2001-03-02 17:07:01' ./bolo query t/data/db/1/ 'select raw cpu where env=staging after 1h ago'` */
+		query = "select raw cpu where env = staging after 5m ago";
+		/*
+		 PLAN:
+		   field `metric_1`:
+		         0: PUSH 'cpu' (raw)
+		           ; found matching series:
+		             ; - [0x0001] 0x573a690
+		       1: RET
+
+
+		   aggregate 0s
+
+		 conditions:
+		   EQ: [env] = 'staging'
+		       - idx [0x0001]
+
+		 metric_1:
+		   - {ts: 983552521000, value: 9141.712322}
+		   - {ts: 983552581000, value: 8636.162236}
+		   - {ts: 983552641000, value: 4965.452476}
+		   - {ts: 983552701000, value: 4154.365632}
+		   - {ts: 983552761000, value: 7242.142521}
+		   - {ts: 983552821000, value: 6895.169995}
+		*/
+		q = query_parse(query);
+		isnt_null(q, "`%s` should be semantically valid BQL", query);
+		ok(query_plan(q, db) == 0, "planning `%s` against database should succeed", query);
+		ok(query_exec(q, db, &ctx) == 0, "executing `%s` against database should succeed", query);
+
+		isnt_null(q->select, "`%s` has at least one selected series", query);
+		is_null(q->select->next, "`%s` has only one selected series", query);
+
+		rs = q->select->result;
+		isnt_null(rs, "executed query has a resultset");
+		is_unsigned(rs->len, 6, "resultset has appropriate number of data points");
+
+		/* check the actual values */
+		is_unsigned(rs->results[0].start, 983552521000,       "data point #1 starts on time");
+		is_within(  rs->results[0].value, 9141.712322, 0.001, "data point #1 (raw) value is correct");
+		is_unsigned(rs->results[1].start, 983552581000,       "data point #2 starts on time");
+		is_within(  rs->results[1].value, 8636.162236, 0.001, "data point #2 (raw) value is correct");
+		is_unsigned(rs->results[2].start, 983552641000,       "data point #3 starts on time");
+		is_within(  rs->results[2].value, 4965.452476, 0.001, "data point #3 (raw) value is correct");
+		is_unsigned(rs->results[3].start, 983552701000,       "data point #4 starts on time");
+		is_within(  rs->results[3].value, 4154.365632, 0.001, "data point #4 (raw) value is correct");
+		is_unsigned(rs->results[4].start, 983552761000,       "data point #5 starts on time");
+		is_within(  rs->results[4].value, 7242.142521, 0.001, "data point #5 (raw) value is correct");
+		is_unsigned(rs->results[5].start, 983552821000,       "data point #6 starts on time");
+		is_within(  rs->results[5].value, 6895.169995, 0.001, "data point #6 (raw) value is correct");
+
+		query_free(q);
 
 		/* i.e. `BOLO_NOW='2001-03-02 17:07:01' ./bolo query t/data/db/1/ 'select median(cpu) where env=staging after 6h ago aggregate 1h'` */
 		query = "select median(cpu) where env=staging after 6h ago aggregate 1h";

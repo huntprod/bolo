@@ -84,7 +84,8 @@ do_parse(int argc, char **argv)
 				switch (f->ops[j].code) {
 				default:         fprintf(stdout, "        ; unknown op [%#02x]\n", f->ops[j].code); break;
 				case QOP_RETURN: fprintf(stdout, "        RETURN\n"); break;
-				case QOP_PUSH:   fprintf(stdout, "        PUSH   %s\n", f->ops[j].data.push.metric); break;
+				case QOP_PUSH:   fprintf(stdout, "        PUSH   %s%s\n", f->ops[j].data.push.metric,
+				                                                          f->ops[j].data.push.raw ? " RAW" : ""); break;
 				case QOP_ADD:    fprintf(stderr, "        ADD\n"); break;
 				case QOP_SUB:    fprintf(stderr, "        SUB\n"); break;
 				case QOP_MUL:    fprintf(stderr, "        MUL\n"); break;
