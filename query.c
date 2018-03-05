@@ -779,7 +779,7 @@ TESTS {
 
 		rs = q->select->result;
 		isnt_null(rs, "executed query has a resultset");
-		is_unsigned(rs->len, 6, "resultset has approprate number of data points");
+		is_unsigned(rs->len, 6, "resultset has appropriate number of data points");
 
 		/* check the actual values */
 		is_unsigned(rs->results[0].start, ctx.now - (6 * 3600000),
@@ -838,7 +838,7 @@ TESTS {
 
 		rs = q->select->result;
 		isnt_null(rs, "executed query has a resultset");
-		is_unsigned(rs->len, 6, "resultset has approprate number of data points");
+		is_unsigned(rs->len, 6, "resultset has appropriate number of data points");
 
 		/* check the actual values */
 		is_unsigned(rs->results[0].start, ctx.now - (6 * 3600000),
@@ -899,7 +899,7 @@ TESTS {
 
 		rs = q->select->result;
 		isnt_null(rs, "executed query has a resultset");
-		is_unsigned(rs->len, 1, "resultset has approprate number of data points");
+		is_unsigned(rs->len, 1, "resultset has appropriate number of data points");
 
 		/* check the actual values */
 		is_unsigned(rs->results[0].start, ctx.now - (1 * 3600000),
@@ -924,7 +924,7 @@ TESTS {
 
 		rs = q->select->result;
 		isnt_null(rs, "executed query has a resultset");
-		is_unsigned(rs->len, 1, "resultset has approprate number of data points");
+		is_unsigned(rs->len, 1, "resultset has appropriate number of data points");
 
 		/* check the actual values */
 		is_unsigned(rs->results[0].start, ctx.now - (1 * 3600000),
@@ -949,7 +949,7 @@ TESTS {
 
 		rs = q->select->result;
 		isnt_null(rs, "executed query has a resultset");
-		is_unsigned(rs->len, 1, "resultset has approprate number of data points");
+		is_unsigned(rs->len, 1, "resultset has appropriate number of data points");
 
 		/* check the actual values */
 		is_unsigned(rs->results[0].start, ctx.now - (1 * 3600000),
@@ -974,7 +974,7 @@ TESTS {
 
 		rs = q->select->result;
 		isnt_null(rs, "executed query has a resultset");
-		is_unsigned(rs->len, 1, "resultset has approprate number of data points");
+		is_unsigned(rs->len, 1, "resultset has appropriate number of data points");
 
 		/* check the actual values */
 		is_unsigned(rs->results[0].start, ctx.now - (1 * 3600000),
@@ -999,7 +999,7 @@ TESTS {
 
 		rs = q->select->result;
 		isnt_null(rs, "executed query has a resultset");
-		is_unsigned(rs->len, 1, "resultset has approprate number of data points");
+		is_unsigned(rs->len, 1, "resultset has appropriate number of data points");
 
 		/* check the actual values */
 		is_unsigned(rs->results[0].start, ctx.now - (1 * 3600000),
@@ -1024,7 +1024,7 @@ TESTS {
 
 		rs = q->select->result;
 		isnt_null(rs, "executed query has a resultset");
-		is_unsigned(rs->len, 1, "resultset has approprate number of data points");
+		is_unsigned(rs->len, 1, "resultset has appropriate number of data points");
 
 		/* check the actual values */
 		is_unsigned(rs->results[0].start, ctx.now - (1 * 3600000),
@@ -1049,7 +1049,7 @@ TESTS {
 
 		rs = q->select->result;
 		isnt_null(rs, "executed query has a resultset");
-		is_unsigned(rs->len, 1, "resultset has approprate number of data points");
+		is_unsigned(rs->len, 1, "resultset has appropriate number of data points");
 
 		/* check the actual values */
 		is_unsigned(rs->results[0].start, ctx.now - (1 * 3600000),
@@ -1074,7 +1074,7 @@ TESTS {
 
 		rs = q->select->result;
 		isnt_null(rs, "executed query has a resultset");
-		is_unsigned(rs->len, 1, "resultset has approprate number of data points");
+		is_unsigned(rs->len, 1, "resultset has appropriate number of data points");
 
 		/* check the actual values */
 		is_unsigned(rs->results[0].start, ctx.now - (1 * 3600000),
@@ -1099,7 +1099,7 @@ TESTS {
 
 		rs = q->select->result;
 		isnt_null(rs, "executed query has a resultset");
-		is_unsigned(rs->len, 1, "resultset has approprate number of data points");
+		is_unsigned(rs->len, 1, "resultset has appropriate number of data points");
 
 		/* check the actual values */
 		is_unsigned(rs->results[0].start, ctx.now - (1 * 3600000),
@@ -1124,7 +1124,7 @@ TESTS {
 
 		rs = q->select->result;
 		isnt_null(rs, "executed query has a resultset");
-		is_unsigned(rs->len, 1, "resultset has approprate number of data points");
+		is_unsigned(rs->len, 1, "resultset has appropriate number of data points");
 
 		/* check the actual values */
 		is_unsigned(rs->results[0].start, ctx.now - (1 * 3600000),
@@ -1149,7 +1149,7 @@ TESTS {
 
 		rs = q->select->result;
 		isnt_null(rs, "executed query has a resultset");
-		is_unsigned(rs->len, 1, "resultset has approprate number of data points");
+		is_unsigned(rs->len, 1, "resultset has appropriate number of data points");
 
 		/* check the actual values */
 		is_unsigned(rs->results[0].start, ctx.now - (1 * 3600000),
@@ -1174,7 +1174,7 @@ TESTS {
 
 		rs = q->select->result;
 		isnt_null(rs, "executed query has a resultset");
-		is_unsigned(rs->len, 1, "resultset has approprate number of data points");
+		is_unsigned(rs->len, 1, "resultset has appropriate number of data points");
 
 		/* check the actual values */
 		is_unsigned(rs->results[0].start, ctx.now - (1 * 3600000),
