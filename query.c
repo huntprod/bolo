@@ -657,6 +657,12 @@ TESTS {
 			"select x before 4h ago and after 4h ago",
 			"select x between 4h ago and 4h ago",
 
+			/* cannot mix aggregate granularities */
+			"select median(x) + y",
+
+			/* cannot nest consolidating functions */
+			"select median(max(min(cpu)))",
+
 			NULL,
 		};
 
@@ -667,7 +673,7 @@ TESTS {
 		}
 		for (i = 0; invalid[i]; i++) {
 			q = query_parse(invalid[i]);
-			is_null(q, "`%s` should not be semantically valid BQL", invalid[i]);
+			is_null(q, "`%s` should not be semantically invalid BQL", invalid[i]);
 			query_free(q);
 		}
 	}

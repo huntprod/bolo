@@ -138,7 +138,7 @@ granularity(struct qexpr *qx)
 
 	case EXPR_REF:  return BUCKET_GRANULARITY;
 	case EXPR_NUM:  return NO_GRANULARITY;
-	case EXPR_FUNC: return granularity(qx->b);
+	case EXPR_FUNC: return AGGREGATE_GRANULARITY;
 	}
 }
 
