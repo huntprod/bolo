@@ -51,9 +51,9 @@ do_parse(int argc, char **argv)
 
 		fprintf(stdout, "  input is a well-formed BQL query.\n");
 		//fprintf(stdout, "  canonical form is\n    '%s'\n", query_stringify(query));
-		if (query->aggr) {
+		if (query->aggr.stride) {
 			fprintf(stdout, "  aggregate window %ds (%.1fm / %.1fh)\n",
-				query->aggr, query->aggr / 60.0, query->aggr / 3600.0);
+				query->aggr.stride, query->aggr.stride / 60.0, query->aggr.stride / 3600.0);
 		} else {
 			fprintf(stdout, "  no aggregation will be performed.\n");
 		}

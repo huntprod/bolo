@@ -78,7 +78,7 @@ do_slabinfo(int argc, char **argv)
 				strftime(date, 64, "%a, %d %b %Y %H:%M:%S%z", &tm);
 
 			fprintf(stdout, "    @%lu (%#016lx) ts %lu [%s] % 6i measurements;"
-			                   " %6.2lf%% full, spanning % 2ud %02u:%02u:%02u.%04u;"
+			                   " %6.2lf%% full, spanning %2ud %02u:%02u:%02u.%04u;"
 			                   " %7.2lf%c/measurement\n",
 				slab.blocks[j].number, slab.blocks[j].number,
 				slab.blocks[j].base, date,

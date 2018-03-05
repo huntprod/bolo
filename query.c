@@ -9,12 +9,8 @@
 #define DEFAULT_QUERY_CF CF_MEDIAN
 #endif
 
-#ifndef DEFAULT_QUERY_STRIDE
-#define DEFAULT_QUERY_STRIDE 60
-#endif
-
-#ifndef DEFAULT_QUERY_AGGREGATE
-#define DEFAULT_QUERY_AGGREGATE 300
+#ifndef DEFAULT_BUCKET_STRIDE
+#define DEFAULT_BUCKET_STRIDE 60
 #endif
 
 #ifndef DEFAULT_QUERY_WINDOW
@@ -72,13 +68,14 @@ query_parse(const char *q)
 		query->from = -DEFAULT_QUERY_WINDOW;
 
 	/* fill in default aggregate */
-	if (query->aggr == 0)
-		query->aggr = DEFAULT_QUERY_AGGREGATE;
+	if (!query->aggr.cf)      query->aggr.cf      = DEFAULT_QUERY_CF;
+	if (!query->aggr.samples) query->aggr.samples = DEFAULT_QUERY_SAMPLES;
+	/* don't set a default aggregate stride; some queries may not aggregate */
 
 	/* fill in default bucketing parameters */
-	if (!query->cf)      query->cf      = DEFAULT_QUERY_CF;
-	if (!query->samples) query->samples = DEFAULT_QUERY_SAMPLES;
-	if (!query->stride)  query->stride  = DEFAULT_QUERY_STRIDE;
+	if (!query->bucket.cf)      query->bucket.cf      = DEFAULT_QUERY_CF;
+	if (!query->bucket.samples) query->bucket.samples = DEFAULT_QUERY_SAMPLES;
+	if (!query->bucket.stride)  query->bucket.stride  = DEFAULT_BUCKET_STRIDE;
 
 	/* check the from..until range */
 	if (query->until <= query->from)
@@ -299,20 +296,43 @@ query_free(struct query *q)
 static int
 s_qfield_exec(struct query *q, struct db *db, struct query_ctx *ctx, struct qfield *f)
 {
-	int i, j, k, strides, top;
+	int i, j, k, strides, top, aggregated;
 	struct resultset *stack[QOPS_STACK_MAX], *tmp;
 	struct cf *bkt, *aggr;
 	struct multidx *set;
 
 	/* allocate the consolidation function context */
-	bkt = cf_new(q->cf, q->samples);
+	bkt = cf_new(q->bucket.cf, q->bucket.samples);
 
+	aggregated = 0;
 	top = -1;
 	for (i = 0; ; i++) {
 		switch (f->ops[i].code) {
 		case QOP_RETURN:
 			if (top < 0) bail("query eval: stack underflow in return");
 			if (top > 0) bail("query eval: leftover stack in return");
+
+			/* implicit / automatic aggregation */
+			if (!aggregated && q->aggr.stride) {
+				/* aggregate the top of the stack down to a smaller resultset */
+				tmp = new_resultset(q->aggr.stride, ctx->now / 1000 + q->from,
+				                                    ctx->now / 1000 + q->until);
+				strides = q->aggr.stride / q->bucket.stride; /* FIXME: make sure aggr % stride == 0 ALWAYS */
+				aggr = cf_new(q->aggr.cf, q->aggr.samples);
+				for (j = 0; j < (int)tmp->len; j++) {
+					cf_reset(aggr);
+					for (k = 0; k < strides; k++) {
+						cf_sample(aggr, stack[top]->results[j*strides+k].value);
+					}
+					tmp->results[j].value = cf_value(aggr);
+				}
+				cf_free(aggr);
+
+				/* replace the top of the stack with the aggregate (pop+push) */
+				free(stack[top]);
+				stack[top] = tmp;
+			}
+
 			f->result = stack[top];
 			cf_free(bkt);
 			return 0;
@@ -322,7 +342,7 @@ s_qfield_exec(struct query *q, struct db *db, struct query_ctx *ctx, struct qfie
 			top++;
 			if (top == QOPS_STACK_MAX)
 				bail("query eval: stack depth exceeded"); /* FIXME */
-			stack[top] = new_resultset(q->stride,
+			stack[top] = new_resultset(q->bucket.stride,
 			                           ctx->now / 1000 + q->from,
 			                           ctx->now / 1000 + q->until);
 
@@ -359,15 +379,19 @@ s_qfield_exec(struct query *q, struct db *db, struct query_ctx *ctx, struct qfie
 			break;
 
 		case QOP_AGGR:
+			/* sanity check: nesting aggregate functions makes no sense */
+			if (aggregated)
+				bail("query eval: nested aggregate calls");
+
 			/* sanity check: we should always have at least one rset on stack */
 			if (top < 0)
 				bail("query eval: insufficient stack for AGGR op");
 
 			/* aggregate the top of the stack down to a smaller resultset */
-			tmp = new_resultset(q->aggr, ctx->now / 1000 + q->from,
-			                             ctx->now / 1000 + q->until);
-			strides = q->aggr / q->stride; /* FIXME: make sure aggr % stride == 0 ALWAYS */
-			aggr = cf_new(f->ops[i].data.aggr.cf, q->stride);
+			tmp = new_resultset(q->aggr.stride, ctx->now / 1000 + q->from,
+			                                    ctx->now / 1000 + q->until);
+			strides = q->aggr.stride / q->bucket.stride; /* FIXME: make sure aggr % stride == 0 ALWAYS */
+			aggr = cf_new(f->ops[i].data.aggr.cf, q->aggr.samples);
 			for (j = 0; j < (int)tmp->len; j++) {
 				cf_reset(aggr);
 				for (k = 0; k < strides; k++) {
@@ -380,6 +404,7 @@ s_qfield_exec(struct query *q, struct db *db, struct query_ctx *ctx, struct qfie
 			/* replace the top of the stack with the aggregate (pop+push) */
 			free(stack[top]);
 			stack[top] = tmp;
+			aggregated = 1; /* skip auto-aggregation */
 			break;
 
 		case QOP_ADD:
@@ -451,8 +476,7 @@ s_qfield_exec(struct query *q, struct db *db, struct query_ctx *ctx, struct qfie
 			break;
 		}
 	}
-
-	return 0;
+	return -1; /* unknown error? */
 }
 
 int
@@ -655,56 +679,56 @@ TESTS {
 		query = "select x aggregate 1d";
 		q = query_parse(query);
 		isnt_null(q, "`%s` should be semantically valid BQL", query);
-		is_int(q->aggr, 86400, "aggregate 1d translates to 86400s");
+		is_int(q->aggr.stride, 86400, "aggregate 1d translates to 86400s");
 		query_free(q);
 
 		query = "select x aggregate 2d";
 		q = query_parse(query);
 		isnt_null(q, "`%s` should be semantically valid BQL", query);
-		is_int(q->aggr, 172800, "aggregate 2d translates to 172800s");
+		is_int(q->aggr.stride, 172800, "aggregate 2d translates to 172800s");
 		query_free(q);
 
 		query = "select x aggregate 1.1d";
 		q = query_parse(query);
 		isnt_null(q, "`%s` should be semantically valid BQL", query);
-		is_int(q->aggr, 95040, "aggregate 1.1d translates to 95040s");
+		is_int(q->aggr.stride, 95040, "aggregate 1.1d translates to 95040s");
 		query_free(q);
 
 
 		query = "select x aggregate 1h";
 		q = query_parse(query);
 		isnt_null(q, "`%s` should be semantically valid BQL", query);
-		is_int(q->aggr, 3600, "aggregate 1h translates to 3600s");
+		is_int(q->aggr.stride, 3600, "aggregate 1h translates to 3600s");
 		query_free(q);
 
 		query = "select x aggregate 2h";
 		q = query_parse(query);
 		isnt_null(q, "`%s` should be semantically valid BQL", query);
-		is_int(q->aggr, 7200, "aggregate 2h translates to 7200s");
+		is_int(q->aggr.stride, 7200, "aggregate 2h translates to 7200s");
 		query_free(q);
 
 		query = "select x aggregate 1.1h";
 		q = query_parse(query);
 		isnt_null(q, "`%s` should be semantically valid BQL", query);
-		is_int(q->aggr, 3960, "aggregate 1.1h translates to 3960s");
+		is_int(q->aggr.stride, 3960, "aggregate 1.1h translates to 3960s");
 		query_free(q);
 
 		query = "select x aggregate 1m";
 		q = query_parse(query);
 		isnt_null(q, "`%s` should be semantically valid BQL", query);
-		is_int(q->aggr, 60, "aggregate 1m translates to 60s");
+		is_int(q->aggr.stride, 60, "aggregate 1m translates to 60s");
 		query_free(q);
 
 		query = "select x aggregate 2m";
 		q = query_parse(query);
 		isnt_null(q, "`%s` should be semantically valid BQL", query);
-		is_int(q->aggr, 120, "aggregate 2m translates to 120s");
+		is_int(q->aggr.stride, 120, "aggregate 2m translates to 120s");
 		query_free(q);
 
 		query = "select x aggregate 10.05m";
 		q = query_parse(query);
 		isnt_null(q, "`%s` should be semantically valid BQL", query);
-		is_int(q->aggr, 603, "aggregate 0.33m translates to 603s");
+		is_int(q->aggr.stride, 603, "aggregate 0.33m translates to 603s");
 		query_free(q);
 
 		query = "select x between 4h ago and now";
@@ -801,6 +825,66 @@ TESTS {
 				"data point #6 (median) value is correct");
 
 		query_free(q);
+
+
+		query = "select cpu where env=staging after 6h ago aggregate 1h";
+		q = query_parse(query);
+		isnt_null(q, "`%s` should be semantically valid BQL", query);
+		ok(query_plan(q, db) == 0, "planning `%s` against database should succeed", query);
+		ok(query_exec(q, db, &ctx) == 0, "executing `%s` against database should succeed", query);
+
+		isnt_null(q->select, "`%s` has at least one selected series", query);
+		is_null(q->select->next, "`%s` has only one selected series", query);
+
+		rs = q->select->result;
+		isnt_null(rs, "executed query has a resultset");
+		is_unsigned(rs->len, 6, "resultset has approprate number of data points");
+
+		/* check the actual values */
+		is_unsigned(rs->results[0].start, ctx.now - (6 * 3600000),
+				"data point #1 starts on time");
+		is_unsigned(rs->results[0].finish, ctx.now - (5 * 3600000) - 1,
+				"data point #1 finishes on time");
+		is_within(rs->results[0].value, 4600.24, 0.1,
+				"data point #1 (median) value is correct");
+
+		is_unsigned(rs->results[1].start, ctx.now - (5 * 3600000),
+				"data point #2 starts on time");
+		is_unsigned(rs->results[1].finish, ctx.now - (4 * 3600000) - 1,
+				"data point #2 finishes on time");
+		is_within(rs->results[1].value, 5574.95, 0.1,
+				"data point #2 (median) value is correct");
+
+		is_unsigned(rs->results[2].start, ctx.now - (4 * 3600000),
+				"data point #3 starts on time");
+		is_unsigned(rs->results[2].finish, ctx.now - (3 * 3600000) - 1,
+				"data point #3 finishes on time");
+		is_within(rs->results[2].value, 5323.23, 0.1,
+				"data point #3 (median) value is correct");
+
+		is_unsigned(rs->results[3].start, ctx.now - (3 * 3600000),
+				"data point #4 starts on time");
+		is_unsigned(rs->results[3].finish, ctx.now - (2 * 3600000) - 1,
+				"data point #4 finishes on time");
+		is_within(rs->results[3].value, 5053.85, 0.1,
+				"data point #4 (median) value is correct");
+
+		is_unsigned(rs->results[4].start, ctx.now - (2 * 3600000),
+				"data point #5 starts on time");
+		is_unsigned(rs->results[4].finish, ctx.now - (1 * 3600000) - 1,
+				"data point #5 finishes on time");
+		is_within(rs->results[4].value, 4730.37, 0.1,
+				"data point #5 (median) value is correct");
+
+		is_unsigned(rs->results[5].start, ctx.now - (1 * 3600000),
+				"data point #6 starts on time");
+		is_unsigned(rs->results[5].finish, ctx.now - (0 * 3600000) - 1,
+				"data point #6 finishes on time");
+		is_within(rs->results[5].value, 4507.95, 0.1,
+				"data point #6 (median) value is correct");
+
+		query_free(q);
+
 
 
 

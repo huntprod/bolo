@@ -645,16 +645,20 @@ struct qfield {
 	struct resultset *result;
 };
 
+struct bucket {
+	int samples;
+	int stride;
+	int cf;
+};
+
 struct query {
 	struct qfield *select;
-	int            aggr;
 	struct qcond  *where;
 	int            from;
 	int            until;
 
-	int samples;
-	int stride;
-	int cf;
+	struct bucket bucket;
+	struct bucket aggr;
 
 	int   err_num;
 	char *err_data;

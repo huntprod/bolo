@@ -14,19 +14,15 @@ struct range {
 typedef union {
 	double  number;
 	char   *text;
+	int     integer;
 
 	struct {
 		int from;
 		int until;
 	} range;
 
-	struct {
-		int samples;
-		int stride;
-		int cf;
-	} bucket;
+	struct bucket bucket;
 
-	int aggrwin;
 	struct qfield *qfield;
 	struct qexpr  *qexpr;
 

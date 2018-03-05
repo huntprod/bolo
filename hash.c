@@ -13,22 +13,22 @@ s_hash_djb2(const char *key)
 
 #define s_hash s_hash_djb2
 
-struct bucket {
+struct hbkt {
 	char *   key;
 	void *   ptr;
 	uint64_t val;
 
-	struct bucket *next;
+	struct hbkt *next;
 };
 
 #define HASH_STRIDE  255
 struct hash {
 	size_t nset;
-	struct bucket *buckets[HASH_STRIDE];
+	struct hbkt *hbkts[HASH_STRIDE];
 
 	/* for iteration */
 	int i;
-	struct bucket *last;
+	struct hbkt *last;
 };
 
 struct hash *
@@ -41,13 +41,13 @@ void
 hash_free(struct hash *h)
 {
 	int i;
-	struct bucket *b, *tmp;
+	struct hbkt *b, *tmp;
 
 	if (!h)
 		return;
 
 	for (i = 0; i < HASH_STRIDE; i++) {
-		for (b = h->buckets[i]; b; ) {
+		for (b = h->hbkts[i]; b; ) {
 			free(b->key);
 
 			tmp = b->next;
@@ -76,7 +76,7 @@ _hash_enext(struct hash *h, void *key, void *val)
 	CHECK(key != NULL || val != NULL, "hash_each() { ... } given NULL key and value destination pointers");
 
 	while (h->i < HASH_STRIDE && !h->last) {
-		h->last = h->buckets[h->i++];
+		h->last = h->hbkts[h->i++];
 	}
 
 	if (h->last) {
@@ -103,7 +103,7 @@ int
 hash_set(struct hash *h, const char *key, void *val)
 {
 	unsigned int k;
-	struct bucket *b;
+	struct hbkt *b;
 
 	CHECK(h != NULL,   "hash_set() given a NULL hash to insert into");
 	CHECK(key != NULL, "hash_set() given a NULL key to insert");
@@ -111,7 +111,7 @@ hash_set(struct hash *h, const char *key, void *val)
 	k = s_hash(key) % HASH_STRIDE;
 
 	/* check existing data */
-	for (b = h->buckets[k]; b; b = b->next) {
+	for (b = h->hbkts[k]; b; b = b->next) {
 		if (!streq(b->key, key))
 			continue;
 
@@ -119,12 +119,12 @@ hash_set(struct hash *h, const char *key, void *val)
 		return 0;
 	}
 
-	/* not in existing data, prepend a new bucket */
-	b = xalloc(1, sizeof(struct bucket));
+	/* not in existing data, prepend a new hbkt */
+	b = xalloc(1, sizeof(struct hbkt));
 	b->key = strdup(key);
 	b->ptr = val;
-	b->next = h->buckets[k];
-	h->buckets[k] = b;
+	b->next = h->hbkts[k];
+	h->hbkts[k] = b;
 	h->nset++;
 	return 0;
 }
@@ -133,7 +133,7 @@ int
 hash_get(struct hash *h, void *dst, const char *key)
 {
 	unsigned int k;
-	struct bucket *b;
+	struct hbkt *b;
 
 	CHECK(h != NULL,   "hash_get() given a NULL hash to query");
 	CHECK(key != NULL, "hash_get() given a NULL key to lookup");
@@ -141,7 +141,7 @@ hash_get(struct hash *h, void *dst, const char *key)
 	k = s_hash(key) % HASH_STRIDE;
 
 	/* check existing data */
-	for (b = h->buckets[k]; b; b = b->next) {
+	for (b = h->hbkts[k]; b; b = b->next) {
 		if (!streq(b->key, key))
 			continue;
 
@@ -214,7 +214,7 @@ hash_write(struct hash *h, int to, hash_writer_fn writer, void *udata)
 {
 	FILE *out;
 	int i, fd;
-	struct bucket *b;
+	struct hbkt *b;
 
 	CHECK(h != NULL, "hash_write() given a NULL hash pointer to write");
 	CHECK(to >= 0,   "hash_write() given an invalid file descriptor to write to");
@@ -235,7 +235,7 @@ hash_write(struct hash *h, int to, hash_writer_fn writer, void *udata)
 	}
 
 	for (i = 0; i < HASH_STRIDE; i++)
-		for (b = h->buckets[i]; b; b = b->next)
+		for (b = h->hbkts[i]; b; b = b->next)
 			fprintf(out, "%s\t%lu\n", b->key, writer(b->key, b->ptr, udata));
 
 	fclose(out);

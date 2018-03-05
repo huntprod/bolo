@@ -1,6 +1,15 @@
 %{
 #include "bql.h"
 
+static void
+_mergeb(struct bucket *a, struct bucket *b, struct bucket *c)
+{
+	a->samples = c->samples ? c->samples : b->samples;
+	a->stride  = c->stride  ? c->stride  : b->stride ;
+	a->cf      = c->cf      ? c->cf      : b->cf     ;
+}
+#define mergeb(a,b,c) _mergeb(&(a),&(b),&(c))
+
 static struct {
 	char *name;
 	int   cf;
@@ -115,6 +124,8 @@ granularity(struct qexpr *qx)
 	int a, b;
 
 	switch (qx->type) {
+	default: return NO_GRANULARITY;
+
 	case EXPR_ADD:
 	case EXPR_SUB:
 	case EXPR_MULT:
@@ -135,6 +146,8 @@ static int
 aggregates(struct qexpr *qx, int seen)
 {
 	switch (qx->type) {
+	default: return 0;
+
 	case EXPR_FUNC:
 		if (seen) return -1;
 		return aggregates(qx->b, 1);
@@ -147,8 +160,6 @@ aggregates(struct qexpr *qx, int seen)
 		if (aggregates(qx->b, seen) < 0) return -1;
 		return 0;
 	}
-
-	return 0;
 }
 
 static int
@@ -318,6 +329,7 @@ qfield(struct qexpr *e, char *name)
 %token T_BEFORE
 %token T_BETWEEN
 %token T_BUCKET
+%token T_BY
 %token T_DAILY
 %token T_DAYS
 %token T_DOES
@@ -358,7 +370,9 @@ qfield(struct qexpr *e, char *name)
 %type <range> when_before
 %type <range> when_after
 
-%type <aggrwin> aggr_clause
+%type <bucket> aggr_clause
+%type <bucket> aggr_subclauses
+%type <bucket> aggr_subclause
 
 %type <bucket> bucket_clause
 %type <bucket> bucket_subclauses
@@ -385,12 +399,10 @@ qfield(struct qexpr *e, char *name)
 query :                     { $$ = QUERY  = xmalloc(sizeof(struct query)); }
       | query select_clause { $$->select  = $2; }
       | query where_clause  { $$->where   = $2; }
-      | query aggr_clause   { $$->aggr    = $2; }
       | query when_clause   { $$->from    = $2.from;
                               $$->until   = $2.until; }
-      | query bucket_clause { if ($2.samples > 0) $$->samples = $2.samples;
-                              if ($2.stride  > 0) $$->stride  = $2.stride;
-                              if ($2.cf)          $$->cf      = $2.cf; }
+      | query aggr_clause   { mergeb($$->aggr,   $2, $$->aggr);   }
+      | query bucket_clause { mergeb($$->bucket, $2, $$->bucket); }
       ;
 
 select_clause: T_SELECT fields { $$ = $2; }
@@ -434,9 +446,18 @@ tagvalue: T_DQSTRING { $$ = $1; }
         | T_BAREWORD { $$ = $1; }
         ;
 
-aggr_clause: T_AGGREGATE timespan { $$ = (int)$2; }
-           | T_AGGREGATE aggrspan { $$ = (int)$2; }
+aggr_clause: T_AGGREGATE aggr_subclause aggr_subclauses { mergeb($$, $2, $3); }
            ;
+
+aggr_subclauses: { memset(&($$), 0, sizeof($$)); }
+               | aggr_subclauses aggr_subclause { mergeb($$, $1, $2); }
+               ;
+
+aggr_subclause: timespan                   { $$.stride = (int)$1; }
+              | aggrspan                   { $$.stride = (int)$1; }
+              | T_BY T_BAREWORD            { $$.cf = cf($2); free($2); }
+              | T_USING T_NUMBER T_SAMPLES { $$.samples = $2; }
+              ;
 
 timespan: T_NUMBER unit { $$ = $1 * $2; }
         | T_TIME        { $$ = $1; }
@@ -458,19 +479,11 @@ unit: T_DAYS     { $$ = 86400; }
     | T_SECONDS  { $$ = 1;     }
     ;
 
-bucket_clause: T_BUCKET bucket_subclause bucket_subclauses {
-                 $$.samples = $3.samples ? $3.samples : $2.samples;
-                 $$.stride  = $3.stride  ? $3.stride  : $2.stride;
-                 $$.cf      = $3.cf      ? $3.cf      : $2.cf;
-               }
+bucket_clause: T_BUCKET bucket_subclause bucket_subclauses { mergeb($$, $2, $3); }
              ;
 
 bucket_subclauses: { memset(&($$), 0, sizeof($$)); }
-                 | bucket_subclauses bucket_subclause {
-                     $$.samples = $2.samples ? $2.samples : $1.samples;
-                     $$.stride  = $2.stride  ? $2.stride  : $1.stride;
-                     $$.cf      = $2.cf      ? $2.cf      : $1.cf;
-                   }
+                 | bucket_subclauses bucket_subclause { mergeb($$, $1, $2); }
                  ;
 
 bucket_subclause: T_USING T_NUMBER T_SAMPLES { $$.samples = $2; }

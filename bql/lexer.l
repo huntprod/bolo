@@ -21,6 +21,7 @@ struct {
 	{  "before",     T_BEFORE     },
 	{  "between",    T_BETWEEN    },
 	{  "bucket",     T_BUCKET     },
+	{  "by",         T_BY         },
 	{  "daily",      T_DAILY      },
 	{  "days",       T_DAYS       },
 	{  "day",        T_DAYS       },

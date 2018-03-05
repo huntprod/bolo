@@ -165,7 +165,7 @@ do_query(int argc, char **argv)
 		}
 		fprintf(stderr, "\n");
 
-		fprintf(stderr, "aggregate %is\n\n", query->aggr);
+		fprintf(stderr, "aggregate %is\n\n", query->aggr.stride);
 
 		if (query->where) {
 			fprintf(stderr, "conditions:\n");
