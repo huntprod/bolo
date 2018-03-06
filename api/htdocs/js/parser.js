@@ -71,6 +71,15 @@ var as_whole = function (n) {
 	return n;
 };
 
+var as_format = function (s) {
+	switch (s) {
+	default:      return as_self;
+	case 'bytes': return as_bytes;
+	case 'si':    return as_si;
+	case 'whole': return as_whole;
+	}
+};
+
 var sparkline = function (svg, data) {
 	var bounds = svg.node().getBoundingClientRect(),
 	    width  = bounds.width,
@@ -397,7 +406,7 @@ GraphBlock.prototype.update = function (data) {
 	if (this.axis.y.on) {
 		frame.append("g")
 		     .call(d3.axisLeft(y)
-		             .tickFormat(this.axis.y.fmt || as_self));
+		             .tickFormat(as_format(this.axis.y.fmt)));
 	}
 };
 
@@ -467,7 +476,7 @@ ScatterPlotBlock.prototype.update = function (data) {
 		frame.append("g")
 		     .attr("transform", "translate(0," + height + ")")
 		     .call(d3.axisBottom(x)
-		             .tickFormat(this.axis.x.fmt || as_self));
+		             .tickFormat(as_format(this.axis.x.fmt)));
 	}
 
 	svg.append("g")
@@ -480,7 +489,7 @@ ScatterPlotBlock.prototype.update = function (data) {
 	if (this.axis.y.on) {
 		frame.append("g")
 		     .call(d3.axisLeft(y)
-		             .tickFormat(this.axis.y.fmt || as_self));
+		             .tickFormat(as_format(this.axis.y.fmt)));
 	}
 };
 
@@ -851,8 +860,18 @@ var World = function () {
 
 	 **/
 	var OP_SET = function (world, op) {
+		var set = function (key, value) {
+			keys = key.split(/\./).reverse();
+			var obj = world.blocks[world.blocks.length - 1];
+			for (var i = keys.length - 1; i > 0; i--) {
+				if (!(keys[i] in obj)) { obj[keys[i]] = {}; }
+				obj = obj[keys[i]];
+			}
+			obj[keys[0]] = value;
+		}
+
 		if (typeof(op[2]) !== 'object') {
-			world.blocks[world.blocks.length - 1][op[1]] = op[2];
+			set(op[1], op[2]);
 			return;
 		}
 
@@ -866,13 +885,13 @@ var World = function () {
 				throw 'I found a '+token_description(op[2])+' for the '+op[1]+' property.<br>Only the <tt>color</tt> property can accept those.';
 				// FIXME line no?
 			}
-			world.blocks[world.blocks.length - 1][op[1]] = world.get('thold', op[2][1]);
+			set(op[1], world.get('thold', op[2][1]));
 			break;
 
 		case T_NUMERIC:
 		case T_SIZE:
 		case T_IDENTIFIER:
-			world.blocks[world.blocks.length - 1][op[1]] = op[2][1];
+			set(op[1], op[2][1]);
 			break;
 
 		case T_STRING:
@@ -884,11 +903,11 @@ var World = function () {
 					s += world.get('var', op[2][1][i].ref);
 				}
 			}
-			world.blocks[world.blocks.length - 1][op[1]] = s;
+			set(op[1], s);
 			break;
 
 		case T_VAR:
-			world.blocks[world.blocks.length - 1][op[1]] = world.get('var', op[2][1]);
+			set(op[1], world.get('var', op[2][1]));
 			break;
 		}
 	};
@@ -1433,24 +1452,30 @@ var World = function () {
 					throw unexpected_token(ctx, t, 'one of either <tt>on</tt>, or <tt>off</tt>');
 				}
 				val = expect_token(ctx);
-				world.op(OP_SET, lead+'-label', val);
+				world.op(OP_SET, 'axis.'+lead+'.label', val);
 				return;
 			}
 
 			if (iskeyword(t, 'format')) {
-				var fmt = as_self;
 				val = expect_token(ctx);
-				world.op(OP_SET, lead+'-format', val);
+				if (lead == 'a') {
+					world.op(OP_SET, 'axis.x.fmt', val);
+					world.op(OP_SET, 'axis.y.fmt', val);
+				} else {
+					world.op(OP_SET, 'axis.'+lead+'.fmt', val);
+				}
 				return;
 			}
 
-			if (iskeyword(t, 'on') || iskeyword(t, 'yes')) {
-				world.op(OP_SET, lead+'-on', 1);
-				return;
-			}
-
-			if (iskeyword(t, 'off') || iskeyword(t, 'no')) {
-				world.op(OP_SET, lead+'-on', 0);
+			if (iskeyword(t, 'on')  || iskeyword(t, 'yes')
+			 || iskeyword(t, 'off') || iskeyword(t, 'no')) {
+				var on = (iskeyword(t, 'on')  || iskeyword(t, 'yes') ? 1 : 0);
+				if (lead == 'a') {
+					world.op(OP_SET, 'axis.x.on', on);
+					world.op(OP_SET, 'axis.y.on', on);
+				} else {
+					world.op(OP_SET, 'axis.'+lead+'.on', on);
+				}
 				return;
 			}
 
