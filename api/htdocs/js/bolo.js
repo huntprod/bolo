@@ -714,6 +714,10 @@
 				$('#explore [name=q]').val("SELECT "+metric+" FROM "+series+" AFTER 4h AGO");
 				$('#explore').trigger('submit');
 			})
+			.on('click', '.hover .grip', function (event) {
+				event.preventDefault();
+				$(event.target).closest('.hover').find('.pop').toggle();
+			})
 			;
 		});
 		/* }}} */

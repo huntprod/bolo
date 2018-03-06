@@ -750,6 +750,33 @@ body[page="browse"]  #browse
 
 
 
+.hover {
+  position: relative;
+}
+.hover .grip {
+  cursor: pointer;
+  position: absolute;
+  top: 0px;
+  right: 4px;
+  font-size: 16pt;
+}
+.hover .grip::before {
+  content: "\2261";
+}
+.hover .pop {
+  display: none;
+  position: absolute;
+  top: 18pt;
+  left: 0px;
+  border: 1px solid #ccc;
+  box-shadow: 1px 1px 6px #ccc;
+  padding: 1em;
+  font-size: 11pt;
+  color: #333;
+  background-color: #fff;
+}
+
+
 
 @media print {
   body.docs #toc { display: none; }

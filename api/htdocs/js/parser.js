@@ -125,6 +125,18 @@ Block.prototype.validate = function () { };
 Block.prototype.parse    = function () { };
 Block.prototype.update   = function () { };
 
+
+var hover = function (x) {
+	if (x.hover && x.hover != '') {
+		$('#'+x.id).append(
+		  '<div class="hover">'+
+		    '<div class="grip"></div>'+
+		    '<div class="pop">'+x.hover+'</div>'+
+		  '</div>');
+	}
+}
+
+
 var Break = function (attrs) { init(this, attrs, 'break') };
 Break.prototype = Object.create(Block.prototype);
 Break.prototype.html = function () {
@@ -134,6 +146,7 @@ Break.prototype.html = function () {
 var PlaceholderBlock = function (attrs) { init(this, attrs, 'placeholder') };
 PlaceholderBlock.prototype = Object.create(Block.prototype);
 PlaceholderBlock.prototype.update = function () {
+	hover(this);
 	var svg    = this.select().append('svg'),
 	    bounds = svg.node().getBoundingClientRect()
 	    c      = color.spec(this.color);
@@ -161,6 +174,7 @@ TextContentBlock.prototype.update = function (data) {
 var MetricBlock = function (attrs) { init(this, attrs, 'metric') };
 MetricBlock.prototype = Object.create(Block.prototype);
 MetricBlock.prototype.update = function (data) {
+	hover(this);
 	data = only_metric(data);
 	var v = data[data.length-1].v;
 
@@ -199,6 +213,7 @@ MetricBlock.prototype.update = function (data) {
 var SparklineBlock = function (attrs) { init(this, attrs, 'sparkline') };
 SparklineBlock.prototype = Object.create(Block.prototype);
 SparklineBlock.prototype.update = function (data) {
+	hover(this);
 	data = only_metric(data, this.plot);
 
 	var root   = this.select(),
@@ -235,6 +250,7 @@ SparklineBlock.prototype.update = function (data) {
 var GraphBlock = function (attrs) { init(this, attrs, 'graph') };
 GraphBlock.prototype = Object.create(Block.prototype);
 GraphBlock.prototype.update = function (data) {
+	hover(this);
 	var svg    = this.select().append('svg'),
 	    bounds = svg.node().getBoundingClientRect(),
 	    margin = {top: 20, right: 20, bottom: 50, left: 70};
@@ -388,6 +404,7 @@ GraphBlock.prototype.update = function (data) {
 var ScatterPlotBlock = function (attrs) { init(this, attrs, 'scatterplot') };
 ScatterPlotBlock.prototype = Object.create(Block.prototype);
 ScatterPlotBlock.prototype.update = function (data) {
+	hover(this);
 	var svg    = this.select().append('svg'),
 	    bounds = svg.node().getBoundingClientRect(),
 	    margin = {top: 20, right: 20, bottom: 40, left: 60};
@@ -1574,7 +1591,8 @@ var World = function () {
 						iskeyword(t, 'label') ||
 						iskeyword(t, 'graph') ||
 						iskeyword(t, 'query') ||
-						iskeyword(t, 'color')
+						iskeyword(t, 'color') ||
+						iskeyword(t, 'hover')
 				) {
 					var val = expect_token(ctx);
 					world.op(OP_SET, t[1], val);
@@ -1604,7 +1622,8 @@ var World = function () {
 						iskeyword(t, 'label') ||
 						iskeyword(t, 'color') ||
 						iskeyword(t, 'query') ||
-						iskeyword(t, 'plot')
+						iskeyword(t, 'plot')  ||
+						iskeyword(t, 'hover')
 				) {
 					var val = expect_token(ctx);
 					world.op(OP_SET, t[1], val);
@@ -1632,7 +1651,8 @@ var World = function () {
 				}
 				if (iskeyword(t, 'size')  ||
 						iskeyword(t, 'label') ||
-						iskeyword(t, 'query')
+						iskeyword(t, 'query') ||
+						iskeyword(t, 'hover')
 				) {
 					var val = expect_token(ctx);
 					world.op(OP_SET, t[1], val);
@@ -1681,7 +1701,8 @@ var World = function () {
 						iskeyword(t, 'x') ||
 						iskeyword(t, 'y') ||
 						iskeyword(t, 'color') ||
-						iskeyword(t, 'query')
+						iskeyword(t, 'query') ||
+						iskeyword(t, 'hover')
 				) {
 					var val = expect_token(ctx);
 					world.op(OP_SET, t[1], val);
@@ -1716,7 +1737,8 @@ var World = function () {
 				}
 				if (iskeyword(t, 'text')  ||
 						iskeyword(t, 'size')  ||
-						iskeyword(t, 'color')
+						iskeyword(t, 'color') ||
+						iskeyword(t, 'hover')
 				) {
 					var val = expect_token(ctx);
 					world.op(OP_SET, t[1], val);
