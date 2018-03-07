@@ -542,6 +542,8 @@ struct cf {
 	size_t used;   /* how many slots are in used in rsv[] */
 	size_t i;      /* what slot should the next sample go into */
 	size_t n;      /* how many samples have been seen total */
+	double carry;  /* a value carried across resets (for delta) */
+	int    active; /* do we care what's in carry? (1 = yes) */
 	double rsv[];  /* reservoir sample for lossy consolidation */
 };
 

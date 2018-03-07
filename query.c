@@ -883,7 +883,7 @@ TESTS {
 
 		rs = q->select->result;
 		isnt_null(rs, "executed query has a resultset");
-		is_unsigned(rs->len, 6, "resultset has appropriate number of data points");
+		is_unsigned(rs->len, 5, "resultset has appropriate number of data points");
 
 		/* check the actual values */
 		is_unsigned(rs->results[0].start, 983552521000,       "data point #1 starts on time");
@@ -896,8 +896,6 @@ TESTS {
 		is_within(  rs->results[3].value, 4154.365632, 0.001, "data point #4 (raw) value is correct");
 		is_unsigned(rs->results[4].start, 983552761000,       "data point #5 starts on time");
 		is_within(  rs->results[4].value, 7242.142521, 0.001, "data point #5 (raw) value is correct");
-		is_unsigned(rs->results[5].start, 983552821000,       "data point #6 starts on time");
-		is_within(  rs->results[5].value, 6895.169995, 0.001, "data point #6 (raw) value is correct");
 
 		query_free(q);
 

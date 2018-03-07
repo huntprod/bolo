@@ -41,7 +41,9 @@ cf_reset(struct cf *cf)
 {
 	CHECK(cf != NULL, "cf_reset() given a NULL reservoir to reset");
 
-	cf->i = cf->used = 0;
+	cf->active = 1;
+	cf->carry = cf->rsv[1];
+	cf->i = cf->used = cf->n = 0;
 	memset(cf->rsv, 0, sizeof(double) * cf->slots);
 }
 
@@ -59,7 +61,7 @@ cf_sample(struct cf *cf, double v)
 	case CF_SUM: cf->rsv[0] += v; break;
 
 	case CF_DELTA:
-		if (cf->n == 0) cf->rsv[0] = v;
+		if (cf->n == 0) cf->rsv[0] = (cf->active ? cf->carry : v);
 		cf->rsv[1] = v;
 		break;
 
