@@ -532,6 +532,45 @@ func (api *API) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if strings.HasPrefix(req.URL.Path, "/v1/lib/") {
+		id := strings.TrimPrefix(req.URL.Path, "/v1/lib/")
+
+		/* GET /v1/lib/:id {{{ */
+		if req.Method == "GET" {
+			if s := api.Session(w, req); s == nil {
+				return
+			}
+
+			var resp struct {
+				Code string `json:"code"`
+			}
+
+			if code, ok := StandardLibrary[id]; ok {
+				resp.Code = code
+
+			} else {
+				b, err := api.DB.GetBoard(0, id)
+				if err != nil {
+					respond(w, 500, "unable to retrieve board")
+					return
+				}
+				if b == nil {
+					respond(w, 404, "lib not found")
+					return
+				}
+				resp.Code = b.Code
+			}
+
+			respondWith(w, 200, resp)
+			return
+		}
+		/* }}} */
+
+		w.WriteHeader(405)
+		fmt.Fprintf(w, "method %s not allowd.\n", req.Method)
+		return
+	}
+
 	if req.URL.Path == "/v1/plan" {
 		/* POST /v1/plan {{{ */
 		if req.Method == "POST" {
