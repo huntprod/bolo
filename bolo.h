@@ -35,6 +35,25 @@
 #include <fcntl.h>
 #include <math.h>
 
+
+#ifndef DEFAULT_QUERY_SAMPLES
+#define DEFAULT_QUERY_SAMPLES 2048
+#endif
+
+#ifndef DEFAULT_QUERY_CF
+#define DEFAULT_QUERY_CF CF_MEDIAN
+#endif
+
+#ifndef DEFAULT_BUCKET_STRIDE
+#define DEFAULT_BUCKET_STRIDE 60
+#endif
+
+#ifndef DEFAULT_QUERY_WINDOW
+#define DEFAULT_QUERY_WINDOW 14400
+#endif
+
+
+
 #ifndef MIN
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #endif

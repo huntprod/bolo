@@ -464,7 +464,10 @@ tagvalue: T_DQSTRING { $$ = $1; }
         | T_BAREWORD { $$ = $1; }
         ;
 
-aggr_clause: T_AGGREGATE aggr_subclause aggr_subclauses { mergeb($$, $2, $3); }
+aggr_clause: T_AGGREGATE aggr_subclause aggr_subclauses {
+               mergeb($$, $2, $3);
+               if (!$$.cf) $$.cf = DEFAULT_QUERY_CF;
+             }
            ;
 
 aggr_subclauses: { memset(&($$), 0, sizeof($$)); }

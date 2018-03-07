@@ -1,22 +1,6 @@
 #include "bolo.h"
 #include <time.h>
 
-#ifndef DEFAULT_QUERY_SAMPLES
-#define DEFAULT_QUERY_SAMPLES 2048
-#endif
-
-#ifndef DEFAULT_QUERY_CF
-#define DEFAULT_QUERY_CF CF_MEDIAN
-#endif
-
-#ifndef DEFAULT_BUCKET_STRIDE
-#define DEFAULT_BUCKET_STRIDE 60
-#endif
-
-#ifndef DEFAULT_QUERY_WINDOW
-#define DEFAULT_QUERY_WINDOW 14400
-#endif
-
 static struct resultset *
 new_resultset(int stride, int from, int until)
 {
@@ -70,7 +54,7 @@ query_parse(const char *q)
 	/* fill in default aggregate */
 	if (!query->aggr.cf)      query->aggr.cf      = DEFAULT_QUERY_CF;
 	if (!query->aggr.samples) query->aggr.samples = DEFAULT_QUERY_SAMPLES;
-	/* don't set a default aggregate stride; some queries may not aggregate */
+	if (!query->aggr.stride)  query->aggr.stride  = DEFAULT_BUCKET_STRIDE;
 
 	/* fill in default bucketing parameters */
 	if (!query->bucket.cf)      query->bucket.cf      = DEFAULT_QUERY_CF;
@@ -313,7 +297,7 @@ s_qfield_exec(struct query *q, struct db *db, struct query_ctx *ctx, struct qfie
 			if (top > 0) bail("query eval: leftover stack in return");
 
 			/* implicit / automatic aggregation */
-			if (!aggregated && q->aggr.stride) {
+			if (!aggregated && q->aggr.cf) {
 				/* aggregate the top of the stack down to a smaller resultset */
 				tmp = new_resultset(q->aggr.stride, ctx->now / 1000 + q->from,
 				                                    ctx->now / 1000 + q->until);
