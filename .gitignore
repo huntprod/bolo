@@ -32,6 +32,10 @@
 # local testing configurations
 /local-config
 
+# dist files
+*.tar.bz2
+/bolo-*.*.*
+
 # generated files
 /bql/lang.c
 /bql/grammar.c

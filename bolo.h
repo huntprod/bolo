@@ -1,6 +1,11 @@
 #ifndef BOLO_H
 #define BOLO_H
 
+#define BOLO_VERSION_MAJOR 0
+#define BOLO_VERSION_MINOR 0
+#define BOLO_VERSION_POINT 1
+#define BOLO_BUILD_DATE "20180308.015647"
+
 #define _POSIX_C_SOURCE 200809L
 #define _GNU_SOURCE /* for asprintf */
 

@@ -39,6 +39,26 @@ bolo: bolo.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o \
 api/api:
 	cd api && go build .
 
+dist:
+	VERSION=$$(./version.sh); \
+	rm -rf bolo-$${VERSION}; \
+	mkdir -p bolo-$${VERSION}; \
+	mkdir -p bolo-$${VERSION}/docs; \
+	cp -a Makefile *.h *.c bql/ t/ HACKING bolo-$${VERSION}/; \
+	cp -a docs/collectors bolo-$${VERSION}/docs/; \
+	find bolo-$${VERSION}/ -name '*.o' -exec rm \{} \;; \
+	tar -cjvf bolo-$${VERSION}.tar.bz2 bolo-$${VERSION}/
+
+distcheck: dist
+	VERSION=$$(./version.sh); \
+	rm -rf _distcheck; mkdir -p _distcheck; \
+	cd _distcheck; \
+	tar -xjvf ../bolo-$${VERSION}.tar.bz2; \
+	cd bolo-$${VERSION}; \
+	make test; \
+	cd ../..; \
+	rm -rf _distcheck
+
 clean:
 	rm -f bolo $(COLLECTORS)
 	rm -f *.o *.gcno *.gcda
