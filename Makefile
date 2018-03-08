@@ -28,7 +28,9 @@ COLLECTORS += process
 process: collectors/process
 	cp $+ $@
 
-all: bolo $(COLLECTORS) api/api
+all: bolo $(COLLECTORS)
+everything: all api/api
+
 bolo: bolo.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o \
       btree.o tags.o query.o cf.o bql/bql.a bqip.o net.o fdpoll.o ingest.o cfg.o \
       \
@@ -43,8 +45,10 @@ dist:
 	VERSION=$$(./version.sh); \
 	rm -rf bolo-$${VERSION}; \
 	mkdir -p bolo-$${VERSION}; \
-	mkdir -p bolo-$${VERSION}/docs; \
 	cp -a Makefile *.h *.c bql/ t/ HACKING bolo-$${VERSION}/; \
+	mkdir -p bolo-$${VERSION}/collectors; \
+	cp -a collectors/linux.c collectors/process bolo-$${VERSION}/collectors/; \
+	mkdir -p bolo-$${VERSION}/docs; \
 	cp -a docs/collectors bolo-$${VERSION}/docs/; \
 	find bolo-$${VERSION}/ -name '*.o' -exec rm \{} \;; \
 	tar -cjvf bolo-$${VERSION}.tar.bz2 bolo-$${VERSION}/
@@ -55,7 +59,7 @@ distcheck: dist
 	cd _distcheck; \
 	tar -xjvf ../bolo-$${VERSION}.tar.bz2; \
 	cd bolo-$${VERSION}; \
-	make test; \
+	make test; make; \
 	cd ../..; \
 	rm -rf _distcheck
 
