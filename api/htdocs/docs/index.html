@@ -33,6 +33,184 @@
 
 
 
+		<a id="bql"></a>
+		<h2 toc="*">Querying Your Data</h2>
+
+		<p>Before we jump into the nitty-gritty details of writing BoardCode,
+		let's take a quick look at <strong>BQL</strong>, the <em>Bolo Query
+		Language</em>.  The most important part of any dashboard is the data it
+		visualizes, so a firm grasp of BQL is kind of important.</p>
+
+		<p>Bolo stores all of its data as a bunch of <em>time series</em>, each
+		representing a single continuous set of measurements over time.  Each
+		series ties together a generic metric, like <em>cpu usage</em>, and a
+		set of tags with values, like the host <strong>web01</strong> in the
+		<strong>prod</strong> environment.  To query data, you need to know what
+		tags you are interested in, and which metrics matter.</p>
+
+		<p>That's the basis of a BQL query: select a metric or three, and filter
+		down to your chosen tags.  Here's an example:</p>
+
+		<pre><code>SELECT mem.total, mem.used
+ WHERE env  = prod
+   AND host = web01</code></pre>
+
+		<p>BQL looks like a lot like SQL, which is on purpose.  The
+		<tt>SELECT</tt> clause sets up the list of one or more fields or
+		expressions to return.  The <tt>WHERE</tt> clause places further
+		restrictions on which time series will match by using tag
+		conditionals.</p>
+
+		<p>All time series for a given metric in a <tt>SELECT</tt> expression
+		will be combined.  For instance, if you have two web hosts in your
+		production environment, the following query:</p>
+
+		<pre><code>SELECT mem.used WHERE env = prod</code></pre>
+
+		<p>will return a single composite time series for memory usage,
+		an aggregate of both servers' measurements.  By default, values will be
+		placed into 60-second buckets and the median value will be taken.
+		You can control this behavior by setting the <tt>BUCKET</tt> clause.
+
+		<pre><code>SELECT mem.used WHERE env = prod
+BUCKET MAX OVER 5m</code></pre>
+
+		<p>When we get into <em>consolidation functions</em> later, we'll revisit
+		buckets.  For now, just know that they are there.</p>
+
+		<p>The conditional <tt>WHERE</tt> clause is pretty powerful.  You've
+		already seen tag value conditional.  You can also assert the presence of
+		a given tag on a series, regardless of its value:</p>
+
+		<pre><code>SELECT something WHERE cluster EXISTS</code></pre>
+
+		<p>Conditional expressions can be combined with the logical operators
+		<tt>AND</tt> and <tt>OR</tt>.  They can be negated via <tt>NOT</tt>.
+		This leads to some pretty powerful query-fu:</p>
+
+		<pre><code>SELECT something
+ WHERE env = prod AND os = linux OR os = unix</code></pre>
+
+		<p>This brings up the issue of precedence.  In BQL, <tt>NOT</tt> binds
+		tightly, and has the highest precedence.  The equality operators
+		<tt>=</tt> and <tt>!=</tt> share the next highest precedence, followed
+		by <tt>AND</tt> (<tt>&amp;&amp;</tt>) and <tt>OR</tt> (<tt>||</tt>).</p>
+
+		<p>It does however mean that the above query is probably not what we
+		intended.  To force a different precedence, we can use parentheses, just
+		like in high school Algebra class.</p>
+
+		<pre><code>SELECT something
+ WHERE env = prod AND (os = linux OR os = unix)</code></pre>
+
+		<p>Otherwise we would get all the Linux servers in production, and all
+		of the UNIX servers, everywhere.  When in doubt, parenthesize!</p>
+
+		<p>Often, you won't be interested in the <em>entire</em> history of a
+		given measurement.  Especially if your Bolo installation is configured
+		to retain a large chunk of history, looking at everything can be both
+		time-consuming and unproductive.  Enter the <em>when</em> clauses:</p>
+
+		<pre><code>SELECT df.used WHERE path = "/var/nfs" AFTER 4h AGO
+SELECT df.used WHERE path = "/var/nfs" BEFORE NOW AND AFTER 4h AGO
+SELECT df.used WHERE path = "/var/nfs" BETWEEN 4h AGO AND NOW</code></pre>
+
+		<p>Those three queries are semantically equivalent.  In practice, you'll
+		probably get the most mileage out of the <tt>AFTER &lt;time&gt; AGO</tt>
+		variant, which has a built-in implicit <tt>AND BEFORE NOW</tt>.
+
+		<p>The simplest BQL queries just return raw time series, unmodified
+		(except for the bucketing combination, of course).  BQL is so much more
+		powerful than that, though.  You can perform arbitrary calculations
+		between time series and either numeric constants or other series.</p>
+
+		<p>Suppose we have per-process monitoring that is generating time
+		series named <strong>nprocs</strong> (for number of detected processes),
+		and <strong>heap</strong> (tracking heap memory usage in bytes).  Using
+		BQL expressions, we can determine the per-process heap average, in
+		kilobytes:</p>
+
+		<pre><code>SELECT (heap / nprocs) / 1024 AS heap_per
+ WHERE process = "nginx"
+   AND host = "web01"</code></pre>
+
+		<p>Both time series will be bucketed before they are combined.  Then,
+		timestamp by timestamp, Bolo will divide the measured heap by the number
+		of processes and scale the resulting byte quantity into kilobytes.  All
+		of this happens server-side, so you don't have to do anyhing!</p>
+
+		<p>In addition to elementary mathematical operations, BQL supports set
+		aggregation functions, allowing you to aggregate adjacent blocks of
+		measurements into larger values.  For example, you mway want to know the
+		hourly peak requests-per-second of a web farm.  You can do that with the
+		<tt>MAX</tt> <em>consolidation function</em>, and an
+		<tt>AGGREGATE</tt> clause:</p>
+
+		<pre><code>   SELECT web.rps WHERE env = prod
+AGGREGATE 1h BY MAX</code></pre>
+
+		<p>You can even mix consolidation functions, if you switch to the
+		functional style:</p>
+
+		<pre><code>   SELECT max(web.rps) AS max,
+          min(web.rps) AS min
+    WHERE env = prod
+AGGREGATE 1h</code></pre>
+
+		<p>If you want to get <em>really</em> fancy, you can even combine these
+		functions with math:</p>
+
+		<pre><code>   SELECT max(web.rps) - min(web.rps) AS spread
+    WHERE env = prod
+AGGREGATE 1h</code></pre>
+
+		<p>The following consolidation functions are defined:</p>
+
+		<ul>
+			<li><strong>max(x)</strong> - Find the local maxima per the aggregation window.</li>
+			<li><strong>min(x)</strong> - Find the local minima per the aggregation window.</li>
+			<li><strong>sum(x)</strong> - Add up all of the measurements in each window.</li>
+			<li><strong>mean(x)</strong> - Find the arithmetic mean (average) in each aggregation window.</li>
+			<li><strong>median(x)</strong> - Find the median, reservoir-sampled (see below).</li>
+			<li><strong>stdev(x)</strong> - Standard (sample) deviation, a.k.a. <strong>&#x3c3;</strong>.</li>
+			<li><strong>variance(x)</strong> - Variance (sample) of the measurements.</li>
+			<li><strong>delta(x)</strong> - The difference between the first and
+			last values in each window.</li>
+		</ul>
+
+		<p>Most of these functions losslessly perform their calculations in
+		fixed memory-space.  To find standard deviation and variance, Bolo
+		employs Wellford's algorithm.  The others are straightforward enough to
+		calculate with only a handful of variables.</p>
+
+		<p>The lone exception to that is <tt>median()</tt>.  The only way to
+		calculate the median of a series is to sort all of the values and pick
+		the middle value(s).  In order to do this in constant space, Bolo
+		employs <em>reservoir sampling</em>.</p>
+
+		<p>Reservoir sampling uses probability theory to derive a representative
+		set of samples from a larger set of values.  If the reservoir is larger
+		than the total size of the input value set, all values are examined.
+		However, once the reservoir is filled, new values may be swapped in for
+		older values, according to a probability function.</p>
+
+		<p>The upshot of all this is that <tt>median()</tt> may give slightly
+		different values from one query execution to the next, if the sample
+		buffer is too small.  You can influence how many large Bolo makes the
+		sampling reservoir by supplying a <tt>USING n SAMPLES</tt> sub-clause to
+		the <tt>AGGREGATE</tt> clause:</p>
+
+		<pre><code>SELECT median(x) WHERE env = dev
+AGGREGATE USING 5000 SAMPLES</code></pre>
+
+		<p><strong>Note:</strong> if you specify this sub-clause to a query that
+		does not use the <tt>median()</tt> consolidation function, you won't
+		incur the additional memory of an over-sized reservoir. Bonus!</p>
+
+		<p>Now that you've got a thorough understanding of how to query your
+		data, let's get back to writing those dashboards!</p>
+
+
 		<a id="lang"></a>
 		<h2 toc="*">Language Basics</h2>
 
