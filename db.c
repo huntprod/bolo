@@ -803,6 +803,7 @@ s_newslab(struct db *db, uint64_t id)
 
 	CHECK(db != NULL, "s_newslab() given a NULL db pointer to work with");
 
+	fd = -1;
 	slab = xmalloc(sizeof(*slab));
 	slab->key = db->key;
 
