@@ -59,6 +59,6 @@ func main() {
 	http.Handle("/v1/", api)
 
 	fmt.Printf("@C{listening on %s...}\n", opt.Listen)
-	http.ListenAndServe(opt.Listen, nil)
-	fmt.Printf("terminating...\n")
+	err = http.ListenAndServe(opt.Listen, nil)
+	bail(err)
 }

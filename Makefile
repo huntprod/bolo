@@ -162,7 +162,7 @@ bql/bql.a: bql/grammar.o bql/lexer.o
 	ar cr $@ $+
 
 
-.PHONY: all clean distclean test check memtest coverage copycov ccov sure fixme
+.PHONY: all everything clean distclean test check memtest coverage copycov ccov sure fixme
 
 ll: l/bql.ll.o l/main.o
 	$(CC) -o $@ $+
