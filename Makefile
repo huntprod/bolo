@@ -22,7 +22,7 @@ TESTS += ingest
 COLLECTORS :=
 COLLECTORS += linux
 linux: collectors/linux.o hash.o time.o util.o
-	$(CC) $(LDFLAGS) -o $@ $+ -lpcre
+	$(CC) $(LDFLAGS) -o $@ $+ -static -lpcre -lpthread
 
 COLLECTORS += process
 process: collectors/process
