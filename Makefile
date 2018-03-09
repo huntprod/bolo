@@ -41,6 +41,9 @@ bolo: bolo.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o \
 api/api:
 	cd api && go build .
 
+webroot:
+	tar -cjf webroot.tar.bz2 -C api/htdocs .
+
 dist:
 	VERSION=$$(./version.sh); \
 	rm -rf bolo-$${VERSION}; \
