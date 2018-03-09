@@ -54,7 +54,8 @@ dist:
 	mkdir -p bolo-$${VERSION}/docs; \
 	cp -a docs/collectors bolo-$${VERSION}/docs/; \
 	find bolo-$${VERSION}/ -name '*.o' -exec rm \{} \;; \
-	tar -cjvf bolo-$${VERSION}.tar.bz2 bolo-$${VERSION}/
+	tar -cjvf bolo-$${VERSION}.tar.bz2 bolo-$${VERSION}/; \
+	rm -rf bolo-$${VERSION}/
 
 distcheck: dist
 	VERSION=$$(./version.sh); \
