@@ -861,7 +861,7 @@ var World = function () {
 	 **/
 	var OP_SET = function (world, op) {
 		var set = function (key, value) {
-			keys = key.split(/\./).reverse();
+			var keys = key.split(/\./).reverse();
 			var obj = world.blocks[world.blocks.length - 1];
 			for (var i = keys.length - 1; i > 0; i--) {
 				if (!(keys[i] in obj)) { obj[keys[i]] = {}; }
