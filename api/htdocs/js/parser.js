@@ -48,21 +48,36 @@ var only_metric = function (d, key) {
 
 var as_self = function (x) { return x; };
 
-var as_bytes = function (b) {
-	var fmt = d3.format('.1f');
-	if (b < 1024) { return fmt(b) + ' B';  } b /= 1024;
-	if (b < 1024) { return fmt(b) + ' kB'; } b /= 1024;
-	if (b < 1024) { return fmt(b) + ' MB'; } b /= 1024;
-	                return fmt(b) + ' GB';
-}
+var fmt = {
+	just: function (fn) {
+		return function (v) {
+			l = fn(v);
+			return l[0]+" "+l[1];
+		};
+	},
 
-var as_si = function (n) {
-	var fmt = d3.format('.1f');
-	if (n < 1000) { return fmt(n) + '';  } n /= 1000;
-	if (n < 1000) { return fmt(n) + 'k'; } n /= 1000;
-	if (n < 1000) { return fmt(n) + 'M'; } n /= 1000;
-	                return fmt(n) + 'B';
-}
+	printf: function (s) {
+		return function (v) {
+			return [d3.format(s)(v),''];
+		};
+	},
+
+	bytes: function (b) {
+		var f = d3.format('.1f');
+		if (b < 1024) { return [f(b), 'b'];  } b /= 1024;
+		if (b < 1024) { return [f(b), 'kB']; } b /= 1024;
+		if (b < 1024) { return [f(b), 'MB']; } b /= 1024;
+		                return [f(b), 'GB'];
+	},
+
+	si: function (n) {
+		var f = d3.format('.1f');
+		if (n < 1000) { return [f(n), ''];  } n /= 1000;
+		if (n < 1000) { return [f(n), 'k']; } n /= 1000;
+		if (n < 1000) { return [f(n), 'M']; } n /= 1000;
+		                return [f(n), 'G'];
+	}
+};
 
 var as_whole = function (n) {
 	if (Math.floor(n) != n) {
@@ -71,11 +86,19 @@ var as_whole = function (n) {
 	return n;
 };
 
+var format = function (s) {
+	switch (s) {
+	default:      return fmt.printf(s || '.1f');
+	case 'bytes': return fmt.bytes;
+	case 'si':    return fmt.si;
+	}
+}
+
 var as_format = function (s) {
 	switch (s) {
-	default:      return as_self;
-	case 'bytes': return as_bytes;
-	case 'si':    return as_si;
+	default:      return s;
+	case 'bytes': return fmt.just(fmt.bytes);
+	case 'si':    return fmt.just(fmt.si);
 	case 'whole': return as_whole;
 	}
 };
@@ -189,10 +212,11 @@ MetricBlock.prototype.update = function (data) {
 
 	var root = this.select();
 
+	value = format(this.format)(v);
 	root.append('p')
-	    .text(d3.format(".2")(v))
+	    .text(value[0])
 	    .append('span')
-	      .text(this.unit);
+	      .text(value[1] || this.unit);
 	root.append('h2')
 	    .text(this.label);
 
@@ -723,10 +747,11 @@ var World = function () {
 		case 'metric':
 			must_be_toplevel();
 			world.blocks.push(new MetricBlock({
-				size:  '3x3',
-				unit:  '',
-				label: '',
-				color: ''
+				size:   '3x3',
+				unit:   '',
+				label:  '',
+				color:  '',
+				format: '.1f'
 			}));
 			break;
 
@@ -1611,12 +1636,13 @@ var World = function () {
 					parse_log(world);
 					continue;
 				}
-				if (iskeyword(t, 'size')  ||
-						iskeyword(t, 'unit')  ||
-						iskeyword(t, 'label') ||
-						iskeyword(t, 'graph') ||
-						iskeyword(t, 'query') ||
-						iskeyword(t, 'color') ||
+				if (iskeyword(t, 'size')   ||
+						iskeyword(t, 'unit')   ||
+						iskeyword(t, 'label')  ||
+						iskeyword(t, 'graph')  ||
+						iskeyword(t, 'query')  ||
+						iskeyword(t, 'color')  ||
+						iskeyword(t, 'format') ||
 						iskeyword(t, 'hover')
 				) {
 					var val = expect_token(ctx);
