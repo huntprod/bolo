@@ -7,6 +7,6 @@ if [[ -z "$OPTS" ]]; then
 fi
 
 docker volume ls | grep -q bolo-dev || docker volume create bolo-dev
-docker stop bolo_core || true
-docker rm   bolo_core || true
+docker stop bolo_core 2>/dev/null || true
+docker rm   bolo_core 2>/dev/null || true
 exec docker run $OPTS -v bolo-dev:/db -p 2001-2002:2001-2002 --name bolo_core bolo/core

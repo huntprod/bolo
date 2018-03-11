@@ -7,6 +7,6 @@ if [[ -z "$OPTS" ]]; then
 fi
 
 docker volume ls | grep -q bolo-dev || docker volume create bolo-dev
-docker stop bolo_web || true
-docker rm   bolo_web || true
+docker stop bolo_web 2>/dev/null || true
+docker rm   bolo_web 2>/dev/null || true
 exec docker run $OPTS -v bolo-dev:/db -v $PWD/api/htdocs:/htdocs -p 8181:80 -e BOLO_CORE=172.17.0.2:2001 --name bolo_web bolo/web
