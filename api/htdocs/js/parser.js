@@ -146,27 +146,43 @@ Block.prototype.html = function () {
 		throw "Invalid size '"+this.size+"'";
 	}
 
-	return '<div id="'+this.id+'" class="'+this.type+' w'+dim[0]+' h'+dim[1]+'"></div>';
+	return '<div id="'+this.id+'" class="blk '+this.type+' w'+dim[0]+' h'+dim[1]+'"></div>';
 };
 
 Block.prototype.select = function () {
 	return d3.select('#'+this.id);
 };
 
+Block.prototype.widget = function (type) {
+	var $e = $('#'+this.id);
+	if ($e.find('.ctl').length == 0) { $e.append('<div class="ctl"></div>'); }
+	$e = $e.find('.ctl');
+
+	switch (type) {
+	case 'data':
+		$e.append(
+		  '<div class="behind">'+
+		    '<div class="grip"></div>'+
+		  '</div>');
+		break;
+
+	case 'hover':
+		if (this.hover && this.hover != '') {
+			$e.append(
+			  '<div class="hover">'+
+			    '<div class="grip"></div>'+
+			    '<div class="pop">'+this.hover+'</div>'+
+			  '</div>');
+		}
+		break;
+
+	}
+};
+
 Block.prototype.validate = function () { };
 Block.prototype.parse    = function () { };
 Block.prototype.update   = function () { };
 
-
-var hover = function (x) {
-	if (x.hover && x.hover != '') {
-		$('#'+x.id).append(
-		  '<div class="hover">'+
-		    '<div class="grip"></div>'+
-		    '<div class="pop">'+x.hover+'</div>'+
-		  '</div>');
-	}
-}
 
 
 var Break = function (attrs) { init(this, attrs, 'break') };
@@ -178,7 +194,7 @@ Break.prototype.html = function () {
 var PlaceholderBlock = function (attrs) { init(this, attrs, 'placeholder') };
 PlaceholderBlock.prototype = Object.create(Block.prototype);
 PlaceholderBlock.prototype.update = function () {
-	hover(this);
+	this.widget('hover');
 	var svg    = this.select().append('svg'),
 	    bounds = svg.node().getBoundingClientRect()
 	    c      = color.spec(this.color);
@@ -206,7 +222,8 @@ TextContentBlock.prototype.update = function (data) {
 var MetricBlock = function (attrs) { init(this, attrs, 'metric') };
 MetricBlock.prototype = Object.create(Block.prototype);
 MetricBlock.prototype.update = function (data) {
-	hover(this);
+	this.widget('data');
+	this.widget('hover');
 	data = only_metric(data);
 	var v = data[data.length-1].v;
 
@@ -246,7 +263,8 @@ MetricBlock.prototype.update = function (data) {
 var SparklineBlock = function (attrs) { init(this, attrs, 'sparkline') };
 SparklineBlock.prototype = Object.create(Block.prototype);
 SparklineBlock.prototype.update = function (data) {
-	hover(this);
+	this.widget('data');
+	this.widget('hover');
 	data = only_metric(data, this.plot);
 
 	var root   = this.select(),
@@ -283,7 +301,8 @@ SparklineBlock.prototype.update = function (data) {
 var GraphBlock = function (attrs) { init(this, attrs, 'graph') };
 GraphBlock.prototype = Object.create(Block.prototype);
 GraphBlock.prototype.update = function (data) {
-	hover(this);
+	this.widget('data');
+	this.widget('hover');
 	var svg    = this.select().append('svg'),
 	    bounds = svg.node().getBoundingClientRect(),
 	    margin = {top: 20, right: 20, bottom: 50, left: 70};
@@ -437,7 +456,8 @@ GraphBlock.prototype.update = function (data) {
 var ScatterPlotBlock = function (attrs) { init(this, attrs, 'scatterplot') };
 ScatterPlotBlock.prototype = Object.create(Block.prototype);
 ScatterPlotBlock.prototype.update = function (data) {
-	hover(this);
+	this.widget('data');
+	this.widget('hover');
 	var svg    = this.select().append('svg'),
 	    bounds = svg.node().getBoundingClientRect(),
 	    margin = {top: 20, right: 20, bottom: 40, left: 60};
@@ -1995,10 +2015,12 @@ Board.prototype.draw = function (root) {
 			       .addClass(self.deleted ? 'deleted' : 'live')
 			       .append('<div class="w12 deleted">This board has been deleted.  <a href="#" rel="undo">undo</a>.</div>');
 
+			$DATA = {}; /* clean up */
 			for (var i = 0; i < self.blocks.length; i++) {
 				var blk = self.blocks[i];
 				$(root).append(blk.html());
-				blk.update(data[q.references[blk.id]]);
+				$DATA[blk.id] = data[q.references[blk.id]];
+				blk.update($DATA[blk.id]);
 			}
 		},
 		error: function (r) {

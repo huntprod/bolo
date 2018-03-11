@@ -749,15 +749,34 @@ body[page="browse"]  #browse
 }
 
 
+body.docs .blk:hover .ctl,
+body.docs .blk       .ctl { display: none; }
 
-.hover {
-  position: relative;
+.ctl {
+  position: absolute;
+  right: 0; top; 0;
+  display: flex;
+  flex-direction: row-reverse;
+  z-index: 50;
+  display: none;
+  right: 5px; top: 5px;
+  overflow: none;
 }
+.blk { position: relative; }
+.blk:hover .ctl {
+  display: flex;
+}
+.metric .ctl {
+}
+.graph .ctl {
+  background-color: rgba(255,255,255,0.9);
+}
+.ctl > * {
+  margin-left: 4px;
+}
+
 .hover .grip {
   cursor: pointer;
-  position: absolute;
-  top: 0px;
-  right: 4px;
   font-size: 16pt;
 }
 .hover .grip::before {
@@ -774,6 +793,78 @@ body[page="browse"]  #browse
   font-size: 11pt;
   color: #333;
   background-color: #fff;
+}
+
+.behind .grip {
+  cursor: pointer;
+  font-size: 16pt;
+}
+.behind .grip::before {
+  content: "\25c8";
+}
+#overlay {
+  display: none;
+  height: 100%; width: 100%;
+  position: fixed; top: 0; left: 0;
+  background-color: #000; opacity: 0.77;
+  z-index: 100;
+}
+#data-behind {
+  z-index: 101;
+  display: none;
+  position: fixed;
+  top: 0; left: 0;
+  height: 80vh;
+  width: 80vw;
+  padding: 38px 0 0 0;
+  box-sizing: border-box;
+  margin: 10vh 10vw;
+  box-shadow: 1px 1px 12px #333;
+  background-color: #fff;
+  overflow: scroll;
+}
+#data-behind header {
+  background-color: slateblue;
+  color: #fff;
+  overflow: hidden;
+  height: 38px;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  position: fixed;
+  top: 10vh; left: 10vw;
+  width: 80vw;
+}
+#data-behind header * {
+  color: #fff;
+  text-decoration: none;
+  font-size: 12pt;
+  font-weight: normal;
+  padding: 0.6em;
+  margin: 0;
+}
+#data-behind header a::before {
+  content: "\2718";
+}
+#data-behind div {
+  padding: 10px;
+}
+#data-behind table {
+  border-spacing: 0;
+  border-collapse: collapse;
+  margin: 0 auto;
+}
+#data-behind table thead th {
+  padding: 0.6em;
+  background-color: #333;
+  color: #fff;
+}
+#data-behind tbody tr:nth-child(even) {
+  background-color: #eee;
+}
+#data-behind tbody td {
+  padding: 0.6em;
+  border: 1px solid #ccc;
 }
 
 

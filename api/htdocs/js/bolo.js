@@ -1,4 +1,6 @@
 (function (document,window,undefined) {
+	var $DATA;
+
 	var init = false;
 	var c1, picker, w1 = 200, h1 = 200;
 	var c2, strip,  w2 =  16, h2 = 200;
@@ -717,6 +719,73 @@
 			.on('click', '.hover .grip', function (event) {
 				event.preventDefault();
 				$(event.target).closest('.hover').find('.pop').toggle();
+			})
+			.on('click', '.behind .grip', function (event) {
+				event.preventDefault();
+				$('#data-behind div').empty().append(
+				  '<table>'+
+				    '<thead><tr><th>When</th></tr></thead>'+
+				    '<tbody></tbody>'+
+				  '</table>');
+				$('#overlay, #data-behind').show();
+				$('body').css({overflow: 'hidden'});
+
+				/* we already have all of the data in $DATA[blkid], but it is
+				   indexed by metric, to make it easier for the data visualization
+				   functions to handle.
+
+				   what we need is the data in [ts] -> [v1, v2, v3], since we are
+				   trying to construct table cells grouped into per-timestamp rows.
+				 */
+
+				var rows = {}, tlist = [], mlist = [],
+				    id = $(event.target).closest('.blk').attr('id');
+
+				/* first we figure out how many metrics we are working with */
+				for (var metric in $DATA[id]) {
+					$('#data-behind thead tr').append('<th>'+metric+'</th>');
+					mlist.push(metric);
+				}
+
+				/* next, iterate through each metric, setting up the rows
+				   list.  for every timestamp, we allocate a full array,
+				   to be filled in by future iterations. */
+				for (var i = 0; i < mlist.length; i++) {i
+					var m = mlist[i];
+					for (var j = 0; j < $DATA[id][m].length; j++) {
+						var t = $DATA[id][m][j].t;
+						if (!(t in rows)) { rows[t] = new Array(mlist.length); }
+						if ($DATA[id][m][j].v != null) {
+							rows[t][i] = $('<td>'+$DATA[id][m][j].v.toLocaleString()+'</td>');
+						}
+					}
+				}
+
+				/* grab the unique list of timestamps, for a sorted loop */
+				for (var t in rows) { tlist.push(t); }
+				tlist.sort();
+
+				for (var i = 0; i < tlist.length; i++) {
+					var $tr = $('<tr>'); $('#data-behind tbody:last-child').append($tr);
+					var d = new Date(); d.setTime(tlist[i]);
+					$tr.append('<td>'+d.toString()+'</td>');
+					for (var j = 0; j < mlist.length; j++) {
+						if (typeof(rows[tlist[i]][j]) === 'undefined') {
+							$tr.append('<td>-</td>');
+						} else {
+							$tr.append(rows[tlist[i]][j]);
+						}
+					}
+					if (i % 15 == 14) {
+						$('#data-behind table').append('<thead>'+$('#data-behind thead').first().html()+'</thead>');
+						$('#data-behind table').append('<tbody>');
+					}
+				}
+			})
+			.on('click', '#data-behind header a', function (event) {
+				event.preventDefault();
+				$('#overlay, #data-behind').hide();
+				$('body').css({overflow: ''});
 			})
 			;
 		});
