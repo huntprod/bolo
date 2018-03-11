@@ -558,6 +558,7 @@ var T_VAR         = 18;
 var T_OPEN_PAREN  = 19;
 var T_CLOSE_PAREN = 20;
 var T_COMMA       = 21;
+var T_THOLD       = 22;
 
 var World = function () {
 	var $w = function() {
@@ -640,6 +641,9 @@ var World = function () {
 		case T_NUMERIC:
 		case T_SIZE:
 		case T_IDENTIFIER:
+			return thing[1];
+
+		case T_THOLD:
 			return thing[1];
 
 		case T_STRING:
@@ -761,7 +765,7 @@ var World = function () {
 		case 'threshold':
 			must_be_toplevel();
 			world.current_thold = {rules: []};
-			world.declare('thold', op[2], world.current_thold);
+			world.declare('thold', op[2], [T_THOLD, world.current_thold]);
 			break;
 
 		case 'metric':
@@ -887,11 +891,11 @@ var World = function () {
 	/* }}} */
 	/** OP_TRULE {{{
 	 **/
-	var OP_TRULE = function (world, cmp, val, color) {
+	var OP_TRULE = function (world, op) {
 		world.current_thold.rules.push({
-			eval:    cmp,
-			against: val,
-			color:   color
+			eval:    op[1],
+			against: typeof(op[2]) === 'undefined' ? undefined : world.valueof(op[2]),
+			color:   world.valueof(op[3])
 		});
 	};
 	/* }}} */
