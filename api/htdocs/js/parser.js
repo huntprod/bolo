@@ -155,8 +155,8 @@ Block.prototype.select = function () {
 
 Block.prototype.widget = function (type) {
 	var $e = $('#'+this.id);
-	if ($e.find('.ctl').length == 0) { $e.append('<div class="ctl"></div>'); }
-	$e = $e.find('.ctl');
+	if ($e.find('.widgets').length == 0) { $e.append('<div class="widgets"></div>'); }
+	$e = $e.find('.widgets');
 
 	switch (type) {
 	case 'data':

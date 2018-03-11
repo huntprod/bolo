@@ -749,29 +749,28 @@ body[page="browse"]  #browse
 }
 
 
-body.docs .blk:hover .ctl,
-body.docs .blk       .ctl { display: none; }
+body.docs .blk:hover .widgets,
+body.docs .blk       .widgets { display: none; }
 
-.ctl {
+.widgets {
   position: absolute;
   right: 0; top; 0;
   display: flex;
   flex-direction: row-reverse;
-  z-index: 50;
   display: none;
   right: 5px; top: 5px;
   overflow: none;
 }
 .blk { position: relative; }
-.blk:hover .ctl {
+.blk:hover .widgets {
   display: flex;
 }
-.metric .ctl {
+.metric .widgets {
 }
-.graph .ctl {
+.graph .widgets {
   background-color: rgba(255,255,255,0.9);
 }
-.ctl > * {
+.blk .widgets > * {
   margin-left: 4px;
 }
 
@@ -807,10 +806,8 @@ body.docs .blk       .ctl { display: none; }
   height: 100%; width: 100%;
   position: fixed; top: 0; left: 0;
   background-color: #000; opacity: 0.77;
-  z-index: 100;
 }
-#data-behind {
-  z-index: 101;
+.modal {
   display: none;
   position: fixed;
   top: 0; left: 0;
@@ -823,7 +820,7 @@ body.docs .blk       .ctl { display: none; }
   background-color: #fff;
   overflow: scroll;
 }
-#data-behind header {
+.modal header {
   background-color: slateblue;
   color: #fff;
   overflow: hidden;
@@ -835,7 +832,7 @@ body.docs .blk       .ctl { display: none; }
   top: 10vh; left: 10vw;
   width: 80vw;
 }
-#data-behind header * {
+.modal header * {
   color: #fff;
   text-decoration: none;
   font-size: 12pt;
@@ -843,12 +840,13 @@ body.docs .blk       .ctl { display: none; }
   padding: 0.6em;
   margin: 0;
 }
-#data-behind header a::before {
+.modal header a::before {
   content: "\2718";
 }
-#data-behind div {
+.modal div {
   padding: 10px;
 }
+
 #data-behind table {
   border-spacing: 0;
   border-collapse: collapse;
@@ -867,6 +865,17 @@ body.docs .blk       .ctl { display: none; }
   border: 1px solid #ccc;
 }
 
+
+
+/*** z-index ***/
+.modal header    { z-index: 103; }
+.modal           { z-index: 102; }
+#overlay         { z-index: 101; }
+
+.blk .hover .pop { z-index: 53; }
+.blk .widgets    { z-index: 52; }
+.blk             { z-index: 51; }
+.board           { z-index: 50; }
 
 
 @media print {
