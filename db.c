@@ -484,6 +484,7 @@ db_mount(const char *path, struct dbkey *key)
 	db = xalloc(1, sizeof(struct db));
 	db->rootfd = fd;
 	db->key = key;
+	db->next_tblock = 0x800;
 
 	infof("checking for main.db index file at %s/%s", path, PATH_TO_MAINDB);
 	fd = openat(db->rootfd, PATH_TO_MAINDB, O_RDONLY);
