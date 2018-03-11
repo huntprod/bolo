@@ -567,10 +567,11 @@
 						for (var i = 0; i < data.select.length; i++) {
 							var x = data.select[i];
 							for (var j = i+1; j < data.select.length; j++) {
-								var y = data.select[j].name;
+								var y = data.select[j];
 								text.push([
 									'% scatter plot, '+x+' vs '+y,
 									'scatterplot {',
+									'  label "'+x+' / '+y+'"',
 									'  size 4x3',
 									'  query ['+q+']',
 									'  x "'+x+'"',
