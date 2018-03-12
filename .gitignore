@@ -36,6 +36,9 @@
 *.tar.bz2
 /bolo-*.*.*
 
+# object files
+*.o
+
 # generated files
 /bql/lang.c
 /bql/grammar.c
