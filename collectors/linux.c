@@ -3,6 +3,7 @@
 #include <dirent.h>
 #include <sys/statvfs.h>
 #include <pcre.h>
+#include <sys/sysmacros.h>
 
 #define PROC "/proc"
 #define DEFAULT_TAGS "tags=none"
