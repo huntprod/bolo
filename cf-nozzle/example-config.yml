@@ -1,0 +1,12 @@
+---
+uaa:
+  url:         https://uaa.system.10.244.0.34.netip.cc
+  client:      firehose
+  secret:      your-uaa-secret
+  skip_verify: yes
+
+traffic_controller_url: wss://doppler.system.10.244.0.34.netip.cc:4443
+subscription: bolo-nozzle
+prefix: 'cf:sandbox:'
+
+flush_interval: 20s
