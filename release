@@ -10,8 +10,9 @@ minor=`echo "$1" | awk -F. '{print $2}'`
 point=`echo "$1" | awk -F. '{print $3}'`
 dated=`date -u +%Y%m%d.%H%M%S`
 
-sed -i -e "s/#define BOLO_VERSION_MAJOR .*/#define BOLO_VERSION_MAJOR $major/" \
-       -e "s/#define BOLO_VERSION_MINOR .*/#define BOLO_VERSION_MINOR $minor/" \
-       -e "s/#define BOLO_VERSION_POINT .*/#define BOLO_VERSION_POINT $point/" \
-       -e "s/#define BOLO_BUILD_DATE .*/#define BOLO_BUILD_DATE \"$dated\"/" \
-       bolo.h
+sed -e "s/#define BOLO_VERSION_MAJOR .*/#define BOLO_VERSION_MAJOR $major/" \
+    -e "s/#define BOLO_VERSION_MINOR .*/#define BOLO_VERSION_MINOR $minor/" \
+    -e "s/#define BOLO_VERSION_POINT .*/#define BOLO_VERSION_POINT $point/" \
+    -e "s/#define BOLO_BUILD_DATE .*/#define BOLO_BUILD_DATE \"$dated\"/" \
+    bolo.h > bolo.h.new
+mv bolo.h.new bolo.h
