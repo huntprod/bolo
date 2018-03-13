@@ -16,7 +16,6 @@ func main() {
 		Endpoint string   `cli:"-e, --endpoint" env:"BOLO_ENDPOINT"`
 		Tags     []string `cli:"-t, --tags"     env:"BOLO_TAGS"`
 	}
-	opts.Config = "cf-bolo-nozzle.yml"
 	env.Override(&opts)
 
 	_, _, err := cli.Parse(&opts)
