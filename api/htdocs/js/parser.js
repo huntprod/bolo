@@ -2028,8 +2028,13 @@ Board.prototype.draw = function (root) {
 			}
 		},
 		error: function (r) {
+			var e = r.responseText;
+			try {
+				e = JSON.parse(e).error;
+			} catch (oops) { }
+
 			$(root).error("Oops.  Something's wrong with one of your queries...",
-			                error_from(r.responseText).replace(/\n/g, '<br>'));
+			                e.replace(/\n/g, '<br>'));
 		}
 	});
 };
