@@ -25,6 +25,8 @@ type Nozzle struct {
 
 	renames map[string]string
 	metrics map[string]Metric
+	uniques uint64
+	values  uint64
 }
 
 func NewNozzle(nozzle *Nozzle) *Nozzle {
@@ -50,8 +52,10 @@ func (nozzle *Nozzle) ingest(k, tags string, ts int64, val float64) {
 	} else {
 		nozzle.renames[k] = strings.Replace(k, "_", "-", -1)
 		k = nozzle.renames[k]
+		nozzle.uniques += 1
 	}
 	k = "cf." + k + " " + tags
+	nozzle.values += 1
 	if v, ok := nozzle.metrics[k]; ok {
 		v.Timestamp = ts
 		v.Value = val
@@ -88,7 +92,9 @@ func (nozzle *Nozzle) Track(e firehose.Event) {
 }
 
 func (nozzle *Nozzle) Flush() error {
-	nozzle.ingest("nmetrics", nozzle.Tags+",origin=nozzle", time.Now().Unix(), float64(len(nozzle.metrics)))
+	now := time.Now().Unix()*NS
+	nozzle.ingest("nmetrics", nozzle.Tags+",origin=nozzle", now, float64(nozzle.uniques))
+	nozzle.ingest("nvalues",  nozzle.Tags+",origin=nozzle", now, float64(nozzle.values))
 
 	bolo, err := net.Dial("tcp", nozzle.Endpoint)
 	if err != nil {
