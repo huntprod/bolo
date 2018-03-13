@@ -91,7 +91,7 @@ func (nozzle *Nozzle) Track(e firehose.Event) {
 
 func (nozzle *Nozzle) Flush() error {
 	now := time.Now().Unix()*NS
-	nozzle.ingest("cf.samples",  nozzle.Tags+",origin=nozzle", now, float64(nozzle.values))
+	nozzle.ingest("samples",  nozzle.Tags+",origin=nozzle", now, float64(nozzle.values))
 
 	bolo, err := net.Dial("tcp", nozzle.Endpoint)
 	if err != nil {
