@@ -12,6 +12,7 @@ import (
 
 const (
 	NS = 1000000000
+	US = 1000000
 )
 
 type Metric struct {
@@ -101,7 +102,7 @@ func (nozzle *Nozzle) Flush() error {
 	defer bolo.Close()
 
 	for name, metric := range nozzle.metrics {
-		fmt.Fprintf(bolo, "%s %d %f\n", name, metric.Timestamp/NS, metric.Value)
+		fmt.Fprintf(bolo, "%s %d %f\n", name, metric.Timestamp/US, metric.Value)
 	}
 	nozzle.Reset()
 	return nil
