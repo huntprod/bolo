@@ -1,5 +1,10 @@
 #!/bin/sh
 
+if [[ -z "$1" ]]; then
+	echo >&2 "USAGE: $0 x.y.z"
+	exit 1
+fi
+
 major=`echo "$1" | awk -F. '{print $1}'`
 minor=`echo "$1" | awk -F. '{print $2}'`
 point=`echo "$1" | awk -F. '{print $3}'`
