@@ -24,6 +24,7 @@ do_slabinfo(int argc, char **argv)
 			continue;
 		}
 
+		memset(&slab, 0, sizeof(slab));
 		rc = tslab_map(&slab, fd);
 		if (rc != 0) {
 			fprintf(stderr, "failed to map %s: %s\n", path, error(errno));
