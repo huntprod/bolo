@@ -1,0 +1,16 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+
+my $ts   = time * 1000;
+my $tags = $ENV{BOLO_TAGS} || 'tags=none';
+
+# USAGE: collect-n TAGS NAME N [NAME N ...]
+while (@ARGV >= 2) {
+	my $name = shift;
+	my $n    = shift() + 0;
+
+	for (my $i = 1; $i <= $n; $i++) {
+		print "$name$i $tags $ts ".rand."\n";
+	}
+}

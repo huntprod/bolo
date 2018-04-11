@@ -4,12 +4,13 @@ mkdir -p local-config
 cat >local-config/agent.conf <<EOF
 # bolo agent configuration
 
-env.PATH = /bin:/usr/bin:/sbin:/usr/sbin:$PWD
+env.PATH = /bin:/usr/bin:/sbin:/usr/sbin:$PWD:$PWD/dev
 env.BOLO_TAGS = host=$(hostname),os=linux,env=dev,owner=$(whoami)
 
 bolo.endpoint = 127.0.0.1:2002
 schedule.splay = 15
 
+@10s collect-n stress.fd.n 10240
 @10s linux mem
 @30s linux nomem
 @60s process -m 'bolo agent'  -t proc=agent,subsys=bolo
