@@ -1,4 +1,5 @@
 #include "bolo.h"
+#include <getopt.h>
 #include <time.h>
 
 int
@@ -11,12 +12,37 @@ do_slabinfo(int argc, char **argv)
 	double full, bitsper;
 	char unit;
 
-	if (argc < 3) {
-		fprintf(stderr, "USAGE: bolo slabinfo FILE\n");
+	{
+		int idx = 0;
+		char c, *shorts = "hD";
+		struct option longs[] = {
+			{"help",  no_argument, 0, 'h'},
+			{"debug", no_argument, 0, 'D'},
+			{0, 0, 0, 0},
+		};
+
+		while ((c = getopt_long(argc, argv, shorts, longs, &idx)) >= 0) {
+			switch (c) {
+			case 'h':
+				printf("USAGE: %s slabinfo [--debug] /path/to/slab ...\n\n", argv[0]);
+				printf("OPTIONS:\n\n");
+				printf("  -h, --help              Show this help screen.\n\n");
+				printf("  -D, --debug             Enable debugging mode.\n"
+					   "                          (mostly useful only to bolo devs).\n\n");
+				return 0;
+
+			case 'D':
+				debugto(fileno(stderr));
+				break;
+			}
+		}
+	}
+	if (argc < optind+2) {
+		fprintf(stderr, "USAGE: %s slabinfo [--debug] /path/to/slab ...\n\n", argv[0]);
 		return 1;
 	}
 
-	for (i = 2; i < argc; i++) {
+	for (i = optind+1; i < argc; i++) {
 		path = argv[i];
 		fd = open(path, O_RDONLY);
 		if (fd < 0) {
