@@ -68,6 +68,7 @@ s_exec(struct runner *r)
 		errnof("failed to fork");
 		close(pfd[0]);
 		close(pfd[1]);
+		r->pid = 0;
 		return;
 	}
 
@@ -182,8 +183,9 @@ scheduler(int ignored, void *_u)
 	int i, rc;
 	pid_t kid;
 
-	while ((kid = waitpid(-1, &rc, WNOHANG)) != -1)
-		;
+	while ((kid = waitpid(-1, &rc, WNOHANG)) > 0) {
+		debugf("child process %d exited [rc %x]", kid, rc);
+	}
 
 	ctx = (struct context *)_u;
 	now = bolo_ms(NULL);
