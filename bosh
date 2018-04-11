@@ -1,0 +1,13 @@
+#!/bin/bash
+
+echo "building artifacts..."
+make dist api/api webroot
+echo ; echo
+
+out=${1:-/vagrant/bosh}
+mkdir -p $out
+echo "copying to $out"
+cp -v bolo-$(./version.sh).tar.bz2 \
+      webroot.tar.bz2 \
+      $out
+cp -v api/api $out/ui-linux-amd64-$(./version.sh)
