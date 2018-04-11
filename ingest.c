@@ -36,7 +36,7 @@ ingest(struct ingestor *in)
 	int done;
 
 	if (in->last) {
-		//debugf("ziping [%s] to just [%s]\n", in->buf, in->last);
+		//debugf("zipping [%s] to just [%s]\n", in->buf, in->last);
 		in->len -= (in->last - in->buf);
 		memmove(in->buf, in->last, in->len);
 		in->buf[in->len] = '\0';
@@ -62,25 +62,25 @@ ingest(struct ingestor *in)
 	}
 
 	if (!in->metric || !in->tags || !time || !value) {
-		debugf("malformed subsmission packet [%s]", in->buf);
+		errorf("malformed subsmission packet [%s]", in->buf);
 		goto fail;
 	}
 
 	if (tags_valid(in->tags) != 0
 	 || tags_canonicalize(in->tags) != 0) {
-		debugf("failed to parse [%s] tags '%s'", in->metric, in->tags);
+		errorf("failed to parse [%s] tags '%s'", in->metric, in->tags);
 		goto fail;
 	}
 
 	in->time = strtoull(time, &end, 10);
 	if (end && *end) {
-		debugf("failed to parse [%s %s] timestamp '%s'", in->metric, in->tags, time);
+		errorf("failed to parse [%s %s] timestamp '%s'", in->metric, in->tags, time);
 		goto fail;
 	}
 
 	in->value = strtod(value, &end);
 	if (end && *end) {
-		debugf("failed to parse [%s %s] measurement value '%s'", in->metric, in->tags, value);
+		errorf("failed to parse [%s %s] measurement value '%s'", in->metric, in->tags, value);
 		goto fail;
 	}
 
