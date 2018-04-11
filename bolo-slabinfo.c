@@ -60,9 +60,10 @@ do_slabinfo(int argc, char **argv)
 				bitsper /= 1024.0;
 				unit = 'k';
 			}
+
 			span = 0;
 			for (k = 0; k < slab.blocks[j].cells; k++) {
-				tmp = tblock_read32(slab.blocks+j, 24 + k * 12);
+				tmp = tblock_read32(slab.blocks+j, 32 + k * 12);
 				if (tmp > span)
 					span = tmp;
 			}
