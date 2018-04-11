@@ -170,7 +170,7 @@ metric_handler(int fd, void *_u)
 	while (n-- > 0) {
 		debugf("ingesting metric submission from fd %d", in->fd);
 		if (ingest(in) != 0) {
-			errnof("failed to ingest metric submission from fd %d");
+			errnof("failed to ingest metric submission from fd %d", in->fd);
 			goto lockfail;
 		}
 
