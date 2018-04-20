@@ -177,10 +177,21 @@ do_query(int argc, char **argv)
 			int i;
 
 			fprintf(stderr, "%s:\n", f->name);
-			for (i = 0; (unsigned)i < f->result->len; i++)
-				fprintf(stderr, "  - {ts: %lu, value: %lf}\n",
+			for (i = 0; (unsigned)i < f->result->len; i++) {
+				char date[64];
+				struct tm tm;
+				time_t ts;
+
+				ts = (time_t)(f->result->results[i].start / 1000);
+				if (!localtime_r(&ts, &tm))
+					strcpy(date, "xxx, xx xx xxxx xx:xx:xx+xxxx");
+				else
+					strftime(date, 64, "%a, %d %b %Y %H:%M:%S%z", &tm);
+
+				fprintf(stderr, "  - {ts: %lu, value: %lf}   # %s\n",
 					f->result->results[i].start,
-					f->result->results[i].value);
+					f->result->results[i].value, date);
+			}
 		}
 
 		fprintf(stderr, "...\n");
