@@ -1,0 +1,160 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "H0YQiK+gA/pU98Hd8MVqRFOUJMk=",
+			"origin": "github.com/jhunt/go-firehose/vendor/github.com/cloudfoundry-incubator/uaago",
+			"path": "github.com/cloudfoundry-incubator/uaago",
+			"revision": "f9e8c2dfd388502945ec8d400f4e7e7fefe1c8c6",
+			"revisionTime": "2018-03-13T11:01:42Z"
+		},
+		{
+			"checksumSHA1": "VmXOTc6jNWYiINtOImSEoJMjQaw=",
+			"origin": "github.com/jhunt/go-firehose/vendor/github.com/cloudfoundry/noaa",
+			"path": "github.com/cloudfoundry/noaa",
+			"revision": "f9e8c2dfd388502945ec8d400f4e7e7fefe1c8c6",
+			"revisionTime": "2018-03-13T11:01:42Z"
+		},
+		{
+			"checksumSHA1": "oBy9IH/PP4Iy7RNia8dBMRZqezI=",
+			"origin": "github.com/jhunt/go-firehose/vendor/github.com/cloudfoundry/noaa/consumer",
+			"path": "github.com/cloudfoundry/noaa/consumer",
+			"revision": "f9e8c2dfd388502945ec8d400f4e7e7fefe1c8c6",
+			"revisionTime": "2018-03-13T11:01:42Z"
+		},
+		{
+			"checksumSHA1": "h1rUpiRmfBEPHwIeFM1+aVP7ln4=",
+			"origin": "github.com/jhunt/go-firehose/vendor/github.com/cloudfoundry/noaa/consumer/internal",
+			"path": "github.com/cloudfoundry/noaa/consumer/internal",
+			"revision": "f9e8c2dfd388502945ec8d400f4e7e7fefe1c8c6",
+			"revisionTime": "2018-03-13T11:01:42Z"
+		},
+		{
+			"checksumSHA1": "ujnvXeQW5PxPPByaWYhZaWg+NDs=",
+			"origin": "github.com/jhunt/go-firehose/vendor/github.com/cloudfoundry/noaa/errors",
+			"path": "github.com/cloudfoundry/noaa/errors",
+			"revision": "f9e8c2dfd388502945ec8d400f4e7e7fefe1c8c6",
+			"revisionTime": "2018-03-13T11:01:42Z"
+		},
+		{
+			"checksumSHA1": "xqubb0PdPRRLHNPPvKQMAgvIr70=",
+			"origin": "github.com/jhunt/go-firehose/vendor/github.com/cloudfoundry/sonde-go/events",
+			"path": "github.com/cloudfoundry/sonde-go/events",
+			"revision": "f9e8c2dfd388502945ec8d400f4e7e7fefe1c8c6",
+			"revisionTime": "2018-03-13T11:01:42Z"
+		},
+		{
+			"checksumSHA1": "2XtrajUc7LktpQETiH+H2hbd200=",
+			"origin": "github.com/jhunt/go-firehose/vendor/github.com/gogo/protobuf/gogoproto",
+			"path": "github.com/gogo/protobuf/gogoproto",
+			"revision": "f9e8c2dfd388502945ec8d400f4e7e7fefe1c8c6",
+			"revisionTime": "2018-03-13T11:01:42Z"
+		},
+		{
+			"checksumSHA1": "wn2shNJMwRZpvuvkf1s7h0wvqHI=",
+			"origin": "github.com/jhunt/go-firehose/vendor/github.com/gogo/protobuf/proto",
+			"path": "github.com/gogo/protobuf/proto",
+			"revision": "f9e8c2dfd388502945ec8d400f4e7e7fefe1c8c6",
+			"revisionTime": "2018-03-13T11:01:42Z"
+		},
+		{
+			"checksumSHA1": "P3xpZBHztuq1wgCHJmd0DkAMhXc=",
+			"origin": "github.com/jhunt/go-firehose/vendor/github.com/gogo/protobuf/protoc-gen-gogo/descriptor",
+			"path": "github.com/gogo/protobuf/protoc-gen-gogo/descriptor",
+			"revision": "f9e8c2dfd388502945ec8d400f4e7e7fefe1c8c6",
+			"revisionTime": "2018-03-13T11:01:42Z"
+		},
+		{
+			"checksumSHA1": "rNGJereenlgchMueLU9iBCyQDo8=",
+			"origin": "github.com/jhunt/go-firehose/vendor/github.com/gorilla/websocket",
+			"path": "github.com/gorilla/websocket",
+			"revision": "f9e8c2dfd388502945ec8d400f4e7e7fefe1c8c6",
+			"revisionTime": "2018-03-13T11:01:42Z"
+		},
+		{
+			"checksumSHA1": "DE6jvAzC7h6Mczf8Tr0X5SkzeNI=",
+			"origin": "github.com/bolo/core/vendor/github.com/jhunt/go-ansi",
+			"path": "github.com/jhunt/go-ansi",
+			"revision": "9472cb648c200dc28d26d90b0d083a165ee71f10",
+			"revisionTime": "2018-03-13T13:40:40Z"
+		},
+		{
+			"checksumSHA1": "9Ac9rwC63VlGI9tHl8DqKOUcJDQ=",
+			"origin": "github.com/bolo/core/vendor/github.com/jhunt/go-cli",
+			"path": "github.com/jhunt/go-cli",
+			"revision": "9472cb648c200dc28d26d90b0d083a165ee71f10",
+			"revisionTime": "2018-03-13T13:40:40Z"
+		},
+		{
+			"checksumSHA1": "8bXnF0vOnAodePX8tfy7vfBPM64=",
+			"origin": "github.com/bolo/core/vendor/github.com/jhunt/go-envirotron",
+			"path": "github.com/jhunt/go-envirotron",
+			"revision": "9472cb648c200dc28d26d90b0d083a165ee71f10",
+			"revisionTime": "2018-03-13T13:40:40Z"
+		},
+		{
+			"checksumSHA1": "rdrStVZYwaYyTtTm6S1grzkkRTU=",
+			"path": "github.com/jhunt/go-firehose",
+			"revision": "68c2477ce51adf10b4c954680a232bd53a742ea7",
+			"revisionTime": "2018-03-29T18:43:14Z"
+		},
+		{
+			"checksumSHA1": "Yr7yfNSyHPshD4iswbywzhuXWp4=",
+			"origin": "github.com/bolo/core/vendor/github.com/jhunt/go-snapshot",
+			"path": "github.com/jhunt/go-snapshot",
+			"revision": "9472cb648c200dc28d26d90b0d083a165ee71f10",
+			"revisionTime": "2018-03-13T13:40:40Z"
+		},
+		{
+			"checksumSHA1": "jQv+QXGIG0pcUiZZcoWlL2DYYyQ=",
+			"origin": "github.com/jhunt/go-firehose/vendor/github.com/mailru/easyjson",
+			"path": "github.com/mailru/easyjson",
+			"revision": "f9e8c2dfd388502945ec8d400f4e7e7fefe1c8c6",
+			"revisionTime": "2018-03-13T11:01:42Z"
+		},
+		{
+			"checksumSHA1": "T8soMJArSZrYnhmdpAnq1bVxQ6Q=",
+			"origin": "github.com/jhunt/go-firehose/vendor/github.com/mailru/easyjson/buffer",
+			"path": "github.com/mailru/easyjson/buffer",
+			"revision": "f9e8c2dfd388502945ec8d400f4e7e7fefe1c8c6",
+			"revisionTime": "2018-03-13T11:01:42Z"
+		},
+		{
+			"checksumSHA1": "Xw5HIdQ2vlr5wkKl+8ANM9xp5Zs=",
+			"origin": "github.com/jhunt/go-firehose/vendor/github.com/mailru/easyjson/jlexer",
+			"path": "github.com/mailru/easyjson/jlexer",
+			"revision": "f9e8c2dfd388502945ec8d400f4e7e7fefe1c8c6",
+			"revisionTime": "2018-03-13T11:01:42Z"
+		},
+		{
+			"checksumSHA1": "tMeVsfYgDW9K0spDZkOBlvZYssw=",
+			"origin": "github.com/jhunt/go-firehose/vendor/github.com/mailru/easyjson/jwriter",
+			"path": "github.com/mailru/easyjson/jwriter",
+			"revision": "f9e8c2dfd388502945ec8d400f4e7e7fefe1c8c6",
+			"revisionTime": "2018-03-13T11:01:42Z"
+		},
+		{
+			"checksumSHA1": "y/A5iuvwjytQE2CqVuphQRXR2nI=",
+			"origin": "github.com/bolo/core/vendor/github.com/mattn/go-isatty",
+			"path": "github.com/mattn/go-isatty",
+			"revision": "9472cb648c200dc28d26d90b0d083a165ee71f10",
+			"revisionTime": "2018-03-13T13:40:40Z"
+		},
+		{
+			"checksumSHA1": "CNHEeGnucEUlTHJrLS2kHtfNbws=",
+			"origin": "github.com/bolo/core/vendor/golang.org/x/sys/unix",
+			"path": "golang.org/x/sys/unix",
+			"revision": "9472cb648c200dc28d26d90b0d083a165ee71f10",
+			"revisionTime": "2018-03-13T13:40:40Z"
+		},
+		{
+			"checksumSHA1": "RDJpJQwkF012L6m/2BJizyOksNw=",
+			"origin": "github.com/jhunt/go-firehose/vendor/gopkg.in/yaml.v2",
+			"path": "gopkg.in/yaml.v2",
+			"revision": "f9e8c2dfd388502945ec8d400f4e7e7fefe1c8c6",
+			"revisionTime": "2018-03-13T11:01:42Z"
+		}
+	],
+	"rootPath": "github.com/bolo/core/cf-nozzle"
+}
