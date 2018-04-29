@@ -274,7 +274,9 @@ void errorf(const char *fmt, ...)
 	va_list args;
 
 	CHECK(fmt != NULL, "errorf() given a NULL format string to print");
-	CHECK(OUT != NULL, "errorf() has nowhere to print output");
+
+	if (!OUT)
+		return;
 
 	va_start(args, fmt);
 	_vlogf(OUT, "ERROR", fmt, args, 0);
@@ -286,7 +288,9 @@ void errnof(const char *fmt, ...)
 	va_list args;
 
 	CHECK(fmt != NULL, "errnof() given a NULL format string to print");
-	CHECK(OUT != NULL, "errnof() has nowhere to print output");
+
+	if (!OUT)
+		return;
 
 	va_start(args, fmt);
 	_vlogf(OUT, "ERROR", fmt, args, 1);
@@ -298,9 +302,8 @@ void warningf(const char *fmt, ...)
 	va_list args;
 
 	CHECK(fmt != NULL, "warningf() given a NULL format string to print");
-	CHECK(OUT != NULL, "warningf() has nowhere to print output");
 
-	if (LEVEL < LOG_WARNINGS)
+	if (!OUT || LEVEL < LOG_WARNINGS)
 		return;
 
 	va_start(args, fmt);
@@ -313,9 +316,8 @@ void infof(const char *fmt, ...)
 	va_list args;
 
 	CHECK(fmt != NULL, "infof() given a NULL format string to print");
-	CHECK(OUT != NULL, "infof() has nowhere to print output");
 
-	if (LEVEL < LOG_INFO)
+	if (!OUT || LEVEL < LOG_INFO)
 		return;
 
 	va_start(args, fmt);
