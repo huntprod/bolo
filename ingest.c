@@ -60,6 +60,7 @@ ingest(struct ingestor *in)
 			else                        break;
 		}
 	}
+	in->last = p;
 
 	if (!in->metric || !in->tags || !time || !value) {
 		errorf("malformed subsmission packet [%s]", in->buf);
@@ -84,7 +85,6 @@ ingest(struct ingestor *in)
 		goto fail;
 	}
 
-	in->last = p;
 	return 0;
 
 fail:
@@ -182,6 +182,25 @@ TESTS {
 		is_string(in.metric, "cpu|a=b", "ingest() should set the metric to `name|canon(tags)`.");
 		is_unsigned(in.time, 123456789, "ingest() should parse timestamp.");
 		is_within(in.value, 34.567, 0.000001, "ingest() should parse value.");
+
+		close(in.fd);
+	}
+
+	subtest {
+		struct ingestor in;
+
+		memset(&in, 0, sizeof(in));
+		in.fd = memfd("ingest");               /* resync fail test */
+		put(in.fd, "cpu  123456789 34.567\n"
+		           "mem a=b 103456789 56.789\n");
+		lseek(in.fd, 0, SEEK_SET);
+
+		ok(ingest_read(&in) == 2, "ingest_read() should see the bogus packet");
+		ok(ingest(&in) != 0, "first ingest() call should fail.");
+		ok(ingest(&in) == 0, "second ingest() should succeed.");
+		is_string(in.metric, "mem|a=b", "ingest() should see only the 'mem' measurement");
+		is_unsigned(in.time, 103456789, "ingest() should see only the timestamp from the 'mem' measurement");
+		is_within(in.value, 56.789, 0.0001, "ingest() should see only the value from the 'mem' measurement");
 
 		close(in.fd);
 	}
