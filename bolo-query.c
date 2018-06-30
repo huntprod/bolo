@@ -64,7 +64,7 @@ do_query(int argc, char **argv)
 		while ((c = getopt_long(argc, argv, shorts, longs, &idx)) >= 0) {
 			switch (c) {
 			case 'h':
-				printf("USAGE: %s query [--key \"key-in-hex\"] [--debug] /path/to/db/\n\n", argv[0]);
+				printf("USAGE: %s query [--key \"key-in-hex\"] [--debug] /path/to/db/ QUERY\n\n", argv[0]);
 				printf("OPTIONS\n\n");
 				printf("  -h, --help              Show this help screen.\n\n");
 				printf("  -k, --key KEY-IN-HEX    The literal, hex-encoded database encryption key.\n");
