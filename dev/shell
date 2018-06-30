@@ -1,0 +1,9 @@
+#!/bin/bash
+set -eu
+
+OPTS="$@"
+if [[ -z "$OPTS" ]]; then
+  OPTS="-it"
+fi
+
+exec docker run $OPTS -v bolo-dev:/db bolo/shell

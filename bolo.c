@@ -8,6 +8,7 @@ EXT(help);          /* bolo help */
 EXT(idxinfo);       /* bolo idxinfo DATADIR/idx/INDEXFILE */
 EXT(import);        /* bolo import DATADIR <INPUT */
 EXT(init);          /* bolo init DATADIR */
+EXT(metrics);       /* bolo metrics DATADIR */
 EXT(parse);         /* bolo parse 'QUERY' */
 EXT(query);         /* bolo query DATADIR 'QUERY' */
 EXT(slabinfo);      /* bolo slabinfo DATADIR/slabs/SLABFILE */
@@ -48,6 +49,7 @@ int main(int argc, char **argv)
 	RUN(idxinfo);
 	RUN(import);
 	RUN(init);
+	RUN(metrics);
 	RUN(parse);
 	RUN(query);
 	RUN(slabinfo);

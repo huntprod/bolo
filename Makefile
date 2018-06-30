@@ -35,7 +35,7 @@ bolo: bolo.o sha.o time.o util.o page.o tblock.o tslab.o db.o hash.o \
       btree.o tags.o query.o cf.o bql/bql.a bqip.o net.o fdpoll.o ingest.o cfg.o \
       \
       bolo-help.o bolo-version.o bolo-core.o bolo-dbinfo.o bolo-idxinfo.o bolo-slabinfo.o \
-      bolo-import.o bolo-parse.o bolo-query.o bolo-init.o bolo-agent.o
+      bolo-import.o bolo-parse.o bolo-query.o bolo-init.o bolo-agent.o bolo-metrics.o
 	$(CC) $(LDFLAGS) -o $@ $+ $(LDLIBS)
 
 api/api:
@@ -148,6 +148,14 @@ docker-web: api/api reexec
 	docker/build libs  docker/bolo/web reexec api
 	docker/build clean docker/bolo/web
 	docker build -t bolo/web:latest docker/bolo/web
+docker-shell: bolo
+	docker/build setup docker/bolo/shell
+	docker/build copy  docker/bolo/shell bolo
+	docker/build libs  docker/bolo/shell bolo
+	mkdir -p docker/bolo/shell/root/usr/sbin
+	mv docker/bolo/shell/root/bolo docker/bolo/shell/root/usr/sbin/bolo
+	docker/build clean docker/bolo/shell
+	docker build -t bolo/shell:latest docker/bolo/shell
 
 bql/lexer.c: bql/lexer.l
 	flex -FTvs -o $@ $<

@@ -46,6 +46,7 @@
 
 /docker/bolo/core/root
 /docker/bolo/web/root
+/docker/bolo/shell/root
 
 # fuzzing tests
 /t/fuzz/json
