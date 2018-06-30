@@ -2034,7 +2034,7 @@ Board.prototype.draw = function (root) {
 			} catch (oops) { }
 
 			$(root).error("Oops.  Something's wrong with one of your queries...",
-			                e.replace(/\n/g, '<br>'));
+			                (e || 'An unknown error has occurred.').replace(/\n/g, '<br>'));
 		}
 	});
 };
