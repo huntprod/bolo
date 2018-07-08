@@ -312,7 +312,7 @@ do_core(int argc, char **argv)
 	startlog(argv[0], getpid(), cfg.log_level);
 
 	infof("mounting database at %s", cfg.db_data_root);
-	db = db_mount(cfg.db_data_root, key);
+	db = db_mount(deslash(cfg.db_data_root), key);
 	if (!db && (errno == BOLO_ENODBROOT || errno == BOLO_ENOMAINDB)) {
 		warningf("unable to mount database; doesn't look like %s has been initialized yet", cfg.db_data_root);
 		infof("initializing database at %s...", cfg.db_data_root);

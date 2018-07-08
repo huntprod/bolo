@@ -60,7 +60,7 @@ do_import(int argc, char **argv)
 		return 1;
 	}
 
-	db = db_mount(argv[optind+1], key);
+	db = db_mount(deslash(argv[optind+1]), key);
 	if (!db && (errno == BOLO_ENODBROOT || errno == BOLO_ENOMAINDB))
 		db = db_init(argv[optind+1], key);
 	if (!db) {

@@ -150,6 +150,17 @@ mktree(int dirfd, const char *path, mode_t mode)
 	return 0;
 }
 
+char *
+deslash(char *s)
+{
+	size_t n;
+
+	n = strlen(s) - 1;
+	while (n > 0 && s[n] == '/')
+		s[n--] = '\0';
+	return s;
+}
+
 size_t
 len(const struct list *lst)
 {

@@ -98,6 +98,7 @@ uint64_t urand64();
 int urand(void *buf, size_t len);
 
 int mktree(int dirfd, const char *path, mode_t mode) RETURNS;
+char * deslash(char *s);
 
 struct list {
 	struct list *next;

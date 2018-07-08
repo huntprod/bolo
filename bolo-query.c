@@ -112,7 +112,7 @@ do_query(int argc, char **argv)
 		return 1;
 	}
 
-	db = db_mount(argv[optind+1], key);
+	db = db_mount(deslash(argv[optind+1]), key);
 	if (!db) {
 		fprintf(stderr, "%s: %s\n", argv[optind+1], error(errno));
 		return 2;
