@@ -152,7 +152,7 @@ docker-web: api/api reexec
 docker-shell: bolo
 	docker/build setup docker/bolo/shell
 	docker/build copy  docker/bolo/shell bolo
-	docker/build libs  docker/bolo/shell bolo
+	# don't do libs; we start with ubuntu
 	mkdir -p docker/bolo/shell/root/usr/sbin
 	mv docker/bolo/shell/root/bolo docker/bolo/shell/root/usr/sbin/bolo
 	docker/build clean docker/bolo/shell
