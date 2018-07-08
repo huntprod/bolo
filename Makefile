@@ -135,7 +135,7 @@ sure: memtest
 fixme:
 	find . -name '*.[ch]' -not -path '*/ice/*' | xargs grep -rin fixme
 
-docker: docker-core docker-web
+docker: docker-core docker-web docker-shell
 docker-core: bolo reexec
 	docker/build setup docker/bolo/core
 	docker/build copy  docker/bolo/core bolo reexec docker/bolo/core/addon/*
