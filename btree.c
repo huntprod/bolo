@@ -128,33 +128,6 @@ s_extend(int fd)
 	return s_mapat(fd, id);
 }
 
-struct btree *
-btree_create(int fd)
-{
-	if (ftruncate(fd, 0) != 0)
-		return NULL;
-
-	return s_extend(fd);
-}
-
-struct btree *
-btree_read(int fd)
-{
-	off_t offset;
-	struct btree *t;
-
-	errno = BOLO_EBADTREE;
-	offset = lseek(fd, 0, SEEK_END);
-	if (offset % BTREE_PAGE_SIZE)
-		return NULL; /* corrupt or invalid btree */
-
-	t = s_mapat(fd, 0);
-	if (!t)
-		return NULL;
-
-	return t;
-}
-
 static int
 s_flush(struct btree *t)
 {
@@ -435,6 +408,171 @@ btree_last(struct btree *t)
 	return keyat(t, t->used - 1);
 }
 
+int
+btallocator(struct btallocator *a, int rootfd)
+{
+	int fd;
+	unsigned int i;
+	off_t off;
+	uint64_t id;
+	struct btblock *blk;
+	struct btree *t;
+	char path[64];
+
+	CHECK(a != NULL,   "btallocator() given a NULL allocator object to initialize");
+	CHECK(rootfd >= 0, "btallocator() given an invalid root directory file descriptor");
+
+	a->rootfd = rootfd;
+	empty(&a->blocks);
+
+	for (id = 0; ; id += BTREE_PAGE_SIZE * BTBLOCK_DENSITY) {
+
+		snprintf(path, sizeof(path), "idx/%04lx.%04lx/%04lx.%04lx.%04lx.%04lx.idx",
+			((id & 0xffff000000000000ul) >> 48),
+			((id & 0x0000ffff00000000ul) >> 32),
+			/* --- */
+			((id & 0xffff000000000000ul) >> 48),
+			((id & 0x0000ffff00000000ul) >> 32),
+			((id & 0x00000000ffff0000ul) >> 16),
+			((id & 0x000000000000fffful)));
+
+		fd = openat(a->rootfd, path, O_RDWR);
+		if (fd < 0)
+			break;
+
+		/* FIXME set errno */
+		off = lseek(fd, 0, SEEK_END);
+		if (off < 0)
+			goto fail;
+
+		/* FIXME set errno */
+		if (off % BTREE_PAGE_SIZE != 0)
+			goto fail;
+
+		blk = xmalloc(sizeof(*blk));
+		blk->fd = fd;
+		blk->used = off / BTREE_PAGE_SIZE;
+		push(&a->blocks, &blk->l);
+		empty(&blk->btrees);
+
+		/* map all of the btrees */
+		for (i = 0; i < blk->used; i++) {
+			CHECK(BTREE_HEADER_SIZE == 8, "BTREE_HEADER_SIZE constant is under- or oversized");
+			if (write(blk->fd, "BTREE\x80\x00\x00", BTREE_HEADER_SIZE) != BTREE_HEADER_SIZE)
+				return -1;
+
+			/* map the btree region */
+			t = xmalloc(sizeof(*t));
+			memset(t, 0, sizeof(*t));
+			if (page_map(&t->page, blk->fd, i * BTREE_PAGE_SIZE, BTREE_PAGE_SIZE) != 0)
+				return -1;
+
+			/* initialize the btree node */
+			t->id = id + i;
+			t->leaf = page_read8 (&t->page, 5) & BTREE_LEAF;
+			t->used = page_read16(&t->page, 6);
+		}
+	}
+
+	return 0;
+
+fail:
+	/* FIXME: deallocate memory */
+	return -1;
+}
+
+struct btree *
+btmake(struct btallocator *a)
+{
+	off_t off;
+	uint64_t id;
+	struct btblock *blk;
+	struct btree *t;
+	char path[64];
+
+	CHECK(a != NULL, "btmake() given a NULL btallocator");
+
+	id = 0;
+	for_each(blk, &a->blocks, l) {
+		if (blk->used < BTBLOCK_DENSITY)
+			goto alloc;
+		id += BTREE_PAGE_SIZE;
+	}
+
+	/* we have no empty blocks; allocate a new one, starting at `id` */
+	blk = xmalloc(sizeof(*blk));
+	push(&a->blocks, &blk->l);
+
+	snprintf(path, sizeof(path), "idx/%04lx.%04lx/%04lx.%04lx.%04lx.%04lx.idx",
+		((id & 0xffff000000000000ul) >> 48),
+		((id & 0x0000ffff00000000ul) >> 32),
+		/* --- */
+		((id & 0xffff000000000000ul) >> 48),
+		((id & 0x0000ffff00000000ul) >> 32),
+		((id & 0x00000000ffff0000ul) >> 16),
+		((id & 0x000000000000fffful)));
+	if (mktree(a->rootfd, path, 0777) != 0)
+		return NULL;
+
+	blk->fd = openat(a->rootfd, path, O_RDWR|O_CREAT, 0666);
+	if (blk->fd < 0)
+		return NULL;
+
+alloc:
+	/* extend the underlying fd */
+	off = lseek(blk->fd, 0, SEEK_END);
+	lseek(blk->fd, BTREE_PAGE_SIZE - 1, SEEK_CUR);
+	if (write(blk->fd, "\0", 1) != 1)
+		return NULL;
+	lseek(blk->fd, -1 * BTREE_PAGE_SIZE, SEEK_END);
+	CHECK(BTREE_HEADER_SIZE == 8, "BTREE_HEADER_SIZE constant is under- or oversized");
+	if (write(blk->fd, "BTREE\x80\x00\x00", BTREE_HEADER_SIZE) != BTREE_HEADER_SIZE)
+		return NULL;
+
+	/* map the btree region */
+	t = xmalloc(sizeof(*t));
+	if (page_map(&t->page, blk->fd, off, BTREE_PAGE_SIZE) != 0)
+		goto fail;
+
+	/* initialize the btree node */
+	t->id = id;
+	t->leaf = page_read8 (&t->page, 5) & BTREE_LEAF;
+	t->used = page_read16(&t->page, 6);
+
+	/* increment the block reference counter */
+	blk->used++;
+	return t;
+
+fail:
+	free(t);
+	return NULL;
+}
+
+struct btree *
+btfind(struct btallocator *a, uint64_t id)
+{
+	struct btblock *blk;
+	struct btree *t;
+
+	for_each(blk, &a->blocks, l) {
+		if (id > blk->used) {
+			id -= blk->used;
+			continue;
+		}
+
+		for_each(t, &blk->btrees, l) {
+			if (id > 0) {
+				id--;
+				continue;
+			}
+
+			return t;
+		}
+	}
+
+	return NULL;
+}
+
 #ifdef TEST
 /* LCOV_EXCL_START */
 /* Tests will be inserting arbitrary values,
@@ -462,6 +600,7 @@ iszero(const void *buf, off_t offset, size_t size)
 }
 
 TESTS {
+#if 0
 	subtest {
 		int fd;
 		struct btree *t, *tmp;
@@ -511,6 +650,7 @@ TESTS {
 		if (btree_write(t) != 0)
 			BAIL_OUT("btree_write failed");
 
+#if 0
 		tmp = t;
 		t = btree_read(fd);
 		if (!t)
@@ -523,6 +663,7 @@ TESTS {
 				is_unsigned(value, key + PERTURB, "find(%lx) after re-read", key);
 		}
 		pass("lookups after re-read should succeed");
+#endif
 
 
 		if (btree_close(t) != 0)
@@ -574,6 +715,7 @@ TESTS {
 		btree_close(t);
 		close(fd);
 	}
+#endif
 }
 /* LCOV_EXCL_STOP */
 #endif

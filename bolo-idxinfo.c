@@ -3,15 +3,21 @@
 int
 do_idxinfo(int argc, char **argv)
 {
+#if 0
 	struct btree *idx;
 	const char *path;
 	int i, fd;
+#endif
 
 	if (argc < 3) {
 		fprintf(stderr, "USAGE: bolo idxinfo FILE\n");
 		return 1;
 	}
 
+	fprintf(stderr, "bolo idxinfo is deprecated\n");
+	return 2;
+
+#if 0
 	for (i = 2; i < argc; i++) {
 		path = argv[i];
 		fd = open(path, O_RDONLY);
@@ -33,4 +39,5 @@ do_idxinfo(int argc, char **argv)
 		close(fd);
 	}
 	return 0;
+#endif
 }

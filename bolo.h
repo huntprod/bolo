@@ -371,8 +371,11 @@ ssize_t page_readn(struct page *p, size_t o, void *buf, size_t len);
 #define BTREE_SPLIT_FACTOR 0.9
 
 struct btree {
+	struct list l;  /* a list handle for keeping track of all
+	                   allocated btree nodes */
+
 	uint16_t used;  /* how many keys are populated?
-	                  (must be strictly <= BTREE_DEGREE */
+	                  (must be strictly <= BTREE_DEGREE) */
 
 	int leaf;      /* is this node a leaf node?
 	                  (leaf nodes contain immediate data,
@@ -385,8 +388,6 @@ struct btree {
 	struct page page;
 };
 
-struct btree * btree_create(int fd);
-struct btree * btree_read(int fd);
 int btree_write(struct btree *t);
 int btree_close(struct btree *t);
 
@@ -397,6 +398,31 @@ int btree_find(struct btree *t, uint64_t *dst, bolo_msec_t key);
 int btree_isempty(struct btree *t);
 bolo_msec_t btree_first(struct btree *t);
 bolo_msec_t btree_last(struct btree *t);
+
+/********************************************************  btree allocator  ***/
+
+#define BTBLOCK_DENSITY 4096
+
+struct btblock {
+	struct list l;       /* list handle for btallocator->blocks */
+	struct list btrees;  /* list of all btree nodes in this block */
+
+	int fd;              /* file descriptor for this block file */
+
+	size_t used;         /* how many btree nodes have been allocated
+	                        on this block.  once BTBLOCK_DENSITY is
+	                        reached, this block is considered "full" */
+};
+
+struct btallocator {
+	int           rootfd; /* file descriptor for database root */
+	struct list   blocks; /* list of btblock structures */
+};
+
+int btallocator(struct btallocator *a, int fd) RETURNS;
+struct btree * btmake(struct btallocator *a) RETURNS;
+struct btree * btfind(struct btallocator *a, uint64_t id) RETURNS;
+
 
 /***************************************************************  database  ***/
 
@@ -532,6 +558,8 @@ struct db {
 	struct dbkey *key;      /* database integrity signing key */
 
 	uint64_t next_tblock;   /* ID of the next tblock to hand out */
+
+	struct btallocator bta; /* btree allocator */
 };
 
 struct db * db_mount(const char *path, struct dbkey *k) RETURNS;

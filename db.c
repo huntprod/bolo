@@ -84,29 +84,6 @@ fail:
 }
 
 static int
-s_handle_idx(struct db *db, uint64_t id, int fd)
-{
-	int esave;
-	struct idx *idx;
-
-	idx = xmalloc(sizeof(*idx));
-	idx->number = id;
-	idx->btree = btree_read(fd);
-	if (!idx->btree)
-		goto fail;
-
-	push(&db->idx, &idx->l);
-	return 0;
-
-fail:
-	esave = errno;
-	free(idx);
-	close(fd);
-	errno = esave;
-	return -1;
-}
-
-static int
 s_handle_slab(struct db *db, uint64_t id, int fd)
 {
 	int i, esave;
@@ -431,32 +408,35 @@ static void *
 s_maindb_reader(const char *key, uint64_t id, void *udata)
 {
 	struct db *db;
-	struct idx *i;
+	struct idx *idx;
+	struct btree *t;
 	char *tags, *next;
 
 	CHECK(udata != NULL, "main.db reader given a NULL db pointer to work with");
 
 	db = (struct db *)udata;
-	for_each(i, &db->idx, l) {
-		if (i->number != id)
-			continue;
+	t = btfind(&db->bta, id);
+	if (!t)
+		return NULL;
 
-		/* expand out the tags hash */
-		tags = strdup(key);
-		insist(tags != NULL, "main.db reader unable to allocate memory during strdup(tags)");
+	idx = xmalloc(sizeof(*idx));
+	idx->btree = t;
+	idx->number = id;
+	push(&db->idx, &idx->l);
 
-		next = strchr(tags, '|');
-		if (next)
-			*next++ = '\0';
+	/* expand out the tags hash */
+	tags = strdup(key);
+	insist(tags != NULL, "main.db reader unable to allocate memory during strdup(tags)");
 
-		s_setmetric(db, tags, i);
-		s_settags(db, next, i);
-		free(tags);
+	next = strchr(tags, '|');
+	if (next)
+		*next++ = '\0';
 
-		return i;
-	}
+	s_setmetric(db, tags, idx);
+	s_settags(db, next, idx);
+	free(tags);
 
-	return NULL;
+	return idx;
 }
 
 struct db *
@@ -496,16 +476,15 @@ db_mount(const char *path, struct dbkey *key)
 
 	/* first, we have to scan the time series indices */
 	infof("scanning time series time index files at %s/idx", path);
-	empty(&db->idx);
-	s_ensure_dirat(db->rootfd, "idx", 0777);
-	if (s_scandir(db, "idx", ".idx", s_handle_idx) != 0)
+	if (btallocator(&db->bta, db->rootfd) != 0)
 		goto fail;
 
-	infof("mounting main.db index file at %s/%s", path, PATH_TO_MAINDB);
+	empty(&db->idx);
 	empty(&db->multidx);
-
 	db->tags = hash_new(0);
 	db->metrics = hash_new(0);
+
+	infof("mounting main.db index file at %s/%s", path, PATH_TO_MAINDB);
 	db->main = hash_read(fd, s_maindb_reader, db);
 	if (!db->main)
 		goto fail;
@@ -734,48 +713,21 @@ db_unmount(struct db *db)
 static int
 s_newidx(struct db *db, struct idx **idx, uint64_t *id)
 {
-	int esave;
-	int fd;
-	char path[64];
-
 	CHECK(db  != NULL, "s_newidx() given a NULL db pointer to work with");
 	CHECK(idx != NULL, "s_newidx() given a NULL destination pointer for the new time series index");
 	CHECK(id  != NULL, "s_newidx() given a NULL detination pointer for the new time series id number");
 
-	*idx = NULL;
-	fd = -1;
-	if (isempty(&db->idx)) *id = (uint64_t)1;
-	else                   *id = item(db->idx.prev, struct idx, l)->number + 1;
-
-	snprintf(path, sizeof(path), "idx/%04lx.%04lx/%04lx.%04lx.%04lx.%04lx.idx",
-		((*id & 0xffff000000000000ul) >> 48),
-		((*id & 0x0000ffff00000000ul) >> 32),
-		/* --- */
-		((*id & 0xffff000000000000ul) >> 48),
-		((*id & 0x0000ffff00000000ul) >> 32),
-		((*id & 0x00000000ffff0000ul) >> 16),
-		((*id & 0x000000000000fffful)));
-	if (mktree(db->rootfd, path, 0777) != 0)
-		goto fail;
-
-	fd = openat(db->rootfd, path, O_RDWR|O_CREAT, 0666);
-	if (fd < 0)
-		goto fail;
-
 	*idx = xmalloc(sizeof(**idx));
-	(*idx)->number = *id;
-
-	if (!((*idx)->btree = btree_create(fd)))
+	if (!((*idx)->btree = btmake(&db->bta)))
 		goto fail;
+
+	*id = (*idx)->number = (*idx)->btree->id;
 
 	push(&db->idx, &(*idx)->l);
 	return 0;
 
 fail:
-	esave = errno;
-	if (fd >= 0) close(fd);
 	free(*idx);
-	errno = esave;
 	return -1;
 }
 
