@@ -69,6 +69,7 @@ s_exec(struct runner *r)
 		close(pfd[0]);
 		close(pfd[1]);
 		r->pid = 0;
+		delist(&r->check->q);
 		return;
 	}
 
