@@ -1,0 +1,53 @@
+#!/bin/bash
+set -e
+
+unknown() {
+	local type=${1:-operating system}
+	local desc=${2:-Operating System}
+	echo "Unrecognized ${desc}"
+	echo
+	echo "In general, the following needs to be installed:"
+	echo
+	echo "  - C compiler toolchain (gcc / clang, ld, etc.)"
+	echo "  - GNU Flex + Bison"
+	echo "  - Perl-Compatible Regular Expressions (PCRE) library"
+	echo "    and include headers (a -dev or -devel package)"
+	echo
+	echo "If you can figure out what commands to run to install"
+	echo "these pacakges for this ${type}, please"
+	echo "consider sending a patcb our way so we can integrate"
+	echo "the support upstream."
+	echo
+	echo "  PRs are welcome at https://github.com/bolo/core/pulls"
+	echo
+}
+
+if [[ -n $(command -v lsb_release) ]]; then
+	case $(lsb_release -cs) in
+	xenial) # Ubuntu 16.04 LTS
+		echo ">> setting up $(lsb_release -ds) system..."
+		sudo apt-get update
+		sudo apt-get install -y build-essential bison flex libpcre3 libpcre3-dev
+		;;
+	*)
+		unknown >&2 "Linux distribution" \
+		            "LSB system '$(lsb_release -cs)' ($(lsb_release -ds))"
+		exit 1
+		;;
+	esac
+
+else
+	unknown >&2 "operating system" \
+	            "$OSTYPE system"
+	exit 1
+fi
+
+# if we get here, we have run through dev/setup successfully
+echo
+echo "You should be all set!"
+echo
+echo "To build bolo, run:"
+echo
+echo "  make"
+echo
+echo "Happy Hacking!"
