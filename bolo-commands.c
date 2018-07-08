@@ -11,7 +11,7 @@ do_commands(int argc, char **argv)
 	printf("  bolo core         Run the bolo core aggregator, which receives measurements.\n");
 	printf("  bolo dbinfo       Print low-level information about a bolo database.\n");
 	printf("  bolo help         Print help and usage information.\n");
-	printf("  bolo idxinfo      (DEPRECATED) Print low-level information about a bolo index.\n");
+	printf("  bolo idxinfo      Print low-level information about a bolo index block.\n");
 	printf("  bolo import       Import time series and their measurements from standard input.\n");
 	printf("  bolo init         Initialize a new bolo database.\n");
 	printf("  bolo metrics      List all time series contained in a bolo database.\n");
