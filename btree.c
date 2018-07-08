@@ -440,12 +440,11 @@ btallocator(struct btallocator *a, int rootfd)
 		if (fd < 0)
 			break;
 
-		/* FIXME set errno */
 		off = lseek(fd, 0, SEEK_END);
 		if (off < 0)
 			goto fail;
 
-		/* FIXME set errno */
+		errno = BOLO_EBADTREE;
 		if (off % BTREE_PAGE_SIZE != 0)
 			goto fail;
 
