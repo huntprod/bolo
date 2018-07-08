@@ -3,7 +3,7 @@ set -eu
 
 OPTS="$@"
 if [[ -z "$OPTS" ]]; then
-  OPTS="-it"
+  OPTS="-it --privileged"
 fi
 
 exec docker run $OPTS -v bolo-dev:/db bolo/shell

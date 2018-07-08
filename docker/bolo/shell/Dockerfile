@@ -1,4 +1,5 @@
 FROM ubuntu
-COPY root /
+RUN apt-get update && apt-get install -y strace
 
+COPY root /
 CMD ["/bin/bash"]
