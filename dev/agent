@@ -16,4 +16,4 @@ schedule.splay = 15
 @60s process -m 'bolo agent'  -t proc=agent,subsys=bolo
 EOF
 
-./bolo agent -D -c local-config/agent.conf
+valgrind --leak-check=full --show-reachable=yes ./bolo agent -D -c local-config/agent.conf
