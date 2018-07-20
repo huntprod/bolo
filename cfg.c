@@ -37,6 +37,10 @@
 #define DEFAULT_AGENT_MAX_RUNNERS 0
 #endif
 
+#ifndef DEFAULT_AGENT_MAX_SENDBUF
+#define DEFAULT_AGENT_MAX_SENDBUF (8*1024*1024)
+#endif
+
 #define T_INIT     0
 #define T_KEY      1
 #define T_EQUALS   2
@@ -94,6 +98,34 @@ s_parsetime(struct string *s, int *v)
 		break;
 	}
 	errorf("unrecognized time unit '%.*s' (must be one of 'h', 'm', 's' or 'ms')", left, p);
+	return -1;
+}
+
+static unsigned int
+s_parsebytes(struct string *s, int *v)
+{
+	char *p;
+	int left;
+
+	*v = 0;
+	for (p = s->data; p != s->data + s->len; p++) {
+		if (*p == '_' || *p == ',') continue; /* legibility */
+		if (!isdigit(*p)) break;
+		*v = (*v * 10) + (*p - '0');
+	}
+
+	left = s->len - (p - s->data);
+	switch (left) {
+	case 0: return 0; /* no units == b */
+	case 1:
+		switch (*p) {
+		case 'g': case 'G': *v *= 1024; /* fallthrough */
+		case 'm': case 'M': *v *= 1024; /* fallthrough */
+		case 'k': case 'K': *v *= 1024; /* fallthrough */
+		case 'b': case 'B': return 0;
+		}
+	}
+	errorf("unrecognized size unit '%.*s' (must be one of 'G', 'M', 'K' or 'B')", left, p);
 	return -1;
 }
 
@@ -468,6 +500,18 @@ s_agent_kv(void *u, struct string *k, struct string *v)
 		return 0;
 	}
 
+	if (strncmp("max.sendbuf", k->data, k->len) == 0) {
+		if (s_parsebytes(v, &cfg->max_sendbuf) != 0) {
+			errorf("failed to read configuration: invalid max.sendbufe value '%.*s'", v->len, v->data);
+			return -1;
+		}
+		if (cfg->max_sendbuf < 256) {
+			errorf("failed to read configuration: max.sendbuf value '%.*s' must be at least 256b", v->len, v->data);
+			return -1;
+		}
+		return 0;
+	}
+
 	errorf("failed to read configuration: unrecognized configuration directive '%.*s'", k->len, k->data);
 	return -1;
 }
@@ -478,6 +522,7 @@ s_configure_agent(struct agent_config *cfg, int fd)
 	memset(cfg, 0, sizeof(*cfg));
 	cfg->schedule_splay = DEFAULT_AGENT_SCHEDULE_SPLAY;
 	cfg->max_runners = DEFAULT_AGENT_MAX_RUNNERS;
+	cfg->max_sendbuf = DEFAULT_AGENT_MAX_SENDBUF;
 	cfg->env = hash_new();
 
 	return s_configure(fd, cfg, s_agent_kv, s_agent_iv);

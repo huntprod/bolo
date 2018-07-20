@@ -34,6 +34,7 @@ struct context {
 		int fd;      /* network socket to send data to bolo on */
 		int watched; /* whether or not fdpoll is watching bolo.fd */
 
+		int bufsiz;       /* how much buffer memory have we used? */
 		struct list bufs; /* buffers to send */
 	} bolo;
 };
@@ -115,7 +116,7 @@ runner_handler(int fd, void *_u)
 	ssize_t nread;
 	struct runner *r;
 	char *eol;
-	struct sndbuf *buf;
+	struct sndbuf *buf, *tmpbuf;
 
 	r = (struct runner *)_u;
 	for (;;) {
@@ -145,10 +146,25 @@ runner_handler(int fd, void *_u)
 		if (!eol) return 0;
 		eol++;
 
+		/* clear space in send buffers by ejecting oldest */
+		debugf("sendbuf: have %d/%d bytes left (%3.1lf%%) in send buffer quota",
+				r->ctx->config.max_sendbuf - r->ctx->bolo.bufsiz, r->ctx->config.max_sendbuf,
+				(100.0 * (r->ctx->config.max_sendbuf - r->ctx->bolo.bufsiz) / r->ctx->config.max_sendbuf));
+		for_eachx(buf, tmpbuf, &r->ctx->bolo.bufs, send) {
+			if (r->ctx->bolo.bufsiz + (eol - r->buf) <= r->ctx->config.max_sendbuf)
+				break;
+
+			debugf("ejecting stale sendbuf %p (reclaiming %d octets)", buf, buf->len);
+			r->ctx->bolo.bufsiz -= buf->len;
+			delist(&buf->send);
+			free(buf);
+		}
+
 		/* allocate a new send buffer */
 		buf = xmalloc(sizeof(struct sndbuf) + (eol - r->buf));
 		buf->off = 0;
 		buf->len = (eol - r->buf);
+		r->ctx->bolo.bufsiz += buf->len;
 		empty(&buf->send);
 		memcpy(buf->data, r->buf, buf->len);
 		debugf("allocated new sendbuf %p for %d octets of data from runner %p", buf, buf->len, r);
@@ -251,7 +267,11 @@ relay_handler(int fd, void *_u)
 		debugf("relay: sent %d/%d octets from sendbuf %p", nwrit, buf->len - buf->off, buf);
 		buf->off += nwrit;
 		if (buf->off == buf->len) {
-			debugf("finished sending all of sendbuf %p; removing it from the list...", buf);
+			debugf("finished sending all of sendbuf %p; removing it from the list (reclaiming %d bytes)...", buf, buf->len);
+			ctx->bolo.bufsiz -= buf->len;
+			debugf("sendbuf: have %d/%d bytes left (%3.1lf%%) in send buffer quota",
+					ctx->config.max_sendbuf - ctx->bolo.bufsiz, ctx->config.max_sendbuf,
+					(100.0 * (ctx->config.max_sendbuf - ctx->bolo.bufsiz) / ctx->config.max_sendbuf));
 			delist(&buf->send);
 			free(buf);
 		}
