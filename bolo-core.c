@@ -193,6 +193,7 @@ metric_handler(int fd, void *_u)
 done:
 	if (ingest_eof(in)) {
 		debugf("at eof on ingestor fd %d; shutting down this connection.", in->fd);
+		close(in->fd);
 		in->eof = in->fd = -1;
 		return -1;
 	}
