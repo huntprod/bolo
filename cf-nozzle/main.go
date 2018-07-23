@@ -24,6 +24,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if opts.Endpoint == "" {
+		fmt.Fprintf(os.Stderr, "@R{!!! missing --endpoint argument}\n")
+		os.Exit(1)
+	}
+
 	firehose.Go(NewNozzle(&Nozzle{
 		Endpoint: opts.Endpoint,
 		Tags:     strings.Join(opts.Tags, ","),

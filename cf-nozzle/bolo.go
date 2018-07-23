@@ -71,7 +71,7 @@ func (nozzle *Nozzle) Track(e firehose.Event) {
 		return
 	}
 
-	tags := fmt.Sprintf("%s,sys=%s", nozzle.Tags, e.GetOrigin())
+	tags := fmt.Sprintf("%s,sys=%s,job=%s,idx=%s", nozzle.Tags, e.GetOrigin(), e.GetJob(), e.GetIndex())
 	switch e.Type() {
 	case firehose.CounterEvent:
 		m := e.GetCounterEvent()
