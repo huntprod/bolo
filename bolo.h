@@ -40,6 +40,7 @@
 #include <fcntl.h>
 #include <math.h>
 
+#define MS(n) ((n) * 1000lu)
 
 #ifndef DEFAULT_QUERY_SAMPLES
 #define DEFAULT_QUERY_SAMPLES 2048
@@ -50,12 +51,20 @@
 #endif
 
 #ifndef DEFAULT_BUCKET_STRIDE
-#define DEFAULT_BUCKET_STRIDE 60
+#define DEFAULT_BUCKET_STRIDE MS(60)
 #endif
 
 #ifndef DEFAULT_QUERY_WINDOW
 #define DEFAULT_QUERY_WINDOW 14400
 #endif
+
+#define BOLO_BUFSIZ 8192
+
+/* limits */
+#define BOLO_SERIES_NAME_MAXLEN   4095
+#define BOLO_SERIES_METRIC_MAXLEN  127
+#define BOLO_SERIES_TAG_MAXLEN     127
+#define BOLO_SERIES_VALUE_MAXLEN   511
 
 
 
@@ -168,6 +177,7 @@ struct agent_config {
 	char         *bolo_endpoint;
 	int           schedule_splay;
 	int           max_runners;
+	int           max_sendbuf;
 
 	size_t              nchecks;
 	struct agent_check *checks;
@@ -468,7 +478,7 @@ typedef double bolo_value_t;
 
 struct tblock {
 	int valid;         /* is this block real? */
-	int cells;         /* how many cells are in use? */
+	unsigned int cells;         /* how many cells are in use? */
 	bolo_msec_t base;  /* base timestamp (ms) for this block */
 
 	uint64_t number;   /* composite slab / block number,
@@ -725,7 +735,7 @@ struct query_ctx {
 	bolo_msec_t now;
 };
 
-struct query * bql_parse(const char *q);
+//struct query * bql_parse(const char *q);
 struct query * query_parse(const char *q);
 void query_free(struct query *q);
 
@@ -733,6 +743,35 @@ int query_plan(struct query *q, struct db *db);
 int query_exec(struct query *q, struct db *db, struct query_ctx *ctx);
 
 const char * query_strerror(struct query *q);
+
+
+
+/***************************************************  bucket consolidation  ***/
+
+struct db2;
+struct db2_results {
+	unsigned int nseries;    /* how many series are there? */
+	unsigned int nslots;     /* how many values slots in each field? */
+
+	bolo_msec_t start;       /* value of timestamp at slot 0 */
+	bolo_msec_t stride;      /* milliseconds between each slot */
+
+	char         **series;   /* list of field names (from query) */
+	bolo_value_t  *values;   /* list of values, row-major order.
+	                            (all slot values for field 0 precede
+	                             those of field 1, etc.) */
+};
+
+int          db2_init(const char *path) RETURNS;
+struct db2 * db2_open(const char *path) RETURNS;
+void         db2_close(struct db2 *db);
+int          db2_insert(struct db2 *db, char *series,
+                        bolo_msec_t ts, bolo_value_t v) RETURNS;
+
+struct db2_results * db2_query(struct db2 *db, const char *q) RETURNS;
+void                 db2_free_results(struct db2_results *r);
+#define              db2_result_value(res,field,slot) \
+        ((res)->values[(res)->nslots * (field) + (slot)])
 
 
 #endif

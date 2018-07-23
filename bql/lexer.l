@@ -1,5 +1,6 @@
 %{
 #include "bql.h"
+#include "public.h"
 #include "grammar.h"
 
 int yyerror(const char *err)
@@ -72,9 +73,9 @@ struct {
 
   yylval.number = strtod(yytext, NULL);
   switch (unit) {
-  case 'd': yylval.number *= 86400.0; break;
-  case 'h': yylval.number *= 3600.0;  break;
-  case 'm': yylval.number *= 60.0;    break;
+  case 'd': yylval.number *= 86400.0 * 1000.0; break;
+  case 'h': yylval.number *= 3600.0  * 1000.0; break;
+  case 'm': yylval.number *= 60.0    * 1000.0; break;
   }
   return T_TIME;
 }
@@ -105,11 +106,71 @@ int yywrap() {
 	return -1;
 }
 
-struct query *
+static void
+free_cond(struct bql_cond *c)
+{
+	if (!c) return;
+
+	switch (c->op) {
+	case COND_AND:
+	case COND_OR:  free_cond(c->b);
+	case COND_NOT: free_cond(c->a);
+	               break;
+
+	case COND_EQ:  free(c->a);
+	               free(c->b);
+	               break;
+
+	case COND_EXIST: free(c->a);
+	                 break;
+	}
+
+	free(c);
+}
+
+void
+bql_free(struct bql_query *q)
+{
+	int i;
+	struct bql_field *f, *_f;
+
+	if (!q) return;
+	free_cond(q->where);
+
+	for (f = q->select; f ;) {
+		for (i = 0; f->ops && f->ops[i].code != QOP_RETURN; i++) {
+			switch (f->ops[i].code) {
+			case QOP_PUSH:
+				free(f->ops[i].data.push.metric);
+			/* FIXME
+				for (set = f->ops[i].data.push.set; set; ) {
+					_set = set->next;
+					free(set);
+					set = _set;
+				}
+			*/
+				break;
+			}
+		}
+		free(f->ops);
+		free(f->name);
+		//free(f->result);
+
+		_f = f->next;
+		free(f);
+		f = _f;
+	}
+
+	free(q->errdat);
+	free(q);
+}
+
+struct bql_query *
 bql_parse(const char *q)
 {
-	int rc;
+	int rc, need, n;
 	YY_BUFFER_STATE buf;
+	struct bql_field *f;
 
 	QUERY = NULL;
 
@@ -117,10 +178,48 @@ bql_parse(const char *q)
 	rc = yyparse();
 	yy_delete_buffer(buf);
 
-	if (rc == 0)
-		return QUERY;
+	if (rc != 0)
+		goto fail;
 
-	query_free(QUERY);
+	if (!QUERY->select)
+		goto fail;
+
+	QUERY->nfields = n = 0;
+	for (f = QUERY->select; f; f = f->next) {
+		QUERY->nfields++;
+		if (!f->ops)
+			goto fail;
+
+		if (!f->name) {
+			n++;
+			need = snprintf(NULL, 0, "metric_%d", n);
+			f->name = xcalloc(need+1, sizeof(char));
+			snprintf(f->name, need+1, "metric_%d", n);
+		}
+	}
+
+	/* fill in default timeframe */
+	if (QUERY->until == 0 && QUERY->from == 0)
+		QUERY->from = -DEFAULT_QUERY_WINDOW;
+
+	/* fill in default aggregate */
+	if (!QUERY->aggregate.cf)      QUERY->aggregate.cf      = DEFAULT_QUERY_CF;
+	if (!QUERY->aggregate.samples) QUERY->aggregate.samples = DEFAULT_QUERY_SAMPLES;
+	if (!QUERY->aggregate.stride)  QUERY->aggregate.stride  = DEFAULT_BUCKET_STRIDE;
+
+	/* fill in default bucketing parameters */
+	if (!QUERY->bucket.cf)      QUERY->bucket.cf      = DEFAULT_QUERY_CF;
+	if (!QUERY->bucket.samples) QUERY->bucket.samples = DEFAULT_QUERY_SAMPLES;
+	if (!QUERY->bucket.stride)  QUERY->bucket.stride  = DEFAULT_BUCKET_STRIDE;
+
+	/* check the from..until range */
+	if (QUERY->until <= QUERY->from)
+		goto fail;
+
+	return QUERY;
+
+fail:
+	bql_free(QUERY);
 	QUERY = NULL;
 	return NULL;
 }

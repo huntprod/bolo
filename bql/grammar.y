@@ -1,8 +1,9 @@
 %{
+// vim:foldmethod=marker
 #include "bql.h"
 
 static void
-_mergeb(struct bucket *a, struct bucket *b, struct bucket *c)
+_mergeb(struct bql_cons *a, struct bql_cons *b, struct bql_cons *c)
 {
 	a->samples = c->samples ? c->samples : b->samples;
 	a->stride  = c->stride  ? c->stride  : b->stride ;
@@ -51,10 +52,21 @@ struct qexpr {
 	void         *a, *b;
 };
 
-static struct qcond *
+static struct bql_query *
+query()
+{
+	struct bql_query *q;
+
+	q = xmalloc(sizeof(*q));
+	empty(&q->alloc_refs);
+
+	return q;
+}
+
+static struct bql_cond *
 cond(int op, void *a, void *b)
 {
-	struct qcond *c;
+	struct bql_cond *c;
 
 	c = xmalloc(sizeof(*c));
 	c->op = op;
@@ -214,7 +226,7 @@ simplify(struct qexpr *qx)
 }
 
 static int
-opcodes(struct qexpr *qx)
+opcodes(struct qexpr *qx, int *fndepth)
 {
 	switch (qx->type) {
 	default:         return 0;
@@ -222,11 +234,12 @@ opcodes(struct qexpr *qx)
 	case EXPR_ADD:
 	case EXPR_SUB:
 	case EXPR_MULT:
-	case EXPR_DIV:   return opcodes(qx->a)
-	                      + opcodes(qx->b)
+	case EXPR_DIV:   return opcodes(qx->a, fndepth)
+	                      + opcodes(qx->b, fndepth)
 	                      + 1;
 
-	case EXPR_FUNC:  return opcodes(qx->b)
+	case EXPR_FUNC:  *fndepth++;
+	                 return opcodes(qx->b, fndepth)
 	                      + 1;
 
 	case EXPR_RAW:
@@ -234,8 +247,8 @@ opcodes(struct qexpr *qx)
 	}
 }
 
-static struct qop *
-opify(struct qexpr *qx, struct qop *next)
+static struct bql_op *
+opify(struct qexpr *qx, struct bql_op *next)
 {
 	int a, b;
 
@@ -244,14 +257,14 @@ opify(struct qexpr *qx, struct qop *next)
 
 	case EXPR_RAW:
 	case EXPR_REF:
-		next->code = QOP_PUSH;
+		next->code = BQL_OP_PUSH;
 		next->data.push.raw = (qx->type == EXPR_RAW);
 		next->data.push.metric = strdup((char *)(qx->a));
 		return next+1;
 
 	case EXPR_FUNC:
 		next = opify(qx->b, next);
-		next->code = QOP_AGGR;
+		next->code = BQL_OP_AGGR;
 		next->data.aggr.cf = cf((char *)(qx->a));
 		return next+1;
 
@@ -259,13 +272,13 @@ opify(struct qexpr *qx, struct qop *next)
 	case EXPR_SUB:
 	case EXPR_MULT:
 	case EXPR_DIV:
-		next = opify(qx->a, next);
 		next = opify(qx->b, next);
+		next = opify(qx->a, next);
 		switch (qx->type) {
-		case EXPR_ADD:  next->code = QOP_ADD; break;
-		case EXPR_SUB:  next->code = QOP_SUB; break;
-		case EXPR_MULT: next->code = QOP_MUL; break;
-		case EXPR_DIV:  next->code = QOP_DIV; break;
+		case EXPR_ADD:  next->code = BQL_OP_ADD; break;
+		case EXPR_SUB:  next->code = BQL_OP_SUB; break;
+		case EXPR_MULT: next->code = BQL_OP_MUL; break;
+		case EXPR_DIV:  next->code = BQL_OP_DIV; break;
 		}
 
 		a = ((struct qexpr *)(qx->a))->type;
@@ -286,8 +299,8 @@ opify(struct qexpr *qx, struct qop *next)
 	}
 }
 
-static struct qfield *
-pushf(struct qfield *lst, struct qfield *node)
+static struct bql_field *
+pushf(struct bql_field *lst, struct bql_field *node)
 {
 	/* FIXME: this is reversed... */
 	node->next = lst;
@@ -295,11 +308,11 @@ pushf(struct qfield *lst, struct qfield *node)
 }
 
 
-static struct qfield *
+static struct bql_field *
 qfield(struct qexpr *e, char *name)
 {
-	int n;
-	struct qfield *f;
+	int n, fn;
+	struct bql_field *f;
 
 	simplify(e);
 
@@ -307,17 +320,20 @@ qfield(struct qexpr *e, char *name)
 	if (!name && e->type == EXPR_REF)
 		name = strdup((char *)(e->a));
 
-	f = xmalloc(sizeof(struct qfield));
+	f = xmalloc(sizeof(struct bql_field));
 	f->name = name;
 
 	if (verify(e) != 0) {
 		f->ops = NULL;
 
 	} else {
-		n = opcodes(e) + 1; /* append QOP_RETURN */
-		f->ops = xcalloc(n, sizeof(struct qop));
+		fn = 0;
+		n = opcodes(e, &fn) + 1; /* implicit BQL_OP_RETURN */
+		if (fn == 0) n++; /* implicit BQL_OP_AGGR */
+		f->ops = xcalloc(n, sizeof(struct bql_op));
 		opify(e, f->ops);
-		f->ops[n-1].code = QOP_RETURN;
+		if (fn == 0) f->ops[n-2].code = BQL_OP_AGGR;
+		             f->ops[n-1].code = BQL_OP_RETURN;
 	}
 
 	qexpr_free(e);
@@ -376,14 +392,14 @@ qfield(struct qexpr *e, char *name)
 %type <range> when_before
 %type <range> when_after
 
-%type <bucket> aggr_clause
-%type <bucket> aggr_subclauses
-%type <bucket> aggr_subclause
+%type <qcons> aggr_clause
+%type <qcons> aggr_subclauses
+%type <qcons> aggr_subclause
 
-%type <bucket> bucket_clause
-%type <bucket> bucket_subclauses
-%type <bucket> bucket_subclause
-%type <bucket> bucket_cf
+%type <qcons> bucket_clause
+%type <qcons> bucket_subclauses
+%type <qcons> bucket_subclause
+%type <qcons> bucket_cf
 
 %type <qcond> where_clause
 %type <qcond> cond
@@ -404,13 +420,13 @@ qfield(struct qexpr *e, char *name)
 
 %%
 
-query :                     { $$ = QUERY  = xmalloc(sizeof(struct query)); }
+query :                     { $$ = QUERY  = query(); }
       | query select_clause { $$->select  = $2; }
       | query where_clause  { $$->where   = $2; }
       | query when_clause   { $$->from    = $2.from;
                               $$->until   = $2.until; }
-      | query aggr_clause   { mergeb($$->aggr,   $2, $$->aggr);   }
-      | query bucket_clause { mergeb($$->bucket, $2, $$->bucket); }
+      | query aggr_clause   { mergeb($$->aggregate, $2, $$->aggregate); }
+      | query bucket_clause { mergeb($$->bucket,    $2, $$->bucket);    }
       ;
 ;
 
@@ -484,20 +500,20 @@ timespan: T_NUMBER unit { $$ = $1 * $2; }
         | T_TIME        { $$ = $1; }
         ;
 
-aggrspan: T_DAILY         { $$ = 86400; }
-        | T_PER T_DAYS    { $$ = 86400; }
-        | T_HOURLY        { $$ = 3600;  }
-        | T_PER T_HOURS   { $$ = 3600;  }
-        | T_MINUTELY      { $$ = 60;    }
-        | T_PER T_MINUTES { $$ = 60;    }
-        | T_SECONDLY      { $$ = 1;     }
-        | T_PER T_SECONDS { $$ = 1;     }
+aggrspan: T_DAILY         { $$ = MS(86400); }
+        | T_PER T_DAYS    { $$ = MS(86400); }
+        | T_HOURLY        { $$ = MS(3600);  }
+        | T_PER T_HOURS   { $$ = MS(3600);  }
+        | T_MINUTELY      { $$ = MS(60);    }
+        | T_PER T_MINUTES { $$ = MS(60);    }
+        | T_SECONDLY      { $$ = MS(1);     }
+        | T_PER T_SECONDS { $$ = MS(1);     }
         ;
 
-unit: T_DAYS     { $$ = 86400; }
-    | T_HOURS    { $$ = 3600;  }
-    | T_MINUTES  { $$ = 60;    }
-    | T_SECONDS  { $$ = 1;     }
+unit: T_DAYS     { $$ = MS(86400); }
+    | T_HOURS    { $$ = MS(3600);  }
+    | T_MINUTES  { $$ = MS(60);    }
+    | T_SECONDS  { $$ = MS(1);     }
     ;
 
 bucket_clause: T_BUCKET bucket_subclause bucket_subclauses { mergeb($$, $2, $3); }

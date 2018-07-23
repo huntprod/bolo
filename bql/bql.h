@@ -2,9 +2,10 @@
 #define BQL_BQL_H
 
 #include "../bolo.h"
+#include "public.h"
 
 /* global query value, shared between lexer / parser */
-struct query *QUERY;
+struct bql_query *QUERY;
 
 struct range {
 	int from;
@@ -21,14 +22,12 @@ typedef union {
 		int until;
 	} range;
 
-	struct bucket bucket;
+	struct bql_cons   qcons;
+	struct bql_field *qfield;
+	struct bql_cond  *qcond;
+	struct bql_query *query;
 
-	struct qfield *qfield;
 	struct qexpr  *qexpr;
-
-	struct qcond *qcond;
-
-	struct query *query;
 } YYSTYPE;
 #define YYSTYPE_IS_DECLARED 1
 

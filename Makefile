@@ -19,6 +19,8 @@ TESTS += tags query db
 TESTS += bqip
 TESTS += ingest
 
+TESTS := db2
+
 COLLECTORS :=
 COLLECTORS += linux
 linux: collectors/linux.o hash.o time.o util.o
@@ -98,6 +100,7 @@ check: testdata util.o page.o btree.o hash.o cf.o sha.o tblock.o tslab.o tags.o 
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o db    db.c     btree.o page.o util.o hash.o sha.o tblock.o tslab.o tags.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o bqip  bqip.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o ingest ingest.c util.o tags.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o db2   db2.c    util.o hash.o page.o bql/bql.a tslab.o tblock.o sha.o cf.o -lm
 	prove -v $(addprefix ./,$(TESTS))
 
 testdata: bolo t/data/db/1/main.db

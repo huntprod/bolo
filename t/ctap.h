@@ -17,8 +17,10 @@
 #define CTAP_TODO 0x0001
 #define CTAP_SKIP 0x0002
 
+void ctap_prefix(const char *s);
 int  ctap_diag(FILE *io, const char *msg, ...);
 void ctap_bail(const char *msg, ...);
+void ctap_bail_at(const char *file, unsigned long line, const char *msg, ...);
 int  ctap_assert(int ok, int autodiag, const char *file, unsigned long line, const char *msg, ...);
 void ctap_pop(void);
 void ctap_push(int type, const char *msg);
@@ -52,6 +54,16 @@ void ctap_ne_ptr(const void *x, const void *y, const char *file, unsigned long l
 void ctap_cmp_ok(int a, const char *op, int b, const char *file, unsigned long line, const char *msg, ...);
 
 /*************************************************************************/
+
+#define SETUP(cmd) ctap_setup((cmd), __FILE__, __LINE__)
+void ctap_setup(const char *cmd, const char *file, unsigned long line)
+{
+	int rc;
+
+	rc = system(cmd);
+	if (rc != 0)
+		ctap_assert(0, 1, file, line, "SETUP FAILED: `%s' exited %i", cmd, rc);
+}
 
 #define ok(t, ...) ctap_assert(!!(t), 1, __FILE__, __LINE__, __VA_ARGS__)
 
@@ -102,7 +114,8 @@ void ctap_cmp_ok(int a, const char *op, int b, const char *file, unsigned long l
 
 #define SKIP(why) for (ctapX(), ctap_push(CTAP_SKIP, why); ctapY(); ctap_pop(), ctapZ())
 #define TODO(why) for (ctapX(), ctap_push(CTAP_TODO, why); ctapY(); ctap_pop(), ctapZ())
-#define BAIL_OUT ctap_bail
+#define BAIL(...) ctap_bail_at(__FILE__, __LINE__, __VA_ARGS__)
+#define BAIL_OUT(...) ctap_bail_at(__FILE__, __LINE__, __VA_ARGS__)
 
 #define note(...) ctap_diag(stdout, __VA_ARGS__)
 #define diag(...) ctap_diag(stderr, __VA_ARGS__)
@@ -123,6 +136,8 @@ static struct {
 	int tests;                  /* number of tests so far */
 	int expect;                 /* number of tests to expect */
 	int fail;                   /* failures (diagnostic use only) */
+
+	char prefix[128];           /* test message prefix (optional) */
 
 	int x;                      /* used for for loop trickery */
 	int evaled;                 /* is this a controlled exit? */
@@ -185,8 +200,8 @@ static int _assert(int ok, int autodiag, const char *file, unsigned long line, c
 		return 0;
 
 	case CTAP_TODO:
-		fprintf(CTAP.stdout, "%sok %i%s%s # TODO %s\n",
-				(ok ? "" : "not "), CTAP.tests,
+		fprintf(CTAP.stdout, "%sok %i%s%s%s # TODO %s\n",
+				(ok ? "" : "not "), CTAP.tests, CTAP.prefix,
 				(msg ? " - " : ""), (msg ? msg   : ""),
 				CTAP.stack[CTAP.i].msg);
 		if (!ok && autodiag) {
@@ -199,11 +214,11 @@ static int _assert(int ok, int autodiag, const char *file, unsigned long line, c
 	case CTAP_NORM:
 	default:
 		if (!ok) CTAP.fail++;
-		fprintf(CTAP.stdout, "%sok %i%s%s\n",
-				(ok ? "" : "not "), CTAP.tests,
+		fprintf(CTAP.stdout, "%sok %i%s%s%s\n",
+				(ok ? "" : "not "), CTAP.tests, CTAP.prefix,
 				(msg ? " - " : ""), (msg ? msg : ""));
 		if (!ok && autodiag) {
-			ctap_diag(stderr, "  Failed test '%s'", msg);
+			ctap_diag(stderr, "  Failed test '%s%s'", CTAP.prefix, msg);
 			if (file) ctap_diag(stderr, "  at %s line %d.", file, line);
 		}
 		free(msg);
@@ -218,6 +233,11 @@ static int _assert(int ok, int autodiag, const char *file, unsigned long line, c
 int ctapX(void) { return CTAP.x = 0; }
 int ctapY(void) { return CTAP.x < 1; }
 int ctapZ(void) { return CTAP.x = 1; }
+
+void ctap_prefix(const char *prefix)
+{
+	snprintf(CTAP.prefix, 127, " %s", prefix);
+}
 
 int ctap_diag(FILE *io, const char *msg, ...)
 {
@@ -235,7 +255,30 @@ int ctap_diag(FILE *io, const char *msg, ...)
 
 void ctap_bail(const char *msg, ...)
 {
-	ctap_diag(stderr, "bailing out: %s", msg);
+	va_list ap;
+	va_start(ap, msg);
+
+	fprintf(stderr, "# bailing out: ");
+	vfprintf(stderr, msg, ap);
+	fprintf(stderr, "\n");
+
+	va_end(ap);
+
+	CTAP.evaled = 1;
+	exit(1);
+}
+
+void ctap_bail_at(const char *file, unsigned long line, const char *msg, ...)
+{
+	va_list ap;
+	va_start(ap, msg);
+
+	fprintf(stderr, "# %s:%li: bailing out: ", file, line);
+	vfprintf(stderr, msg, ap);
+	fprintf(stderr, "\n");
+
+	va_end(ap);
+
 	CTAP.evaled = 1;
 	exit(1);
 }
